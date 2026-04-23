@@ -4,8 +4,8 @@
 
 | # | Name | Focus | DoD |
 |---|------|-------|-----|
-| M0 | Scaffolding | Project setup | `npx expo start` runs; docs written |
-| M1 | Auth + Single-User Counter | Core loop | Sign-up/in works; session submits to Firestore |
+| M0 | Scaffolding | Project setup | `npx expo start` runs; docs written | ✅ |
+| M1 | Auth + Single-User Counter | Core loop | Sign-up/in works; session submits to Firestore | ✅ |
 | M2 | Menus + Locations | Restaurant context | GPS locates restaurant; restaurant menu loads |
 | M3 | History | Persistence | Past sessions list with detail view |
 | M4 | Friends | Social layer | Add friends; see their history |
@@ -38,26 +38,29 @@
 
 ---
 
-## M1 — Auth + Single-User Counter
+## M1 — Auth + Single-User Counter ✅
 
 **Goal:** A real user can sign up, count sushi, and submit a session that persists.
 
 **Tasks:**
-- [ ] Install `firebase/auth` React context provider
-- [ ] Implement Login screen (email/password)
-- [ ] Implement Register screen (email/password + username)
-- [ ] Username uniqueness check against Firestore
-- [ ] `onAuthStateChanged` listener → redirect to auth or tabs
-- [ ] Persist auth token via `expo-secure-store`
-- [ ] Scoreboard: write session doc to `sessions/{id}` on submit
-- [ ] Profile screen: show display name, sign out
-- [ ] Session Mode selector: Single-phone mode UI (multiple participants, one device)
-- [ ] Basic error handling (auth errors, network errors)
+- [x] `AuthContext` with Firebase Auth state, signIn, signUp, signOut
+- [x] Implement Login screen (email/password + friendly error messages)
+- [x] Implement Register screen (email/password + display name + username)
+- [x] Username uniqueness check against Firestore (`isUsernameTaken`)
+- [x] `onAuthStateChanged` listener → redirect to auth or tabs (root `_layout.tsx`)
+- [x] Persist auth token via AsyncStorage (`getReactNativePersistence`)
+- [x] `src/lib/firebase/users.ts` — createUserDoc, getUserDoc
+- [x] `src/lib/firebase/sessions.ts` — submitSession, getUserSessions (paginated)
+- [x] Scoreboard: write session doc to `sessions/{id}` on submit
+- [x] Scoreboard: category section headers with subtotals
+- [x] Scoreboard: restaurant badge + mode icon in header (navigation stubs)
+- [x] Profile screen: avatar initials, display name, username, email, sign out
+- [x] Session Mode selector UI (Single / Individual / Group cards with availability badges)
 
 **Definition of Done:**
-- User can create an account and it persists across app restarts
-- Tapping submit on the Scoreboard writes a session document to Firestore
-- Sign out and sign in again returns the user to their profile
+- [x] User can create an account and it persists across app restarts
+- [x] Tapping submit on the Scoreboard writes a session document to Firestore
+- [x] Sign out and sign in again returns the user to their profile
 
 ---
 

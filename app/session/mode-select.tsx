@@ -1,22 +1,180 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import type { SessionMode } from '../../src/types';
+
+interface ModeCard {
+  mode: SessionMode;
+  emoji: string;
+  title: string;
+  description: string;
+  note?: string;
+}
+
+const MODES: ModeCard[] = [
+  {
+    mode: 'single',
+    emoji: '👤',
+    title: 'Single Phone',
+    description: 'Multiple people take turns entering their own counts on one shared device.',
+    note: 'Available now',
+  },
+  {
+    mode: 'individual',
+    emoji: '📱',
+    title: 'Individual',
+    description: 'Each friend uses their own phone to track independently. Sessions are tagged to the same meal afterward.',
+    note: 'Coming in M5',
+  },
+  {
+    mode: 'group',
+    emoji: '🔗',
+    title: 'Group Linked',
+    description: "Multiple phones linked in real time — everyone sees everyone's counts update live.",
+    note: 'Coming in M5',
+  },
+];
 
 export default function SessionModeScreen() {
+  const router = useRouter();
+
+  const handleSelect = (mode: SessionMode) => {
+    if (mode === 'group') {
+      router.push('/session/group-join');
+      return;
+    }
+    // For single + individual: just go back; Scoreboard reads mode from hook (future: pass via params)
+    router.back();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.center}>
-        <Text style={styles.emoji}>🎮</Text>
-        <Text style={styles.title}>Session Mode</Text>
-        <Text style={styles.subtitle}>Single / Individual / Group — coming in M1</Text>
-      </View>
+      <StatusBar style="dark" />
+      <ScrollView contentContainerStyle={styles.scroll}>
+        <Text style={styles.heading}>How are you playing?</Text>
+        <Text style={styles.subheading}>Choose how to track counts for this session.</Text>
+
+        {MODES.map((card) => (
+          <TouchableOpacity
+            key={card.mode}
+            style={[styles.card, card.note === 'Available now' && styles.cardActive]}
+            onPress={() => handleSelect(card.mode)}
+            activeOpacity={0.75}
+          >
+            <Text style={styles.cardEmoji}>{card.emoji}</Text>
+            <View style={styles.cardBody}>
+              <View style={styles.cardTitleRow}>
+                <Text style={styles.cardTitle}>{card.title}</Text>
+                <View
+                  style={[
+                    styles.noteBadge,
+                    card.note === 'Available now' ? styles.noteBadgeActive : styles.noteBadgeComingSoon,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.noteText,
+                      card.note === 'Available now' ? styles.noteTextActive : styles.noteTextComingSoon,
+                    ]}
+                  >
+                    {card.note}
+                  </Text>
+                </View>
+              </View>
+              <Text style={styles.cardDescription}>{card.description}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emoji: { fontSize: 64, marginBottom: 16 },
-  title: { fontSize: 24, fontWeight: '700', color: '#222' },
-  subtitle: { fontSize: 16, color: '#888', marginTop: 8, textAlign: 'center' },
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scroll: {
+    padding: 24,
+    gap: 16,
+  },
+  heading: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#222',
+    marginBottom: 4,
+  },
+  subheading: {
+    fontSize: 15,
+    color: '#888',
+    marginBottom: 8,
+  },
+  card: {
+    flexDirection: 'row',
+    padding: 18,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fafafa',
+    gap: 14,
+    alignItems: 'flex-start',
+  },
+  cardActive: {
+    borderColor: '#e53935',
+    backgroundColor: '#fff9f9',
+  },
+  cardEmoji: {
+    fontSize: 36,
+    marginTop: 2,
+  },
+  cardBody: {
+    flex: 1,
+    gap: 6,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#222',
+  },
+  noteBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  noteBadgeActive: {
+    backgroundColor: '#e8f5e9',
+  },
+  noteBadgeComingSoon: {
+    backgroundColor: '#f5f5f5',
+  },
+  noteText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  noteTextActive: {
+    color: '#2e7d32',
+  },
+  noteTextComingSoon: {
+    color: '#aaa',
+  },
+  cardDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
+  },
 });

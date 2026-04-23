@@ -1,4 +1,8 @@
-import { getAuth } from 'firebase/auth';
+import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { firebaseApp } from './config';
 
-export const auth = getAuth(firebaseApp);
+// Use AsyncStorage so auth survives app restarts on iOS/Android
+export const auth = initializeAuth(firebaseApp, {
+  persistence: getReactNativePersistence(AsyncStorage),
+});

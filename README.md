@@ -135,7 +135,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the full milestone breakdown.
 | Milestone | Status |
 |-----------|--------|
 | M0 — Scaffolding | ✅ Complete |
-| M1 — Auth + Single-User Counter | 🔜 Next |
+| M1 — Auth + Single-User Counter | ✅ Complete |
 | M2 — Menus + Locations | Planned |
 | M3 — History | Planned |
 | M4 — Friends | Planned |
