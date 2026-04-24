@@ -1,11 +1,13 @@
 import {
   collection,
   addDoc,
+  doc,
   serverTimestamp,
   query,
   where,
   orderBy,
   getDocs,
+  getDoc,
   limit,
   startAfter,
   type QueryDocumentSnapshot,
@@ -54,4 +56,9 @@ export async function getUserSessions(
   const sessions = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as SushiSession);
   const nextCursor = snap.docs.length === PAGE_SIZE ? snap.docs[snap.docs.length - 1] ?? null : null;
   return { sessions, nextCursor };
+}
+
+export async function getSessionById(sessionId: string): Promise<SushiSession | null> {
+  const snap = await getDoc(doc(db, COLLECTIONS.SESSIONS, sessionId));
+  return snap.exists() ? ({ id: snap.id, ...snap.data() } as SushiSession) : null;
 }

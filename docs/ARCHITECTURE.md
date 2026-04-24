@@ -1,4 +1,4 @@
-# Sushi Smackdown — Architecture
+# Sushi Party — Architecture
 
 ## 1. High-Level Architecture
 
@@ -93,11 +93,13 @@ counts:      map<string, number>   // "itemId" → count
 
 #### `restaurants/{restaurantId}`
 ```
-id:       string
-name:     string
-address:  string
-location: GeoPoint
-menuId:   string      // points to menus/{id} or 'global-default'
+id:        string
+name:      string
+nameLower: string        // lowercased name — enables Firestore prefix search
+address:   string
+location:  GeoPoint
+menuId:    string        // points to menus/{id} or 'global-default'
+createdAt: Timestamp
 stats: {
   totalSessions:          number
   meanPiecesPerSession:   number
@@ -161,10 +163,13 @@ service cloud.firestore {
       // Friend visibility enforced at query layer (fan-out reads)
     }
 
-    // Restaurants: public read, admin-only write
+    // Restaurants: public read; authenticated users can create
+    // (stats updates are admin-only via Cloud Function in M6)
     match /restaurants/{id} {
       allow read: if true;
-      allow write: if false; // Cloud Function only
+      allow create: if request.auth != null;
+      allow update: if false; // Cloud Function only
+      allow delete: if false;
     }
 
     // Menus: public read, admin-only write

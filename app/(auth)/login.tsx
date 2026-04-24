@@ -47,7 +47,7 @@ export default function LoginScreen() {
 
       <View style={styles.header}>
         <Text style={styles.logo}>🍣</Text>
-        <Text style={styles.title}>Sushi Smackdown</Text>
+        <Text style={styles.title}>Sushi Party</Text>
         <Text style={styles.subtitle}>Sign in to track your meals</Text>
       </View>
 

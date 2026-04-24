@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "Sushi Smackdown",
-    "slug": "sushi-smackdown",
+    "name": "Sushi Party",
+    "slug": "sushi-party",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "scheme": "sushismackdown",
+    "scheme": "sushiparty",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.sushismackdown.app"
+      "bundleIdentifier": "com.sushiparty.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +24,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.sushismackdown.app"
+      "package": "com.sushiparty.app"
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +37,7 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow Sushi Smackdown to use your location to find nearby restaurants."
+          "locationAlwaysAndWhenInUsePermission": "Allow Sushi Party to use your location to find nearby restaurants."
         }
       ]
     ],

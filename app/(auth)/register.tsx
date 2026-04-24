@@ -75,7 +75,7 @@ export default function RegisterScreen() {
         <View style={styles.header}>
           <Text style={styles.logo}>👤</Text>
           <Text style={styles.title}>Create Account</Text>
-          <Text style={styles.subtitle}>Join the smackdown</Text>
+          <Text style={styles.subtitle}>Join the party</Text>
         </View>
 
         <View style={styles.form}>

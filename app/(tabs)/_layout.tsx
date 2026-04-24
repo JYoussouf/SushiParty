@@ -9,11 +9,19 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
+        headerShown: false,
         tabBarActiveTintColor: '#e53935',
         tabBarInactiveTintColor: '#999',
-        tabBarStyle: { borderTopColor: '#f0f0f0' },
+        tabBarStyle: { display: 'none' },
       }}
     >
+      <Tabs.Screen
+        name="home"
+        options={{
+          title: 'Home',
+          tabBarIcon: () => <TabIcon emoji="🏠" />,
+        }}
+      />
       <Tabs.Screen
         name="scoreboard"
         options={{

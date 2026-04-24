@@ -50,7 +50,18 @@ export interface SushiSession {
   submittedAt?: string; // ISO, set when session is closed
   participants: SessionParticipant[];
   groupCode?: string; // present for group-linked sessions
+  note?: string;
   flagged?: boolean; // true if anomaly detection raised a flag
+}
+
+export interface GroupSessionDraft {
+  id: string;
+  code: string;
+  ownerUid: string;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  participants: SessionParticipant[];
 }
 
 export interface GeoPoint {
@@ -85,4 +96,32 @@ export interface FriendActivity {
   restaurantName: string;
   totalPieces: number;
   submittedAt: string;
+}
+
+export interface SessionTemplate {
+  id: string;
+  name: string;
+  mode: SessionMode;
+  restaurantId?: string;
+  restaurantName?: string;
+  useGlobalMenu: boolean;
+  createdAt: string;
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  earned: boolean;
+  earnedAt?: string;
+}
+
+export interface FriendChallengeProgress {
+  id: string;
+  title: string;
+  description: string;
+  target: number;
+  currentUserProgress: number;
+  friendAverageProgress: number;
+  unit: string;
 }

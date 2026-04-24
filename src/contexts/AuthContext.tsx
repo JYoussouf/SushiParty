@@ -1,17 +1,18 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { clearLocalSessions } from '../lib/local/sessions';
 import {
-  createUserWithEmailAndPassword,
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  onAuthStateChanged,
-  type User as FirebaseUser,
-} from 'firebase/auth';
-import { auth } from '../lib/firebase/auth';
-import { createUserDoc, getUserDoc, isUsernameTaken } from '../lib/firebase/users';
+  getOrCreateDeviceProfile,
+  resetDeviceProfile,
+  updateDeviceProfile,
+} from '../lib/local/deviceProfile';
 import type { User } from '../types';
 
+interface LocalIdentity {
+  email: string;
+}
+
 interface AuthContextValue {
-  firebaseUser: FirebaseUser | null;
+  firebaseUser: LocalIdentity | null;
   userProfile: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
@@ -28,56 +29,51 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<LocalIdentity | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      setFirebaseUser(fbUser);
-      if (fbUser) {
-        const profile = await getUserDoc(fbUser.uid);
-        setUserProfile(profile);
-      } else {
-        setUserProfile(null);
-      }
+    void (async () => {
+      const profile = await getOrCreateDeviceProfile();
+      setUserProfile(profile);
+      setFirebaseUser(profile.email ? { email: profile.email } : null);
       setLoading(false);
-    });
-    return unsubscribe;
+    })();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const cred = await signInWithEmailAndPassword(auth, email, password);
-    const profile = await getUserDoc(cred.user.uid);
+  const signIn = async (email: string) => {
+    const profile = await updateDeviceProfile({ email });
     setUserProfile(profile);
+    setFirebaseUser(profile.email ? { email: profile.email } : null);
   };
 
   const signUp = async (
     email: string,
-    password: string,
+    _password: string,
     displayName: string,
     username: string,
   ) => {
-    const trimmedUsername = username.toLowerCase().trim();
-    if (await isUsernameTaken(trimmedUsername)) {
-      throw new Error('Username is already taken.');
-    }
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await createUserDoc(cred.user.uid, email, displayName, trimmedUsername);
-    const profile = await getUserDoc(cred.user.uid);
+    const profile = await updateDeviceProfile({
+      email,
+      displayName,
+      username,
+    });
     setUserProfile(profile);
+    setFirebaseUser(profile.email ? { email: profile.email } : null);
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
-    setUserProfile(null);
+    await clearLocalSessions();
+    const freshProfile = await resetDeviceProfile();
+    setUserProfile(freshProfile);
+    setFirebaseUser(freshProfile.email ? { email: freshProfile.email } : null);
   };
 
   const refreshProfile = async () => {
-    if (firebaseUser) {
-      const profile = await getUserDoc(firebaseUser.uid);
-      setUserProfile(profile);
-    }
+    const profile = await getOrCreateDeviceProfile();
+    setUserProfile(profile);
+    setFirebaseUser(profile.email ? { email: profile.email } : null);
   };
 
   return (

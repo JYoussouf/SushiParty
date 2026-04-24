@@ -10,6 +10,7 @@ import {
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import type { SessionMode } from '../../src/types';
+import { useSession } from '../../src/hooks/useSession';
 
 interface ModeCard {
   mode: SessionMode;
@@ -31,28 +32,30 @@ const MODES: ModeCard[] = [
     mode: 'individual',
     emoji: '📱',
     title: 'Individual',
-    description: 'Each friend uses their own phone to track independently. Sessions are tagged to the same meal afterward.',
-    note: 'Coming in M5',
+    description: 'Each friend uses their own phone to track independently. Parties are tagged to the same meal afterward.',
+    note: 'Available now',
   },
   {
     mode: 'group',
     emoji: '🔗',
     title: 'Group Linked',
     description: "Multiple phones linked in real time — everyone sees everyone's counts update live.",
-    note: 'Coming in M5',
+    note: 'Link phones',
   },
 ];
 
 export default function SessionModeScreen() {
   const router = useRouter();
+  const { mode, setMode } = useSession();
 
-  const handleSelect = (mode: SessionMode) => {
-    if (mode === 'group') {
+  const handleSelect = async (selectedMode: SessionMode) => {
+    if (selectedMode === 'group') {
       router.push('/session/group-join');
       return;
     }
-    // For single + individual: just go back; Scoreboard reads mode from hook (future: pass via params)
-    router.back();
+
+    await setMode(selectedMode);
+    router.replace('/(tabs)/scoreboard');
   };
 
   return (
@@ -60,13 +63,17 @@ export default function SessionModeScreen() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <Text style={styles.heading}>How are you playing?</Text>
-        <Text style={styles.subheading}>Choose how to track counts for this session.</Text>
+        <Text style={styles.subheading}>Choose how to track counts for this party.</Text>
 
         {MODES.map((card) => (
           <TouchableOpacity
             key={card.mode}
-            style={[styles.card, card.note === 'Available now' && styles.cardActive]}
-            onPress={() => handleSelect(card.mode)}
+            style={[
+              styles.card,
+              mode === card.mode && styles.cardActive,
+              (card.mode === 'single' || card.mode === 'individual') && styles.cardEnabled,
+            ]}
+            onPress={() => void handleSelect(card.mode)}
             activeOpacity={0.75}
           >
             <Text style={styles.cardEmoji}>{card.emoji}</Text>
@@ -76,16 +83,24 @@ export default function SessionModeScreen() {
                 <View
                   style={[
                     styles.noteBadge,
-                    card.note === 'Available now' ? styles.noteBadgeActive : styles.noteBadgeComingSoon,
+                    card.mode === 'single' || card.mode === 'individual' || card.mode === 'group'
+                      ? styles.noteBadgeActive
+                      : styles.noteBadgeComingSoon,
                   ]}
                 >
                   <Text
                     style={[
                       styles.noteText,
-                      card.note === 'Available now' ? styles.noteTextActive : styles.noteTextComingSoon,
+                      card.mode === 'single' || card.mode === 'individual' || card.mode === 'group'
+                        ? styles.noteTextActive
+                        : styles.noteTextComingSoon,
                     ]}
                   >
-                    {card.note}
+                    {card.mode === 'group'
+                      ? 'Link phones'
+                      : card.mode === 'individual'
+                        ? 'Available now'
+                        : card.note}
                   </Text>
                 </View>
               </View>
@@ -131,6 +146,9 @@ const styles = StyleSheet.create({
   cardActive: {
     borderColor: '#e53935',
     backgroundColor: '#fff9f9',
+  },
+  cardEnabled: {
+    borderColor: '#f0d0cf',
   },
   cardEmoji: {
     fontSize: 36,

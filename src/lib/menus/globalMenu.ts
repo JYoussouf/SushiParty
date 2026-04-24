@@ -2,6 +2,7 @@ import type { Menu, SushiItem } from '../../types';
 
 const items: SushiItem[] = [
   // ── Nigiri ──────────────────────────────────────────────────────────────────
+  { id: 'nigiri-any', name: 'Any Nigiri', category: 'nigiri', imageKey: 'nigiri_any' },
   { id: 'nigiri-salmon', name: 'Salmon Nigiri', category: 'nigiri', imageKey: 'nigiri_salmon' },
   { id: 'nigiri-tuna', name: 'Tuna Nigiri', category: 'nigiri', imageKey: 'nigiri_tuna' },
   { id: 'nigiri-yellowtail', name: 'Yellowtail Nigiri', category: 'nigiri', imageKey: 'nigiri_yellowtail' },
@@ -12,6 +13,7 @@ const items: SushiItem[] = [
   { id: 'nigiri-egg', name: 'Egg Nigiri (Tamago)', category: 'nigiri', imageKey: 'nigiri_egg' },
 
   // ── Sashimi ─────────────────────────────────────────────────────────────────
+  { id: 'sashimi-any', name: 'Any Sashimi', category: 'sashimi', imageKey: 'sashimi_any' },
   { id: 'sashimi-salmon', name: 'Salmon Sashimi', category: 'sashimi', imageKey: 'sashimi_salmon' },
   { id: 'sashimi-tuna', name: 'Tuna Sashimi', category: 'sashimi', imageKey: 'sashimi_tuna' },
   { id: 'sashimi-yellowtail', name: 'Yellowtail Sashimi', category: 'sashimi', imageKey: 'sashimi_yellowtail' },
@@ -19,6 +21,7 @@ const items: SushiItem[] = [
   { id: 'sashimi-scallop', name: 'Scallop Sashimi', category: 'sashimi', imageKey: 'sashimi_scallop' },
 
   // ── Rolls ────────────────────────────────────────────────────────────────────
+  { id: 'roll-any', name: 'Any Roll', category: 'roll', imageKey: 'roll_any' },
   { id: 'roll-california', name: 'California Roll', category: 'roll', imageKey: 'roll_california' },
   { id: 'roll-spicy-tuna', name: 'Spicy Tuna Roll', category: 'roll', imageKey: 'roll_spicy_tuna' },
   { id: 'roll-salmon-avocado', name: 'Salmon Avocado Roll', category: 'roll', imageKey: 'roll_salmon_avocado' },

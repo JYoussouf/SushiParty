@@ -1,4 +1,4 @@
-# Sushi Smackdown — UX Flow & Screen Inventory
+# Sushi Party — UX Flow & Screen Inventory
 
 ## Screen List
 

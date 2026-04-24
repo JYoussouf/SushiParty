@@ -12,9 +12,16 @@ interface SushiCounterProps {
   count: number;
   onIncrement: () => void;
   onDecrement: () => void;
+  disabled?: boolean;
 }
 
-export function SushiCounter({ name, count, onIncrement, onDecrement }: SushiCounterProps) {
+export function SushiCounter({
+  name,
+  count,
+  onIncrement,
+  onDecrement,
+  disabled = false,
+}: SushiCounterProps) {
   const scale = useSharedValue(1);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -32,14 +39,14 @@ export function SushiCounter({ name, count, onIncrement, onDecrement }: SushiCou
         {name}
       </Text>
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.btn} onPress={onDecrement} disabled={count === 0}>
-          <Text style={[styles.btnText, count === 0 && styles.disabledText]}>−</Text>
+        <TouchableOpacity style={styles.btn} onPress={onDecrement} disabled={count === 0 || disabled}>
+          <Text style={[styles.btnText, (count === 0 || disabled) && styles.disabledText]}>−</Text>
         </TouchableOpacity>
         <Animated.View style={[styles.countBadge, animatedStyle]}>
           <Text style={styles.countText}>{count}</Text>
         </Animated.View>
-        <TouchableOpacity style={styles.btn} onPress={handleIncrement}>
-          <Text style={styles.btnText}>+</Text>
+        <TouchableOpacity style={styles.btn} onPress={handleIncrement} disabled={disabled}>
+          <Text style={[styles.btnText, disabled && styles.disabledText]}>+</Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -1,4 +1,4 @@
-# Sushi Smackdown — Implementation Roadmap
+# Sushi Party — Implementation Roadmap
 
 ## Milestone Overview
 
@@ -6,7 +6,7 @@
 |---|------|-------|-----|
 | M0 | Scaffolding | Project setup | `npx expo start` runs; docs written | ✅ |
 | M1 | Auth + Single-User Counter | Core loop | Sign-up/in works; session submits to Firestore | ✅ |
-| M2 | Menus + Locations | Restaurant context | GPS locates restaurant; restaurant menu loads |
+| M2 | Menus + Locations | Restaurant context | GPS locates restaurant; restaurant menu loads | ✅ |
 | M3 | History | Persistence | Past sessions list with detail view |
 | M4 | Friends | Social layer | Add friends; see their history |
 | M5 | Group Sessions | Real-time | 2+ phones sync live counts |
@@ -64,24 +64,28 @@
 
 ---
 
-## M2 — Menus + Locations
+## M2 — Menus + Locations ✅
 
 **Goal:** Sessions are tied to a real restaurant; restaurant-specific menus load.
 
 **Tasks:**
-- [ ] Request location permission via `expo-location`
-- [ ] `restaurant/picker` screen: nearby restaurant list (Firestore GeoPoint query or Geohash)
-- [ ] Manual restaurant search by name
-- [ ] "Add new restaurant" flow
-- [ ] Load restaurant-specific menu from Firestore (fallback to global)
-- [ ] Menu toggle UI on Scoreboard (global ↔ restaurant menu)
-- [ ] Restaurant name badge in Scoreboard header (tappable)
-- [ ] Store `restaurantId`, `restaurantName`, `menuId`, `location` on session submit
+- [x] Request location permission via `expo-location` (`useLocation` hook)
+- [x] `src/lib/geo.ts` — haversine distance + latitude bounding box for geo queries
+- [x] `src/lib/firebase/restaurants.ts` — getNearbyRestaurants, search, create, get
+- [x] `src/lib/firebase/menus.ts` — getMenu with global-default fallback
+- [x] `restaurant/picker` screen: GPS nearby list sorted by distance
+- [x] Manual restaurant search by name (Firestore prefix query on `nameLower`)
+- [x] "Add new restaurant" modal (uses current GPS location, writes to Firestore)
+- [x] `RestaurantContext` — selected restaurant + active menu state app-wide
+- [x] Menu toggle UI on Scoreboard (global ↔ restaurant menu, only shown when they differ)
+- [x] Restaurant name badge in Scoreboard header (tappable)
+- [x] Store `restaurantId`, `restaurantName`, `menuId`, `location` on session submit
+- [x] Clear restaurant selection after successful submit
 
 **Definition of Done:**
-- GPS detects approximate location; user confirms or manually selects restaurant
-- Restaurant-specific menu loads on Scoreboard when available
-- Submitted sessions contain correct restaurant and location metadata
+- [x] GPS detects approximate location; user confirms or manually selects restaurant
+- [x] Restaurant-specific menu loads on Scoreboard when available
+- [x] Submitted sessions contain correct restaurant and location metadata
 
 ---
 
@@ -192,3 +196,79 @@
 - **Error boundaries:** React error boundary wrapping tab screens
 - **Analytics:** Expo + Firebase Analytics for basic screen tracking (optional, add in M3)
 - **Testing:** Jest + React Native Testing Library; target hooks and stats utilities first
+
+---
+
+## Continuous Feature Requests
+
+These are post-milestone product requests that users are likely to ask for once the core loop is stable. Each request includes a concrete build prompt so it can be picked up and implemented independently.
+
+### CFR1 — Personal Stats Dashboard
+
+**Why users will ask for it:** Once history exists, users will want a fast summary of their own habits without manually reading every session.
+
+**Implementation prompt:**
+Build a profile analytics dashboard that summarizes the current user’s own eating history. Use saved sessions to compute total sessions, total pieces personally eaten, average pieces per session, favorite restaurant, most ordered item, and a recent activity streak. Make the UI live on the Profile tab, refresh when the screen regains focus, and handle the empty-history case gracefully. Stats should be based on the current user’s participant record inside each session, not the full table total. Keep the implementation local-first, typed, and reusable so the same calculation helpers can later power leaderboards and achievements.
+
+### CFR2 — Export Session History
+
+**Why users will ask for it:** Users who track seriously will want to move their data into Notes, Sheets, or messages.
+
+**Implementation prompt:**
+Add a history export flow that lets the user generate a shareable plain-text or CSV summary of their sessions. Include date, restaurant, mode, personal piece count, tagged attendees, and top items for each session. Start with local generation and the system share sheet or copy-to-clipboard fallback. The export action should be available from History and Profile, work offline, and avoid blocking the UI on large histories.
+
+### CFR3 — Top Dishes And Favorites
+
+**Why users will ask for it:** After enough sessions, users will want to know which sushi they actually order most often.
+
+**Implementation prompt:**
+Add a favorites analytics view that ranks the user’s most ordered sushi items across all sessions, including counts and percentage of sessions ordered. Show top 5 items and let the user expand to a full ranked list. Use existing menu metadata when available so item names stay human-readable even when sessions were saved under different restaurants. Keep the aggregation logic reusable and stable for future recommendation features.
+
+### CFR4 — Session Notes
+
+**Why users will ask for it:** People remember meals by context, not just counts, and will want to attach quick notes like “birthday dinner” or “service was slow.”
+
+**Implementation prompt:**
+Add optional notes to each session. Let users write or edit a short note from the session summary screen and display it on History cards and the detail view. Persist notes inside the session record, keep editing lightweight, and do not require a note for submission. Notes should be searchable later without changing the core counting flow.
+
+### CFR5 — Favorite Restaurants And Restaurant Insights
+
+**Why users will ask for it:** The current app tracks restaurants already, so users will naturally want restaurant-specific summaries.
+
+**Implementation prompt:**
+Add restaurant insights for the current user: favorite restaurant by visits, total pieces eaten per restaurant, most recent visit date, and top items at that restaurant. Surface a compact summary in Profile and make each restaurant row expandable or navigable to a detail screen. Build the aggregation from existing session metadata and keep the helpers reusable for future public leaderboards.
+
+### CFR6 — Search And Filter History
+
+**Why users will ask for it:** As history grows, the current reverse-chronological list becomes hard to use without search.
+
+**Implementation prompt:**
+Add search and filter controls to History so users can filter by restaurant name, mode, tagged friend, and date range. Results should update client-side from already-loaded local data first, with a structure that can later support backend filtering. Preserve pagination behavior and keep the empty state specific to the active filter when no matches are found.
+
+### CFR7 — Achievements And Milestones
+
+**Why users will ask for it:** A tracking app with friends and history naturally invites milestone badges and progress mechanics.
+
+**Implementation prompt:**
+Implement a lightweight achievements system with locally computed badges such as first session, 100 total pieces, 10 sessions, 5 different restaurants, and first group session. Show earned badges on Profile and optionally surface a newly-earned badge on session summary after submission. Keep the achievement engine data-driven so new badges can be added without rewriting the screen logic.
+
+### CFR8 — Session Templates And Quick Start
+
+**Why users will ask for it:** Frequent diners will want to avoid repeating the same setup for favorite restaurants or common group configurations.
+
+**Implementation prompt:**
+Add quick-start templates that save a preferred restaurant, menu preference, and default mode. Let users launch a new session from a saved template on the Scoreboard or Profile tab. Templates should be editable, stored locally, and designed so cloud sync can be added later without changing the UI contract.
+
+### CFR9 — Friend Challenges
+
+**Why users will ask for it:** Once Friends and group sessions exist, users will want more competitive or cooperative social mechanics.
+
+**Implementation prompt:**
+Add lightweight friend challenges such as “first to 50 pieces this week” or “visit 3 sushi spots this month.” Start with local challenge definitions and progress computed from saved sessions for the current user and locally available friend data. Show active challenges in Friends and summary progress on Profile. Keep the logic modular so synced/shared challenges can replace the local model later.
+
+### CFR10 — Backup And Restore
+
+**Why users will ask for it:** A local-first app needs a way to protect data before users trust it long term.
+
+**Implementation prompt:**
+Add a backup and restore flow for local data. Let users export their profile, sessions, friends, and templates to a JSON bundle and re-import it on the same or another device. Validate imported data carefully, prevent malformed merges, and keep the flow explicit so users understand whether they are replacing or augmenting existing local data.

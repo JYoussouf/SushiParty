@@ -1,4 +1,4 @@
-# Sushi Smackdown 🍣
+# Sushi Party 🍣
 
 A mobile scoreboard for all-you-can-eat sushi restaurants. Tap to count, submit your tally, and share eating history with friends.
 
@@ -16,7 +16,7 @@ Built with React Native + Expo, Firebase Firestore, and Reanimated.
 ### 1. Install dependencies
 
 ```bash
-cd sushi-smackdown
+cd sushi-party
 npm install --legacy-peer-deps
 ```
 
@@ -54,7 +54,7 @@ Press `i` for iOS simulator, `a` for Android emulator, or scan the QR code with 
 ## Project Structure
 
 ```
-sushi-smackdown/
+sushi-party/
 ├── app/                        # Expo Router route tree
 │   ├── _layout.tsx             # Root layout
 │   ├── (tabs)/                 # Bottom tab bar
@@ -136,8 +136,8 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the full milestone breakdown.
 |-----------|--------|
 | M0 — Scaffolding | ✅ Complete |
 | M1 — Auth + Single-User Counter | ✅ Complete |
-| M2 — Menus + Locations | Planned |
-| M3 — History | Planned |
+| M2 — Menus + Locations | ✅ Complete |
+| M3 — History | 🔜 Next |
 | M4 — Friends | Planned |
 | M5 — Group Sessions | Planned |
 | M6 — Anomaly Detection | Planned |
@@ -148,3 +148,12 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the full milestone breakdown.
 ## Architecture
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for Firestore schema, security rules, real-time sync strategy, and anomaly detection design.
+
+## Privacy Policy
+
+A draft privacy policy for App Store publishing is included at [docs/PRIVACY_POLICY.md](docs/PRIVACY_POLICY.md).
+
+Before submission:
+- Replace the placeholder business/contact details
+- Host the policy at a public HTTPS URL
+- Ensure App Store Connect privacy disclosures match the app’s actual behavior
