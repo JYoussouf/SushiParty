@@ -23,6 +23,7 @@ const CATEGORY_LABELS: Record<SushiItem['category'], string> = {
   nigiri: 'Nigiri',
   sashimi: 'Sashimi',
   roll: 'Rolls',
+  soup: 'Soup',
   special: 'Specials',
   other: 'Other',
 };

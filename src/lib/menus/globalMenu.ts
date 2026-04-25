@@ -33,10 +33,19 @@ const items: SushiItem[] = [
   { id: 'roll-avocado', name: 'Avocado Roll', category: 'roll', imageKey: 'roll_avocado' },
   { id: 'roll-tuna', name: 'Tuna Roll (Tekka Maki)', category: 'roll', imageKey: 'roll_tuna' },
 
+  // ── Soup ─────────────────────────────────────────────────────────────────────
+  { id: 'soup-any', name: 'Any Soup', category: 'soup', imageKey: 'soup_any' },
+  { id: 'soup-miso', name: 'Miso Soup', category: 'soup', imageKey: 'soup_miso' },
+  { id: 'soup-hot-sour', name: 'Hot & Sour Soup', category: 'soup', imageKey: 'soup_hot_sour' },
+  { id: 'soup-tom-yum', name: 'Tom Yum Soup', category: 'soup', imageKey: 'soup_tom_yum' },
+  { id: 'soup-egg-drop', name: 'Egg Drop Soup', category: 'soup', imageKey: 'soup_egg_drop' },
+  { id: 'soup-wonton', name: 'Wonton Soup', category: 'soup', imageKey: 'soup_wonton' },
+  { id: 'soup-seaweed', name: 'Seaweed Soup', category: 'soup', imageKey: 'soup_seaweed' },
+  { id: 'soup-sumashi', name: 'Sumashi (Clear) Soup', category: 'soup', imageKey: 'soup_sumashi' },
+
   // ── Specials ─────────────────────────────────────────────────────────────────
   { id: 'special-edamame', name: 'Edamame', category: 'special', imageKey: 'special_edamame' },
   { id: 'special-gyoza', name: 'Gyoza', category: 'special', imageKey: 'special_gyoza' },
-  { id: 'special-miso-soup', name: 'Miso Soup', category: 'special', imageKey: 'special_miso_soup' },
   { id: 'special-ice-cream', name: 'Ice Cream', category: 'special', imageKey: 'special_ice_cream' },
 ];
 

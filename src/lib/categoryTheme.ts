@@ -33,6 +33,15 @@ export const CATEGORY_THEMES: Record<string, CategoryTheme> = {
     borderActive: '#86c98f',
     badge: '#43a047',
   },
+  soup: {
+    emoji: '🍜',
+    accent: '#f57c00',
+    bg: '#fff8e1',
+    bgActive: '#ffecb3',
+    border: '#ffe082',
+    borderActive: '#ffc107',
+    badge: '#f57c00',
+  },
   special: {
     emoji: '⭐',
     accent: '#8e24aa',

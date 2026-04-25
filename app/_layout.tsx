@@ -20,12 +20,17 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!navState?.key) return;
     if (didInitialRedirect) return;
+    const currentPath = segments.join('/');
+    if (currentPath && currentPath !== 'index') {
+      didInitialRedirect = true;
+      return;
+    }
     const t = setTimeout(() => {
       didInitialRedirect = true;
       router.replace(hasActiveSession ? '/(tabs)/scoreboard' : '/(tabs)/home');
     }, 0);
     return () => clearTimeout(t);
-  }, [router, navState?.key, hasActiveSession]);
+  }, [router, navState?.key, hasActiveSession, segments]);
 
   useEffect(() => {
     if (!navState?.key || !hasActiveSession) {
@@ -47,24 +52,30 @@ function RootLayoutNav() {
   }, [hasActiveSession, navState?.key, router, segments]);
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(tabs)" />
+    <Stack
+      screenOptions={{
+        headerShown: false,
+        animation: 'fade_from_bottom',
+        animationDuration: 280,
+      }}
+    >
+      <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       <Stack.Screen name="(auth)" />
       <Stack.Screen
         name="restaurant/picker"
-        options={{ headerShown: false, presentation: 'modal' }}
+        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="session/mode-select"
-        options={{ headerShown: false, presentation: 'modal' }}
+        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="session/group-join"
-        options={{ headerShown: false, presentation: 'modal' }}
+        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="session/restaurant-confirm"
-        options={{ headerShown: false, presentation: 'modal' }}
+        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
       />
       <Stack.Screen
         name="session/summary"

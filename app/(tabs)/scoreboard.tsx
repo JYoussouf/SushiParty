@@ -37,6 +37,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   nigiri: 'Nigiri',
   sashimi: 'Sashimi',
   roll: 'Rolls',
+  soup: 'Soup',
   special: 'Specials',
   other: 'Other',
 };
@@ -68,6 +69,7 @@ export default function ScoreboardScreen() {
     mean: number;
     stdDev: number;
   } | null>(null);
+  const [scoreboardMode, setScoreboardMode] = useState<'simple' | 'detailed'>('simple');
 
   useEffect(() => {
     void getSessionTemplates().then(setTemplates);
@@ -176,6 +178,26 @@ export default function ScoreboardScreen() {
     }
   };
 
+  const handleCancel = () => {
+    Alert.alert(
+      'Cancel this party?',
+      'Nothing will be saved.',
+      [
+        { text: 'Keep going', style: 'cancel' },
+        {
+          text: 'Cancel party',
+          style: 'destructive',
+          onPress: () => {
+            void completeSession().then(() => {
+              clearRestaurant();
+              router.replace('/(tabs)/home');
+            });
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
@@ -192,6 +214,28 @@ export default function ScoreboardScreen() {
             </Text>
           </TouchableOpacity>
         </View>
+        <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={submitting}>
+          <Text style={styles.cancelBtnText}>✕</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.modeBar}>
+        <TouchableOpacity
+          style={[styles.modeBtn, scoreboardMode === 'simple' && styles.modeBtnActive]}
+          onPress={() => setScoreboardMode('simple')}
+          accessibilityRole="button"
+          accessibilityState={{ selected: scoreboardMode === 'simple' }}
+        >
+          <Text style={[styles.modeBtnText, scoreboardMode === 'simple' && styles.modeBtnTextActive]}>Simple</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeBtn, scoreboardMode === 'detailed' && styles.modeBtnActive]}
+          onPress={() => setScoreboardMode('detailed')}
+          accessibilityRole="button"
+          accessibilityState={{ selected: scoreboardMode === 'detailed' }}
+        >
+          <Text style={[styles.modeBtnText, scoreboardMode === 'detailed' && styles.modeBtnTextActive]}>Detailed</Text>
+        </TouchableOpacity>
       </View>
 
       <Animated.View style={[styles.totalBar, totalStyle]}>
@@ -304,14 +348,14 @@ export default function ScoreboardScreen() {
       )}
 
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {(() => {
+        {scoreboardMode === 'simple' ? (() => {
           const visible = Object.entries(categorized).flatMap(([cat, items]) => {
             const anyItem = items.find((item) => item.id.endsWith('-any'));
             const collapsible = !!anyItem && items.length > 1;
             return collapsible && anyItem ? [anyItem] : items;
           });
-          const rows: typeof visible[] = [];
           const cols = 3;
+          const rows: typeof visible[] = [];
           for (let i = 0; i < visible.length; i += cols) {
             rows.push(visible.slice(i, i + cols));
           }
@@ -345,7 +389,43 @@ export default function ScoreboardScreen() {
                 ))}
             </View>
           ));
-        })()}
+        })() : Object.entries(categorized).map(([cat, catItems]) => {
+          const detailItems = catItems.filter((item) => !item.id.endsWith('-any'));
+          const items = detailItems.length > 0 ? detailItems : catItems;
+          const cols = 3;
+          const rows: typeof items[] = [];
+          for (let i = 0; i < items.length; i += cols) {
+            rows.push(items.slice(i, i + cols));
+          }
+          return (
+            <View key={cat}>
+              <Text style={styles.categoryHeader}>{CATEGORY_LABELS[cat] ?? cat}</Text>
+              {rows.map((row, rowIdx) => (
+                <View key={rowIdx} style={styles.gridRow}>
+                  {row.map((item) => {
+                    const theme = getCategoryTheme(item.category);
+                    return (
+                      <SushiTile
+                        key={item.id}
+                        name={item.name}
+                        emoji={getItemEmoji(item.imageKey, item.category)}
+                        count={getCount(item.id)}
+                        tint={theme}
+                        onIncrement={() => void increment(item.id)}
+                        onDecrement={() => void decrement(item.id)}
+                        disabled={!currentUserCanEditActive}
+                      />
+                    );
+                  })}
+                  {row.length < cols &&
+                    Array.from({ length: cols - row.length }).map((_, idx) => (
+                      <View key={`spacer-${idx}`} style={styles.gridSpacer} />
+                    ))}
+                </View>
+              ))}
+            </View>
+          );
+        })}
         <View style={styles.listPadding} />
       </ScrollView>
 
@@ -458,6 +538,20 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 22,
   },
+  cancelBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelBtnText: {
+    fontSize: 16,
+    color: '#999',
+    fontWeight: '600',
+    lineHeight: 20,
+  },
   totalBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -499,6 +593,48 @@ const styles = StyleSheet.create({
     color: '#b75c57',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
+  },
+  modeBar: {
+    flexDirection: 'row',
+    backgroundColor: '#f2f2f2',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#e0e0e0',
+    padding: 6,
+    gap: 4,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modeBtnActive: {
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOpacity: 0.10,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 2,
+  },
+  modeBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#999',
+  },
+  modeBtnTextActive: {
+    color: '#e53935',
+    fontWeight: '700',
+  },
+  categoryHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#bbb',
+    letterSpacing: 0.9,
+    textTransform: 'uppercase',
+    paddingHorizontal: 8,
+    paddingTop: 14,
+    paddingBottom: 2,
   },
   menuToggle: {
     paddingHorizontal: 10,

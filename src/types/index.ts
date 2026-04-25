@@ -16,7 +16,7 @@ export type SushiSize = 'small' | 'medium' | 'large';
 export interface SushiItem {
   id: string;
   name: string;
-  category: 'nigiri' | 'sashimi' | 'roll' | 'special' | 'other';
+  category: 'nigiri' | 'sashimi' | 'roll' | 'soup' | 'special' | 'other';
   sizes?: SushiSize[]; // undefined = no size variant (one-size)
   imageKey?: string; // filename stem in assets/images/sushi/
 }
@@ -35,6 +35,7 @@ export type SessionMode = 'single' | 'individual' | 'group';
 export interface SessionParticipant {
   userId: string;
   displayName: string;
+  avatar?: string;
   counts: Record<string, number>; // itemId → count (or itemId:size → count)
 }
 
