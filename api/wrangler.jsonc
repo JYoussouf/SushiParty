@@ -1,0 +1,35 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sushi-party-api",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-04-25",
+	"observability": {
+		"enabled": true
+	},
+	"vars": {
+		"ALLOWED_ORIGIN": "*"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "sushi-party",
+			"database_id": "dd049256-6cad-49be-9800-f5e62d63d39f"
+		}
+	],
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "GROUP_PARTIES",
+				"class_name": "GroupParty"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": [
+				"GroupParty"
+			]
+		}
+	]
+}

@@ -78,8 +78,8 @@ export function getAchievements(sessions: SushiSession[], userId: string): Achie
       title: 'Party Table',
       description: 'Finish your first linked group party.',
       earned: !!groupSession,
-      ...(groupSession?.submittedAt || groupSession?.startedAt
-        ? { earnedAt: groupSession?.submittedAt ?? groupSession?.startedAt! }
+      ...(groupSession
+        ? { earnedAt: groupSession.submittedAt ?? groupSession.startedAt }
         : {}),
     }),
   ];

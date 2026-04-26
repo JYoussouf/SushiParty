@@ -3,240 +3,172 @@
 ## 1. High-Level Architecture
 
 ```
-┌───────────────────────────────────────────────────────────────┐
-│                   React Native / Expo (iOS + Android)         │
-│                                                               │
-│  ┌──────────────┐  ┌─────────────────┐  ┌──────────────────┐ │
-│  │  Expo Router │  │  React Context  │  │ React Native     │ │
-│  │  (navigation)│  │  (session state)│  │ Reanimated       │ │
-│  └──────────────┘  └─────────────────┘  └──────────────────┘ │
-│            │                │                    │            │
-│  ┌─────────▼────────────────▼────────────────────▼─────────┐ │
-│  │                      src/                               │ │
-│  │  screens  components  hooks  lib/firebase  lib/stats    │ │
-│  └──────────────────────────────────────────────────────────┘ │
-│                            │                                  │
-└────────────────────────────┼──────────────────────────────────┘
-                             │ Firebase SDK (client)
-                   ┌─────────▼──────────┐
-                   │   Firebase Cloud   │
-                   │                   │
-                   │  Auth (email/pass) │
-                   │  Firestore         │
-                   │  (real-time sync)  │
-                   └────────────────────┘
+React Native / Expo app
+  ├─ Expo Router screens
+  ├─ React Context state
+  └─ src/lib/cloudflare/*
+        │
+        ▼
+Cloudflare Worker API
+  ├─ D1 SQL database: users, sessions, restaurants, menus
+  ├─ Durable Object: group party realtime state
+  └─ Worker-issued device token stored in SecureStore
 ```
+
+The mobile app never talks to D1 directly. It calls the Worker over HTTPS using
+`EXPO_PUBLIC_API_BASE_URL`, and the Worker enforces ownership and persistence.
 
 ## 2. Module Breakdown
 
 | Module | Path | Responsibility |
 |--------|------|----------------|
-| Navigation shell | `app/` | Expo Router route tree, layouts |
-| Scoreboard | `app/(tabs)/scoreboard.tsx` | Counter UI, session state, submit |
-| History | `app/(tabs)/history.tsx` | Past sessions list |
-| Friends | `app/(tabs)/friends.tsx` | Friend list + activity feed |
-| Profile | `app/(tabs)/profile.tsx` | Account, sign out |
-| Auth screens | `app/(auth)/` | Login, register |
-| Restaurant picker | `app/restaurant/picker.tsx` | GPS + search, menu toggle |
-| Session mode select | `app/session/mode-select.tsx` | Single/individual/group |
-| Group join | `app/session/group-join.tsx` | QR/code join for group sessions |
-| Types | `src/types/index.ts` | Shared TypeScript interfaces |
-| Firebase config | `src/lib/firebase/config.ts` | App init (reads `.env`) |
-| Firestore helpers | `src/lib/firebase/firestore.ts` | Collection constants, query wrappers |
-| Firebase Auth | `src/lib/firebase/auth.ts` | Auth instance |
-| Global menu | `src/lib/menus/globalMenu.ts` | Default 28-item menu seed data |
+| App routes | `app/` | Expo Router route tree, tabs, auth, session screens |
+| Cloudflare client | `src/lib/cloudflare/` | API fetch wrapper, auth token, data helpers |
+| Backend | `api/src/index.ts` | Worker routes and Durable Object class |
+| D1 schema | `api/migrations/` | SQL migrations for backend state |
+| Types | `src/types/index.ts` | Shared app TypeScript interfaces |
+| Global menu | `src/lib/menus/globalMenu.ts` | Default menu seed data |
 | Anomaly detection | `src/lib/stats/anomalyDetection.ts` | Z-score flagging + Welford updates |
-| useSession hook | `src/hooks/useSession.ts` | Local session state + counts |
-| useMenu hook | `src/hooks/useMenu.ts` | Menu toggle (global ↔ restaurant) |
-| useFriends hook | `src/hooks/useFriends.ts` | Friend list queries (M4) |
-| SushiCounter | `src/components/SushiCounter.tsx` | Animated +/− counter row |
-| Sushi images | `assets/images/sushi/` | PNG assets, 1×/2×/3× |
+| Local preferences | `src/lib/local/` | Device profile, templates, local-only helpers |
 
-## 3. Firebase Firestore Schema
+## 3. D1 Schema
 
-### Collections
-
-#### `users/{userId}`
-```
-uid:         string        // same as Firebase Auth UID
-username:    string        // unique, lowercase, URL-safe
-displayName: string
-email:       string
-createdAt:   Timestamp
-friendIds:   string[]      // array of UIDs
-```
-
-#### `sessions/{sessionId}`
-```
-id:              string
-mode:            'single' | 'individual' | 'group'
-restaurantId:    string          // ref to restaurants/{id}
-restaurantName:  string          // denormalized for display
-menuId:          string
-menuVersion:     number
-location:        GeoPoint
-startedAt:       Timestamp
-submittedAt:     Timestamp | null
-participants:    Participant[]   // embedded array (see below)
-groupCode:       string | null   // 6-char code for group sessions
-flagged:         boolean
-ownerUid:        string
-```
-
-**Participant (embedded in sessions)**
-```
-userId:      string
-displayName: string
-counts:      map<string, number>   // "itemId" → count
-             // or "itemId:size" → count for sized items
-```
-
-#### `restaurants/{restaurantId}`
-```
-id:        string
-name:      string
-nameLower: string        // lowercased name — enables Firestore prefix search
-address:   string
-location:  GeoPoint
-menuId:    string        // points to menus/{id} or 'global-default'
-createdAt: Timestamp
-stats: {
-  totalSessions:          number
-  meanPiecesPerSession:   number
-  stdDevPiecesPerSession: number
-  updatedAt:              Timestamp
-}
-```
-
-#### `menus/{menuId}`
-```
-id:           string
-restaurantId: string | null   // null = global default
-version:      number
-items: [
-  {
-    id:       string
-    name:     string
-    category: 'nigiri' | 'sashimi' | 'roll' | 'special' | 'other'
-    sizes:    string[] | null
-    imageKey: string | null
-  }
-]
-```
-
-#### `groupCodes/{code}`
-```
-code:      string    // 6-char alphanumeric
-sessionId: string
-createdAt: Timestamp
-expiresAt: Timestamp // TTL: 8 hours
-```
-
-### Indexes Required
-- `sessions`: `ownerUid ASC, submittedAt DESC` — user history
-- `sessions`: `groupCode ASC, submittedAt DESC` — group lookup
-- `sessions`: `restaurantId ASC, submittedAt DESC` — per-restaurant stats
-- `restaurants`: `location GEO` — nearby restaurant queries (Firestore GeoPoint range or Geohash)
-
-### Security Rules Outline
+### `users`
 
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // Users can read/write their own doc; friends can read
-    match /users/{userId} {
-      allow read: if request.auth != null &&
-                     (request.auth.uid == userId ||
-                      request.auth.uid in resource.data.friendIds);
-      allow write: if request.auth.uid == userId;
-    }
-
-    // Sessions: owner can write; participants + their friends can read
-    match /sessions/{sessionId} {
-      allow create: if request.auth != null;
-      allow update: if request.auth.uid == resource.data.ownerUid ||
-                       request.auth.uid in resource.data.participants[*].userId;
-      allow read: if request.auth.uid == resource.data.ownerUid ||
-                     request.auth.uid in resource.data.participants[*].userId;
-      // Friend visibility enforced at query layer (fan-out reads)
-    }
-
-    // Restaurants: public read; authenticated users can create
-    // (stats updates are admin-only via Cloud Function in M6)
-    match /restaurants/{id} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if false; // Cloud Function only
-      allow delete: if false;
-    }
-
-    // Menus: public read, admin-only write
-    match /menus/{id} {
-      allow read: if true;
-      allow write: if false;
-    }
-
-    // Group codes: authenticated read; creator write
-    match /groupCodes/{code} {
-      allow read: if request.auth != null;
-      allow create: if request.auth != null;
-      allow delete: if request.auth.uid == resource.data.creatorUid;
-    }
-  }
-}
+uid TEXT PRIMARY KEY
+username TEXT UNIQUE
+display_name TEXT
+email TEXT
+friend_ids_json TEXT
+created_at TEXT
+updated_at TEXT
 ```
 
-## 4. Real-Time Sync Strategy (Group-Linked Sessions)
+### `sessions`
 
-Group sessions use Firestore `onSnapshot` on the shared `sessions/{sessionId}` document.
+```
+id TEXT PRIMARY KEY
+owner_uid TEXT
+mode TEXT
+restaurant_id TEXT
+restaurant_name TEXT
+menu_id TEXT
+menu_version INTEGER
+latitude REAL
+longitude REAL
+participants_json TEXT
+group_code TEXT
+note TEXT
+flagged INTEGER
+started_at TEXT
+submitted_at TEXT
+created_at TEXT
+updated_at TEXT
+```
 
-**Flow:**
-1. Session owner creates session doc → generates 6-char `groupCode` → writes to `groupCodes/{code}`.
-2. Joining peers look up `groupCodes/{code}` → get `sessionId` → call `onSnapshot(sessions/{sessionId})`.
-3. Each peer's local counter increments are **immediately reflected locally** (optimistic UI) then written via `updateDoc` to the `participants` array at their index.
-4. Firestore `onSnapshot` propagates updates to all connected peers in ~100–300 ms.
-5. On submit: owner marks `submittedAt`; all listeners receive the update and transition to the summary view.
+Indexes:
+- `sessions_owner_submitted_idx` on `(owner_uid, submitted_at DESC)`
+- `sessions_submitted_idx` on `(submitted_at DESC)`
 
-**Conflict avoidance:** Each participant owns only their own `counts` sub-map. Writes use `FieldValue` dot-notation updates (`participants.N.counts.itemId`) to avoid overwriting siblings.
+### `restaurants`
 
-## 5. Anomaly Detection
+```
+id TEXT PRIMARY KEY
+name TEXT
+name_lower TEXT
+address TEXT
+latitude REAL
+longitude REAL
+menu_id TEXT
+stats_json TEXT
+created_at TEXT
+updated_at TEXT
+```
 
-**Baseline storage:** `restaurants/{id}.stats` holds a running mean and stdDev computed via Welford's online algorithm (`src/lib/stats/anomalyDetection.ts`). Updated by a Cloud Function triggered on session submission (M6).
+Indexes:
+- `restaurants_latitude_idx` on `latitude`
+- `restaurants_name_lower_idx` on `name_lower`
 
-**Flagging logic:**
-1. Client totals piece count before submit.
-2. Calls `isAnomaly(total, stats)` — flags if z-score > 3.5 SDs above mean.
-3. If flagged: shows confirmation modal ("That's a lot of sushi — are you sure?").
-4. User confirms → session submitted with `flagged: true` and baseline NOT updated.
-5. User cancels → returns to scoreboard to adjust.
-6. No baseline update for confirmed outliers preserves data integrity.
-7. Minimum 10 sessions required before flagging activates per restaurant.
+### `menus`
 
-## 6. Auth Flow
+```
+id TEXT PRIMARY KEY
+restaurant_id TEXT
+version INTEGER
+items_json TEXT
+created_at TEXT
+updated_at TEXT
+```
+
+## 4. Worker API
+
+```
+POST   /auth/device
+GET    /users/me
+PATCH  /users/me
+GET    /users/username/:username/exists
+
+POST   /sessions
+GET    /sessions/me
+GET    /sessions/:id
+PATCH  /sessions/:id
+
+GET    /restaurants/nearby?lat=&lng=&radiusKm=
+GET    /restaurants/search?q=&lat=&lng=
+GET    /restaurants/:id
+POST   /restaurants
+
+GET    /menus/:id
+
+POST   /groups
+GET    /groups/:code
+POST   /groups/:code/join
+POST   /groups/:code/counts
+POST   /groups/:code/reset
+POST   /groups/:code/avatar
+GET    /groups/:code/ws
+DELETE /groups/:code
+```
+
+## 5. Auth Flow
 
 ```
 App start
-  │
-  ├─ Firebase Auth onAuthStateChanged
-  │       │
-  │       ├─ user == null → redirect to (auth)/login
-  │       │
-  │       └─ user != null → load user doc from users/{uid}
-  │                 │
-  │                 ├─ doc exists → enter (tabs) shell
-  │                 │
-  │                 └─ doc missing → redirect to (auth)/register
-  │                       (first-time user finishing profile)
-  │
-  └─ SecureStore caches auth token across app restarts
+  ├─ Load local device profile from AsyncStorage
+  ├─ POST /auth/device
+  │    ├─ Worker creates/updates users.uid
+  │    └─ Worker returns signed device token
+  ├─ Store token in expo-secure-store
+  └─ Send Authorization: Bearer <token> on API calls
 ```
 
-## 7. The Three Session Modes
+For development, the Worker uses a fallback signing secret. Before a real deploy,
+set `JWT_SECRET` with `wrangler secret put JWT_SECRET`.
+
+## 6. Real-Time Group Sessions
+
+Group sessions are coordinated by a Durable Object addressed by the 6-character
+party code. The object owns the draft state and accepts WebSocket connections.
+
+Flow:
+1. Host calls `POST /groups`; Worker reserves a code and creates a Durable Object draft.
+2. Joiners call `POST /groups/:code/join`.
+3. Scoreboard count/avatar changes call the group endpoints.
+4. The Durable Object broadcasts the updated draft to connected WebSocket clients.
+5. Submit writes the finished session to D1 through `POST /sessions`.
+
+## 7. Anomaly Detection
+
+Restaurant stats are stored in `restaurants.stats_json`. On non-flagged session
+submission, the Worker updates the running mean and standard deviation. The
+client still checks `isAnomaly(total, stats)` before submit so unusual counts can
+be confirmed before persistence.
+
+## 8. Session Modes
 
 | Mode | Description | Data flow |
 |------|-------------|-----------|
-| **Single (shared phone)** | Multiple people take turns entering counts on one device | One session doc, multiple participant entries, local state only until submit |
-| **Individual** | Each friend on their own phone, counts tracked independently | Each device creates its own session doc; optionally tagged with same location/friends |
-| **Group-linked** | Multiple phones linked to the same session in real time | One session doc, `onSnapshot` subscription on each device, writes via dot-notation updates |
+| Single | One device, one participant | Local counter state, submitted to D1 |
+| Individual | Multiple people tracked on one device | Multiple participants, submitted to D1 |
+| Group-linked | Multiple phones linked live | Durable Object draft, then submitted to D1 |

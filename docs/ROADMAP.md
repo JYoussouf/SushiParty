@@ -5,7 +5,7 @@
 | # | Name | Focus | DoD |
 |---|------|-------|-----|
 | M0 | Scaffolding | Project setup | `npx expo start` runs; docs written | ✅ |
-| M1 | Auth + Single-User Counter | Core loop | Sign-up/in works; session submits to Firestore | ✅ |
+| M1 | Auth + Single-User Counter | Core loop | Sign-up/in works; session submits to Cloudflare D1 | ✅ |
 | M2 | Menus + Locations | Restaurant context | GPS locates restaurant; restaurant menu loads | ✅ |
 | M3 | History | Persistence | Past sessions list with detail view |
 | M4 | Friends | Social layer | Add friends; see their history |
@@ -25,10 +25,10 @@
 - [x] 4 tabs: Scoreboard, History, Friends, Profile
 - [x] Auth placeholder screens (login, register)
 - [x] Additional routes: restaurant/picker, session/mode-select, session/group-join
-- [x] Firebase config wired to `.env` (placeholder keys)
+- [x] Cloudflare API URL wired to `.env`
 - [x] Global sushi menu seed data (`globalMenu.ts` — 28 items)
 - [x] `SushiCounter` component with Reanimated spring feedback
-- [x] `useSession` hook (local state, no Firestore yet)
+- [x] `useSession` hook (local state before submit)
 - [x] Anomaly detection logic (`isAnomaly`, `updateRestaurantStats`)
 - [x] ESLint + Prettier + TypeScript strict configured
 - [x] `assets/images/sushi/README.md` with naming convention
@@ -43,15 +43,15 @@
 **Goal:** A real user can sign up, count sushi, and submit a session that persists.
 
 **Tasks:**
-- [x] `AuthContext` with Firebase Auth state, signIn, signUp, signOut
+- [x] `AuthContext` with Worker-issued device auth, signIn, signUp, signOut
 - [x] Implement Login screen (email/password + friendly error messages)
 - [x] Implement Register screen (email/password + display name + username)
-- [x] Username uniqueness check against Firestore (`isUsernameTaken`)
-- [x] `onAuthStateChanged` listener → redirect to auth or tabs (root `_layout.tsx`)
-- [x] Persist auth token via AsyncStorage (`getReactNativePersistence`)
-- [x] `src/lib/firebase/users.ts` — createUserDoc, getUserDoc
-- [x] `src/lib/firebase/sessions.ts` — submitSession, getUserSessions (paginated)
-- [x] Scoreboard: write session doc to `sessions/{id}` on submit
+- [x] Username uniqueness check against D1 (`isUsernameTaken`)
+- [x] Device auth bootstrap → redirect to app shell (root `_layout.tsx`)
+- [x] Persist auth token via SecureStore
+- [x] `src/lib/cloudflare/users.ts` — createUserDoc, getUserDoc
+- [x] `src/lib/cloudflare/sessions.ts` — submitSession, getUserSessions
+- [x] Scoreboard: write session row to D1 through the Worker on submit
 - [x] Scoreboard: category section headers with subtotals
 - [x] Scoreboard: restaurant badge + mode icon in header (navigation stubs)
 - [x] Profile screen: avatar initials, display name, username, email, sign out
@@ -59,7 +59,7 @@
 
 **Definition of Done:**
 - [x] User can create an account and it persists across app restarts
-- [x] Tapping submit on the Scoreboard writes a session document to Firestore
+- [x] Tapping submit on the Scoreboard writes a session row to D1 through the Worker
 - [x] Sign out and sign in again returns the user to their profile
 
 ---
@@ -71,11 +71,11 @@
 **Tasks:**
 - [x] Request location permission via `expo-location` (`useLocation` hook)
 - [x] `src/lib/geo.ts` — haversine distance + latitude bounding box for geo queries
-- [x] `src/lib/firebase/restaurants.ts` — getNearbyRestaurants, search, create, get
-- [x] `src/lib/firebase/menus.ts` — getMenu with global-default fallback
+- [x] `src/lib/cloudflare/restaurants.ts` — getNearbyRestaurants, search, create, get
+- [x] `src/lib/cloudflare/menus.ts` — getMenu with global-default fallback
 - [x] `restaurant/picker` screen: GPS nearby list sorted by distance
-- [x] Manual restaurant search by name (Firestore prefix query on `nameLower`)
-- [x] "Add new restaurant" modal (uses current GPS location, writes to Firestore)
+- [x] Manual restaurant search by name (D1 prefix query on `name_lower`)
+- [x] "Add new restaurant" modal (uses current GPS location, writes to D1)
 - [x] `RestaurantContext` — selected restaurant + active menu state app-wide
 - [x] Menu toggle UI on Scoreboard (global ↔ restaurant menu, only shown when they differ)
 - [x] Restaurant name badge in Scoreboard header (tappable)
@@ -94,7 +94,7 @@
 **Goal:** Users can see and review all their past sessions.
 
 **Tasks:**
-- [ ] History tab: Firestore query `sessions` where `ownerUid == uid` ordered by `submittedAt DESC`
+- [ ] History tab: Worker query `sessions` where `owner_uid == uid` ordered by `submitted_at DESC`
 - [ ] Session card component: restaurant name, date, total pieces, mode badge
 - [ ] `session/summary` detail screen: full breakdown by category + item
 - [ ] Display friends who attended (tagged UIDs resolved to display names)
@@ -112,10 +112,10 @@
 **Goal:** Users can add friends and see their eating history.
 
 **Tasks:**
-- [ ] "Add Friend" modal: search by username (Firestore query)
+- [ ] "Add Friend" modal: search by username (D1 query)
 - [ ] Friend request / mutual-follow model vs. direct add (decision: start with direct add — username lookup + confirm)
 - [ ] Friends list screen with last session info
-- [ ] Activity feed: recent sessions from `friendIds` (fan-out read or Firestore array-contains query)
+- [ ] Activity feed: recent sessions from `friendIds` (fan-out read or D1 query)
 - [ ] Friend profile (read-only): their history visible to you
 - [ ] Tag friends on a session (post-submit flow)
 - [ ] `useFriends` hook implementation
@@ -132,12 +132,12 @@
 **Goal:** Multiple phones linked to the same session, live count updates for all.
 
 **Tasks:**
-- [ ] "Create Group" flow: generate 6-char `groupCode`, write to `groupCodes/{code}`
-- [ ] "Join Group" flow: enter code → look up sessionId → subscribe to `onSnapshot`
+- [ ] "Create Group" flow: generate 6-char `groupCode`, create Durable Object draft
+- [ ] "Join Group" flow: enter code → connect to Durable Object WebSocket
 - [ ] Scoreboard shows all participants' live counts (grouped by participant)
-- [ ] Dot-notation `updateDoc` writes to prevent participant count conflicts
+- [ ] Per-participant count updates handled by the Durable Object
 - [ ] `session/group-join` screen with QR display + manual code entry
-- [ ] Group code expiry (8-hour TTL, enforced by Cloud Function cleanup)
+- [ ] Group code expiry (8-hour TTL, enforced by Durable Object storage)
 - [ ] Graceful handling of participant disconnect/reconnect
 
 **Definition of Done:**
@@ -152,7 +152,7 @@
 **Goal:** Statistically unusual submissions are flagged and confirmed before saving.
 
 **Tasks:**
-- [ ] Cloud Function: `onSessionSubmit` trigger → call `updateRestaurantStats` if `!flagged`
+- [ ] Worker session submit route calls `updateRestaurantStats` if `!flagged`
 - [ ] Client: call `isAnomaly` before submitting → show confirmation modal if true
 - [ ] Anomaly modal UI (see UX_FLOW.md)
 - [ ] Store `flagged: true` on confirmed outlier sessions (baseline not updated)
@@ -192,9 +192,9 @@
 
 ## Cross-Cutting Concerns (any milestone)
 
-- **Offline support:** Firestore `enableIndexedDbPersistence` (web) or offline persistence (native) so counter works without connectivity; sync on reconnect
+- **Offline support:** queue Worker writes locally so counter works without connectivity; sync on reconnect
 - **Error boundaries:** React error boundary wrapping tab screens
-- **Analytics:** Expo + Firebase Analytics for basic screen tracking (optional, add in M3)
+- **Analytics:** Expo analytics or Cloudflare Analytics Engine for basic screen tracking (optional, add in M3)
 - **Testing:** Jest + React Native Testing Library; target hooks and stats utilities first
 
 ---

@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   RefreshControl,
@@ -18,7 +19,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useFriends } from '../../src/hooks/useFriends';
 import { getFriendChallenges } from '../../src/lib/challenges';
 import { getFriendSessions } from '../../src/lib/local/friends';
-import { getAllSessions } from '../../src/lib/local/sessions';
+import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 import type { FriendChallengeProgress } from '../../src/types';
 
 function getInitials(name: string): string {
@@ -42,16 +43,24 @@ export default function FriendsScreen() {
   useFocusEffect(
     useCallback(() => {
       void refresh();
-      void (async () => {
-        if (!userProfile) {
-          setChallenges([]);
-          return;
-        }
+    }, [refresh]),
+  );
 
+  useEffect(() => {
+    let active = true;
+
+    void (async () => {
+      if (!userProfile) {
+        setChallenges([]);
+        return;
+      }
+
+      try {
         const userSessions = await getAllSessions();
         const friendSessions = (
           await Promise.all(friends.map((friend) => getFriendSessions(friend.user.uid)))
         ).flat();
+        if (!active) return;
         setChallenges(
           getFriendChallenges(
             userSessions,
@@ -60,9 +69,15 @@ export default function FriendsScreen() {
             friends.map((friend) => friend.user.uid),
           ),
         );
-      })();
-    }, [friends, refresh, userProfile]),
-  );
+      } catch {
+        if (active) setChallenges([]);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [friends, userProfile]);
 
   const handleSearchChange = (nextQuery: string) => {
     setQuery(nextQuery);
@@ -76,7 +91,12 @@ export default function FriendsScreen() {
   };
 
   const handleAddFriend = async (friendId: string) => {
-    await addFriend(friendId);
+    try {
+      await addFriend(friendId);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Could not add that friend.';
+      Alert.alert('Add friend failed', message);
+    }
   };
 
   const header = (

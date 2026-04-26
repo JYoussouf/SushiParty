@@ -18,9 +18,9 @@ import {
   getNearbyRestaurants,
   getRestaurant,
   searchRestaurantsByName,
-} from '../../src/lib/firebase/restaurants';
+} from '../../src/lib/cloudflare/restaurants';
 import { formatDistance } from '../../src/lib/geo';
-import { updateSession } from '../../src/lib/local/sessions';
+import { updateSession } from '../../src/lib/cloudflare/sessions';
 import type { Restaurant } from '../../src/types';
 
 type RestaurantWithDistance = Restaurant & { distanceKm?: number };
@@ -59,7 +59,12 @@ export default function SessionRestaurantConfirmScreen() {
       setSearchResults([]);
       return;
     }
-    void searchRestaurantsByName(text).then(setSearchResults);
+    void searchRestaurantsByName(text)
+      .then(setSearchResults)
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Could not search restaurants.';
+        Alert.alert('Restaurant lookup failed', message);
+      });
   }, []);
 
   const goToSummary = useCallback(
@@ -112,6 +117,9 @@ export default function SessionRestaurantConfirmScreen() {
 
       setRestaurant(restaurant);
       goToSummary('0');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Could not save that restaurant.';
+      Alert.alert('Restaurant update failed', message);
     } finally {
       setSaving(false);
     }

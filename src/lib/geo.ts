@@ -17,9 +17,9 @@ export function haversineKm(a: GeoPoint, b: GeoPoint): number {
 }
 
 /**
- * Latitude-only bounding box for a Firestore range query.
+ * Latitude-only bounding box for a simple restaurant lookup query.
  * One degree of latitude ≈ 111 km everywhere. Longitude is filtered client-side
- * because Firestore only supports range filters on a single field per query.
+ * so the backend can keep the index cheap and the final radius precise.
  */
 export function latitudeBounds(center: GeoPoint, radiusKm: number): { min: number; max: number } {
   const delta = radiusKm / 111;

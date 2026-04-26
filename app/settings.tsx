@@ -22,7 +22,7 @@ import {
   restoreBackupPayload,
   type BackupPayload,
 } from '../src/lib/local/backup';
-import { getAllSessions } from '../src/lib/local/sessions';
+import { getAllSessions } from '../src/lib/cloudflare/sessions';
 
 export default function SettingsScreen() {
   const router = useRouter();

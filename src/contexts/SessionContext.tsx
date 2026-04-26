@@ -1,13 +1,15 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
 import {
-  createGroupSession,
-  getGroupSessionById,
-  joinGroupSession,
-  removeGroupSession,
-  resetGroupParticipantCounts,
-  updateGroupParticipantCounts,
-} from '../lib/local/groupSessions';
+  createGroupParty,
+  joinGroupParty,
+  removeGroupParty,
+  resetGroupPartyParticipantCounts,
+  subscribeToGroupParty,
+  updateGroupPartyParticipantAvatar,
+  updateGroupPartyParticipantCounts,
+} from '../lib/cloudflare/groupParties';
+import { DEFAULT_CAT_AVATAR } from '../lib/catAvatars';
 import type { GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
 
 interface SessionContextValue {
@@ -24,8 +26,10 @@ interface SessionContextValue {
   completeSession: () => Promise<void>;
   groupCode: string | null;
   groupSessionId: string | null;
+  groupOwnerUid: string | null;
   createGroup: () => Promise<GroupSessionDraft>;
   joinGroup: (code: string) => Promise<GroupSessionDraft>;
+  setParticipantAvatar: (avatar: string) => Promise<void>;
   currentUserParticipantIndex: number;
   currentUserCanEditActive: boolean;
   hasActiveSession: boolean;
@@ -33,10 +37,11 @@ interface SessionContextValue {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-function createLocalParticipant(userId?: string, displayName?: string): SessionParticipant {
+function createLocalParticipant(userId?: string, displayName?: string, avatar?: string): SessionParticipant {
   return {
     userId: userId ?? 'local',
     displayName: displayName ?? 'Me',
+    avatar: avatar ?? DEFAULT_CAT_AVATAR,
     counts: {},
   };
 }
@@ -48,10 +53,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [activeParticipantIndex, setActiveParticipantIndex] = useState(0);
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [groupCode, setGroupCode] = useState<string | null>(null);
+  const [groupOwnerUid, setGroupOwnerUid] = useState<string | null>(null);
+  const [localAvatar, setLocalAvatar] = useState<string>(
+    () => userProfile?.avatar ?? DEFAULT_CAT_AVATAR,
+  );
+
+  // Keep localAvatar in sync with the persisted profile avatar
+  useEffect(() => {
+    if (!userProfile?.avatar) return;
+    setLocalAvatar(userProfile.avatar);
+  }, [userProfile?.avatar]);
 
   const localParticipant = useMemo(
-    () => createLocalParticipant(userProfile?.uid, userProfile?.displayName),
-    [userProfile?.displayName, userProfile?.uid],
+    () => createLocalParticipant(userProfile?.uid, userProfile?.displayName, localAvatar),
+    [localAvatar, userProfile?.displayName, userProfile?.uid],
   );
 
   const syncFromDraft = useCallback(
@@ -59,6 +74,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setParticipants(draft.participants);
       setGroupSessionId(draft.id);
       setGroupCode(draft.code);
+      setGroupOwnerUid(draft.ownerUid);
       setModeState('group');
 
       const participantIndex = draft.participants.findIndex(
@@ -85,17 +101,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    let active = true;
-
-    const sync = async () => {
-      const draft = await getGroupSessionById(groupSessionId);
-      if (!active) {
-        return;
-      }
-
+    return subscribeToGroupParty(groupSessionId, (draft) => {
       if (!draft) {
         setGroupSessionId(null);
         setGroupCode(null);
+        setGroupOwnerUid(null);
         setModeState('single');
         setParticipants([localParticipant]);
         setActiveParticipantIndex(0);
@@ -103,25 +113,16 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       syncFromDraft(draft);
-    };
-
-    void sync();
-    const interval = setInterval(() => {
-      void sync();
-    }, 1000);
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
+    });
   }, [groupSessionId, localParticipant, syncFromDraft]);
 
   const setMode = useCallback(
     async (nextMode: SessionMode) => {
       if (nextMode !== 'group' && groupSessionId) {
-        await removeGroupSession(groupSessionId);
+        await removeGroupParty(groupSessionId);
         setGroupSessionId(null);
         setGroupCode(null);
+        setGroupOwnerUid(null);
       }
 
       setModeState(nextMode);
@@ -148,12 +149,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const updateCounts = useCallback(
     async (itemId: string, delta: number) => {
       if (mode === 'group' && groupSessionId && userProfile) {
-        const draft = await updateGroupParticipantCounts(
+        const draft = await updateGroupPartyParticipantCounts(
           groupSessionId,
           userProfile.uid,
           userProfile.displayName,
           itemId,
           delta,
+          localAvatar,
         );
         if (draft) {
           syncFromDraft(draft);
@@ -163,7 +165,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
       updateLocalCounts(itemId, delta);
     },
-    [groupSessionId, mode, syncFromDraft, updateLocalCounts, userProfile],
+    [groupSessionId, localAvatar, mode, syncFromDraft, updateLocalCounts, userProfile],
   );
 
   const increment = useCallback((itemId: string) => updateCounts(itemId, 1), [updateCounts]);
@@ -181,7 +183,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const reset = useCallback(async () => {
     if (mode === 'group' && groupSessionId && userProfile) {
-      const draft = await resetGroupParticipantCounts(groupSessionId, userProfile.uid);
+      const draft = await resetGroupPartyParticipantCounts(groupSessionId, userProfile.uid);
       if (draft) {
         syncFromDraft(draft);
       }
@@ -193,9 +195,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const completeSession = useCallback(async () => {
     if (groupSessionId) {
-      await removeGroupSession(groupSessionId);
+      await removeGroupParty(groupSessionId);
       setGroupSessionId(null);
       setGroupCode(null);
+      setGroupOwnerUid(null);
     }
 
     setModeState('single');
@@ -208,24 +211,50 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       throw new Error('Profile unavailable.');
     }
 
-    const draft = await createGroupSession(userProfile.uid, userProfile.displayName);
+    const draft = await createGroupParty(userProfile.uid, userProfile.displayName, localAvatar);
     syncFromDraft(draft);
     return draft;
-  }, [syncFromDraft, userProfile]);
+  }, [localAvatar, syncFromDraft, userProfile]);
 
   const joinGroup = useCallback(async (code: string) => {
     if (!userProfile) {
       throw new Error('Profile unavailable.');
     }
 
-    const draft = await joinGroupSession(code, userProfile.uid, userProfile.displayName);
+    const draft = await joinGroupParty(code, userProfile.uid, userProfile.displayName, localAvatar);
     if (!draft) {
       throw new Error('Group code not found or expired.');
     }
 
     syncFromDraft(draft);
     return draft;
-  }, [syncFromDraft, userProfile]);
+  }, [localAvatar, syncFromDraft, userProfile]);
+
+  const setParticipantAvatar = useCallback(
+    async (avatar: string) => {
+      setLocalAvatar(avatar);
+
+      if (mode === 'group' && groupSessionId && userProfile) {
+        const draft = await updateGroupPartyParticipantAvatar(
+          groupSessionId,
+          userProfile.uid,
+          userProfile.displayName,
+          avatar,
+        );
+        if (draft) {
+          syncFromDraft(draft);
+        }
+        return;
+      }
+
+      setParticipants((prev) =>
+        prev.map((participant, index) =>
+          index === activeParticipantIndex ? { ...participant, avatar } : participant,
+        ),
+      );
+    },
+    [activeParticipantIndex, groupSessionId, mode, syncFromDraft, userProfile],
+  );
 
   const currentUserParticipantIndex = participants.findIndex(
     (participant) => participant.userId === userProfile?.uid,
@@ -251,8 +280,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     completeSession,
     groupCode,
     groupSessionId,
+    groupOwnerUid,
     createGroup,
     joinGroup,
+    setParticipantAvatar,
     currentUserParticipantIndex,
     currentUserCanEditActive:
       mode !== 'group' || currentUserParticipantIndex === activeParticipantIndex,

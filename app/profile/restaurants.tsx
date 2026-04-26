@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getUserRestaurantInsights, type RankedRestaurant } from '../../src/lib/analytics';
-import { getAllSessions } from '../../src/lib/local/sessions';
+import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 
 export default function RestaurantInsightsScreen() {
+  const router = useRouter();
   const { userProfile } = useAuth();
   const [restaurants, setRestaurants] = useState<RankedRestaurant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,6 +33,11 @@ export default function RestaurantInsightsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
       {loading ? (
         <View style={styles.center}>
           <ActivityIndicator color="#e53935" />
@@ -67,6 +74,9 @@ export default function RestaurantInsightsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  header: { paddingHorizontal: 16, paddingVertical: 12 },
+  backBtn: { alignSelf: 'flex-start' },
+  backText: { fontSize: 16, fontWeight: '700', color: '#e53935' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 12 },
   title: { fontSize: 28, fontWeight: '800', color: '#222' },

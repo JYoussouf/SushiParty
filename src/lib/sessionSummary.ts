@@ -1,4 +1,11 @@
 import type { SessionParticipant, SushiItem, SushiSession } from '../types';
+import { CATEGORY_LABELS } from './categoryLabels';
+
+export interface Superlative {
+  label: string;
+  emoji: string;
+  winners: string[];
+}
 
 export interface ParticipantSummary {
   userId: string;
@@ -18,15 +25,6 @@ export interface CategoryBreakdown {
   totalPieces: number;
   items: CategoryBreakdownItem[];
 }
-
-const CATEGORY_LABELS: Record<SushiItem['category'], string> = {
-  nigiri: 'Nigiri',
-  sashimi: 'Sashimi',
-  roll: 'Rolls',
-  soup: 'Soup',
-  special: 'Specials',
-  other: 'Other',
-};
 
 export function getParticipantTotalPieces(participant: SessionParticipant): number {
   return Object.values(participant.counts).reduce((sum, count) => sum + count, 0);
@@ -48,6 +46,88 @@ export function getAttendeeNames(session: SushiSession): string[] {
   return session.participants
     .map((participant) => participant.displayName.trim())
     .filter(Boolean);
+}
+
+export function getSessionSuperlatives(
+  session: SushiSession,
+  menuItems: SushiItem[],
+): Superlative[] {
+  const ps = session.participants;
+  if (ps.length < 2) return [];
+
+  const menuById = new Map(menuItems.map((item) => [item.id, item]));
+
+  const score = (fn: (p: SessionParticipant) => number): Superlative['winners'] => {
+    const scores = ps.map((p) => ({ name: p.displayName, val: fn(p) }));
+    const max = Math.max(...scores.map((s) => s.val));
+    if (max === 0) return [];
+    const winners = scores.filter((s) => s.val === max).map((s) => s.name);
+    // Skip if all tied
+    if (winners.length === ps.length) return [];
+    return winners;
+  };
+
+  const candidates: Array<{ label: string; emoji: string; fn: (p: SessionParticipant) => number }> = [
+    {
+      label: 'Most Eaten',
+      emoji: '🏆',
+      fn: (p) => getParticipantTotalPieces(p),
+    },
+    {
+      label: 'Lightest Eater',
+      emoji: '🌸',
+      fn: (p) => {
+        const total = getParticipantTotalPieces(p);
+        return total === 0 ? 0 : -total;
+      },
+    },
+    {
+      label: 'Most Variety',
+      emoji: '🎲',
+      fn: (p) => Object.values(p.counts).filter((c) => c > 0).length,
+    },
+    {
+      label: 'Roll Lover',
+      emoji: '🌀',
+      fn: (p) =>
+        Object.entries(p.counts).reduce((sum, [id, count]) => {
+          const cat = menuById.get(id)?.category;
+          return cat === 'roll' || cat === 'handroll' || cat === 'special_roll' ? sum + count : sum;
+        }, 0),
+    },
+    {
+      label: 'Sushi Purist',
+      emoji: '🎋',
+      fn: (p) =>
+        Object.entries(p.counts).reduce((sum, [id, count]) => {
+          const cat = menuById.get(id)?.category;
+          return cat === 'nigiri' || cat === 'sashimi' ? sum + count : sum;
+        }, 0),
+    },
+    {
+      label: 'Most Adventurous',
+      emoji: '🗺️',
+      fn: (p) =>
+        new Set(
+          Object.entries(p.counts)
+            .filter(([, c]) => c > 0)
+            .map(([id]) => menuById.get(id)?.category)
+            .filter(Boolean),
+        ).size,
+    },
+    {
+      label: 'Sweet Tooth',
+      emoji: '🍡',
+      fn: (p) =>
+        Object.entries(p.counts).reduce((sum, [id, count]) => {
+          return menuById.get(id)?.category === 'dessert' ? sum + count : sum;
+        }, 0),
+    },
+  ];
+
+  return candidates
+    .map(({ label, emoji, fn }) => ({ label, emoji, winners: score(fn) }))
+    .filter((s) => s.winners.length > 0);
 }
 
 export function getSessionCategoryBreakdown(

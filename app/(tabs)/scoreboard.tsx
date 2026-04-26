@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -15,32 +15,17 @@ import { StatusBar } from 'expo-status-bar';
 import { SushiTile } from '../../src/components';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
 import { getCategoryTheme } from '../../src/lib/categoryTheme';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSequence,
-  withSpring,
-} from 'react-native-reanimated';
+import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { useSession } from '../../src/hooks/useSession';
 import { useMenu } from '../../src/hooks/useMenu';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
-import { submitSession } from '../../src/lib/local/sessions';
-import { getRestaurantStats, recordRestaurantSession } from '../../src/lib/local/restaurantStats';
-import { getRestaurant } from '../../src/lib/firebase/restaurants';
+import { submitSession } from '../../src/lib/cloudflare/sessions';
+import { getRestaurantStats } from '../../src/lib/local/restaurantStats';
+import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
 import { getSessionTemplates } from '../../src/lib/local/templates';
 import { isAnomaly } from '../../src/lib/stats/anomalyDetection';
 import type { SessionTemplate } from '../../src/types';
-
-
-const CATEGORY_LABELS: Record<string, string> = {
-  nigiri: 'Nigiri',
-  sashimi: 'Sashimi',
-  roll: 'Rolls',
-  soup: 'Soup',
-  special: 'Specials',
-  other: 'Other',
-};
 
 export default function ScoreboardScreen() {
   const router = useRouter();
@@ -51,7 +36,6 @@ export default function ScoreboardScreen() {
     increment,
     decrement,
     getCount,
-    totalPieces,
     reset,
     participants,
     setActiveParticipantIndex,
@@ -70,25 +54,28 @@ export default function ScoreboardScreen() {
     stdDev: number;
   } | null>(null);
   const [scoreboardMode, setScoreboardMode] = useState<'simple' | 'detailed'>('simple');
+  const eatenScrollRef = useRef<ScrollView>(null);
+  const activeParticipant = participants[activeParticipantIndex];
+  const activeParticipantTotal = Object.values(activeParticipant?.counts ?? {}).reduce(
+    (sum, count) => sum + count,
+    0,
+  );
+  const sessionTotalPieces = participants.reduce(
+    (sum, participant) =>
+      sum + Object.values(participant.counts).reduce((participantSum, count) => participantSum + count, 0),
+    0,
+  );
+
+  useEffect(() => {
+    if (activeParticipantTotal > 0) {
+      eatenScrollRef.current?.scrollToEnd({ animated: true });
+    }
+  }, [activeParticipantTotal]);
 
   useEffect(() => {
     void getSessionTemplates().then(setTemplates);
   }, []);
 
-  const totalPulse = useSharedValue(1);
-
-  useEffect(() => {
-    if (totalPieces > 0) {
-      totalPulse.value = withSequence(
-        withSpring(1.18, { duration: 120 }),
-        withSpring(1, { duration: 180 }),
-      );
-    }
-  }, [totalPieces, totalPulse]);
-
-  const totalStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: totalPulse.value }],
-  }));
 
   // Group items by category for section display
   const categorized = activeMenu.items.reduce<Record<string, typeof activeMenu.items>>(
@@ -122,14 +109,6 @@ export default function ScoreboardScreen() {
         ...(groupCode ? { groupCode } : {}),
       });
 
-      if (!flagged && restaurant?.id) {
-        await recordRestaurantSession(
-          restaurant.id,
-          totalPieces,
-          restaurant.stats,
-        );
-      }
-
       await completeSession();
       clearRestaurant();
       setShowAnomalyModal(false);
@@ -147,7 +126,7 @@ export default function ScoreboardScreen() {
   };
 
   const handleSubmit = async () => {
-    if (totalPieces === 0) return;
+    if (sessionTotalPieces === 0) return;
     if (!userProfile) {
       Alert.alert('Profile unavailable', 'Unable to load the local device profile.');
       return;
@@ -155,9 +134,9 @@ export default function ScoreboardScreen() {
 
     if (restaurant?.id) {
       const stats = await getRestaurantStats(restaurant.id, restaurant.stats);
-      if (isAnomaly(totalPieces, stats)) {
+      if (isAnomaly(sessionTotalPieces, stats)) {
         setPendingSubmit({
-          totalPieces,
+          totalPieces: sessionTotalPieces,
           mean: Math.round(stats.meanPiecesPerSession),
           stdDev: Math.round(stats.stdDevPiecesPerSession),
         });
@@ -238,15 +217,15 @@ export default function ScoreboardScreen() {
         </TouchableOpacity>
       </View>
 
-      <Animated.View style={[styles.totalBar, totalStyle]}>
-        {totalPieces === 0 ? (
+      <View style={styles.totalBar}>
+        {activeParticipantTotal === 0 ? (
           <Text style={styles.totalBarEmpty}>Tap a sushi to begin</Text>
         ) : (
           <ScrollView
+            ref={eatenScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.eatenStrip}
-            style={styles.eatenScroll}
           >
             {activeMenu.items.flatMap((item) => {
               const count = getCount(item.id);
@@ -265,20 +244,24 @@ export default function ScoreboardScreen() {
             })}
           </ScrollView>
         )}
-        {mode === 'group' && groupCode && (
-          <Text style={styles.groupCodeText}>Code {groupCode}</Text>
+        {((mode === 'group' && groupCode) || canToggle) && (
+          <View style={styles.totalBarMeta}>
+            {mode === 'group' && groupCode && (
+              <Text style={styles.groupCodeText}>Code {groupCode}</Text>
+            )}
+            {canToggle && (
+              <TouchableOpacity
+                style={styles.menuToggle}
+                onPress={() => setUseGlobalMenu(!useGlobalMenu)}
+              >
+                <Text style={styles.menuToggleText}>
+                  {useGlobalMenu ? 'Restaurant' : 'Global'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
-        {canToggle && (
-          <TouchableOpacity
-            style={styles.menuToggle}
-            onPress={() => setUseGlobalMenu(!useGlobalMenu)}
-          >
-            <Text style={styles.menuToggleText}>
-              {useGlobalMenu ? 'Restaurant' : 'Global'}
-            </Text>
-          </TouchableOpacity>
-        )}
-      </Animated.View>
+      </View>
       {templates.length > 0 && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateStrip}>
           {templates.map((template) => (
@@ -349,7 +332,7 @@ export default function ScoreboardScreen() {
 
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {scoreboardMode === 'simple' ? (() => {
-          const visible = Object.entries(categorized).flatMap(([cat, items]) => {
+          const visible = Object.values(categorized).flatMap((items) => {
             const anyItem = items.find((item) => item.id.endsWith('-any'));
             const collapsible = !!anyItem && items.length > 1;
             return collapsible && anyItem ? [anyItem] : items;
@@ -367,9 +350,11 @@ export default function ScoreboardScreen() {
                 const catItems = categorized[item.category] ?? [];
                 const catTotal = catItems.reduce((s, it) => s + getCount(it.id), 0);
                 const displayCount = isAny ? catTotal : getCount(item.id);
-                const displayName = isAny
-                  ? (CATEGORY_LABELS[item.category] ?? item.name)
-                  : item.name;
+                const displayName = isAny ? getCategoryLabel(item.category) : item.name;
+                const decrementTarget =
+                  isAny && getCount(item.id) === 0
+                    ? catItems.find((catItem) => getCount(catItem.id) > 0)
+                    : item;
                 return (
                   <SushiTile
                     key={item.id}
@@ -378,7 +363,9 @@ export default function ScoreboardScreen() {
                     count={displayCount}
                     tint={theme}
                     onIncrement={() => void increment(item.id)}
-                    onDecrement={() => void decrement(item.id)}
+                    onDecrement={() => {
+                      if (decrementTarget) void decrement(decrementTarget.id);
+                    }}
                     disabled={!currentUserCanEditActive}
                   />
                 );
@@ -399,7 +386,7 @@ export default function ScoreboardScreen() {
           }
           return (
             <View key={cat}>
-              <Text style={styles.categoryHeader}>{CATEGORY_LABELS[cat] ?? cat}</Text>
+              <Text style={styles.categoryHeader}>{getCategoryLabel(cat)}</Text>
               {rows.map((row, rowIdx) => (
                 <View key={rowIdx} style={styles.gridRow}>
                   {row.map((item) => {
@@ -436,9 +423,9 @@ export default function ScoreboardScreen() {
         <TouchableOpacity
           style={[
             styles.submitBtn,
-            (totalPieces === 0 || submitting) && styles.submitBtnDisabled,
+            (sessionTotalPieces === 0 || submitting) && styles.submitBtnDisabled,
           ]}
-          disabled={totalPieces === 0 || submitting}
+          disabled={sessionTotalPieces === 0 || submitting}
           onPress={() => void handleSubmit()}
         >
           {submitting ? (
@@ -454,7 +441,7 @@ export default function ScoreboardScreen() {
           <View style={styles.anomalyCard}>
             <Text style={styles.anomalyTitle}>That count looks unusual</Text>
             <Text style={styles.anomalyText}>
-              You logged {pendingSubmit?.totalPieces ?? totalPieces} pieces at{' '}
+              You logged {pendingSubmit?.totalPieces ?? sessionTotalPieces} pieces at{' '}
               {restaurant?.name ?? 'this restaurant'}.
             </Text>
             <Text style={styles.anomalyText}>
@@ -553,39 +540,37 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   totalBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#fafafa',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    minHeight: 56,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e5e5e5',
-    gap: 8,
+    gap: 4,
   },
   totalBarEmpty: {
-    flex: 1,
     fontSize: 13,
     color: '#999',
     fontWeight: '600',
     fontStyle: 'italic',
+    lineHeight: 32,
   },
-  eatenScroll: {
-    flex: 1,
+  totalBarMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   eatenStrip: {
+    flexDirection: 'row',
     alignItems: 'center',
     gap: 2,
-    paddingHorizontal: 2,
   },
   eatenChip: {
-    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
   eatenEmoji: {
-    fontSize: 28,
-    lineHeight: 34,
+    fontSize: 26,
+    lineHeight: 32,
   },
   groupCodeText: {
     fontSize: 12,

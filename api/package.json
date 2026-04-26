@@ -1,0 +1,17 @@
+{
+  "name": "sushi-party-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "types": "tsc --noEmit",
+    "d1:apply:local": "wrangler d1 migrations apply sushi-party --local",
+    "d1:apply:remote": "wrangler d1 migrations apply sushi-party --remote"
+  },
+  "devDependencies": {
+    "typescript": "~5.9.2",
+    "wrangler": "^4.14.0"
+  }
+}

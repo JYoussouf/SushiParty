@@ -16,17 +16,18 @@ import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useFriends } from '../../src/hooks/useFriends';
 import { getNewlyEarnedAchievements } from '../../src/lib/achievements';
-import { getMenu } from '../../src/lib/firebase/menus';
+import { getCategoryLabel } from '../../src/lib/categoryLabels';
+import { getMenu } from '../../src/lib/cloudflare/menus';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
 import {
   getAllSessions,
   getSessionById,
   tagFriendsOnSession,
   updateSessionNote,
-} from '../../src/lib/local/sessions';
+} from '../../src/lib/cloudflare/sessions';
 import {
   getParticipantSummaries,
-  getSessionCategoryBreakdown,
+  getSessionSuperlatives,
   getSessionTotalPieces,
 } from '../../src/lib/sessionSummary';
 import type { Menu, SushiSession } from '../../src/types';
@@ -81,13 +82,11 @@ function PlateCard({
   subtitle,
   pieces,
   hiddenCount,
-  accent,
 }: {
   title: string;
   subtitle: string;
   pieces: string[];
   hiddenCount: number;
-  accent: string;
 }) {
   return (
     <View style={styles.plateCard}>
@@ -96,7 +95,6 @@ function PlateCard({
           <Text style={styles.plateTitle}>{title}</Text>
           <Text style={styles.plateSubtitle}>{subtitle}</Text>
         </View>
-        <View style={[styles.plateAccent, { backgroundColor: accent }]} />
       </View>
 
       <View style={styles.plateSurface}>
@@ -137,6 +135,18 @@ export default function SessionSummaryScreen() {
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [draftNote, setDraftNote] = useState('');
   const [earnedAchievements, setEarnedAchievements] = useState<string[]>([]);
+  const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  const [expandedBreakdownCats, setExpandedBreakdownCats] = useState<Set<string>>(new Set());
+
+  const toggleBreakdownCat = (userId: string, cat: string) => {
+    const key = `${userId}:${cat}`;
+    setExpandedBreakdownCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
   const { friends, refresh: refreshFriends } = useFriends();
 
   const sessionId = Array.isArray(params.id) ? params.id[0] : params.id;
@@ -197,10 +207,6 @@ export default function SessionSummaryScreen() {
   }, [loadSession]);
 
   const participants = useMemo(() => (session ? getParticipantSummaries(session) : []), [session]);
-  const categories = useMemo(
-    () => (session && menu ? getSessionCategoryBreakdown(session, menu.items) : []),
-    [menu, session],
-  );
   const totalPieces = session ? getSessionTotalPieces(session) : 0;
   const submittedAt = session ? new Date(session.submittedAt ?? session.startedAt) : null;
   const participantIds = new Set(session?.participants.map((participant) => participant.userId) ?? []);
@@ -227,6 +233,11 @@ export default function SessionSummaryScreen() {
       ...buildPlatePieces(participant.counts, menu.items),
     }));
   }, [menu, session]);
+
+  const superlatives = useMemo(
+    () => (session && menu ? getSessionSuperlatives(session, menu.items) : []),
+    [session, menu],
+  );
 
   const handleDone = () => {
     if (origin === 'history') {
@@ -329,7 +340,6 @@ export default function SessionSummaryScreen() {
           subtitle={`${totalPieces} pieces disappeared in total`}
           pieces={totalPlate.pieces}
           hiddenCount={totalPlate.hiddenCount}
-          accent="#ffb26b"
         />
 
         {participantPlates.length > 0 && (
@@ -345,7 +355,6 @@ export default function SessionSummaryScreen() {
                     subtitle={`${summary?.totalPieces ?? 0} pieces`}
                     pieces={pieces}
                     hiddenCount={hiddenCount}
-                    accent="#ffd6a5"
                   />
                 );
               })}
@@ -363,28 +372,119 @@ export default function SessionSummaryScreen() {
             )}
           </View>
           <View style={styles.listCard}>
-            {participants.map((participant) => (
-              <View key={participant.userId} style={styles.rowCard}>
-                <Text style={styles.rowTitle}>{participant.displayName}</Text>
-                <Text style={styles.rowValue}>{participant.totalPieces} pcs</Text>
-              </View>
-            ))}
+            {participants.map((participant) => {
+              const isExpanded = expandedParticipants.has(participant.userId);
+              const sessionParticipant = session.participants.find((p) => p.userId === participant.userId);
+              const itemsByCategory = menu.items.reduce<Record<string, { id: string; name: string; imageKey: string | undefined; category: string; count: number }[]>>(
+                (acc, menuItem) => {
+                  const count = sessionParticipant?.counts[menuItem.id] ?? 0;
+                  if (count === 0) return acc;
+                  if (!acc[menuItem.category]) acc[menuItem.category] = [];
+                  const isAny = menuItem.id.endsWith('-any');
+                  const name = isAny ? getCategoryLabel(menuItem.category) : menuItem.name;
+                  acc[menuItem.category]!.push({ id: menuItem.id, name, imageKey: menuItem.imageKey, category: menuItem.category, count });
+                  return acc;
+                },
+                {},
+              );
+              const hasItems = Object.keys(itemsByCategory).length > 0;
+
+              return (
+                <View key={participant.userId}>
+                  <TouchableOpacity
+                    style={styles.rowCard}
+                    onPress={() => {
+                      if (!hasItems) return;
+                      setExpandedParticipants((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(participant.userId)) next.delete(participant.userId);
+                        else next.add(participant.userId);
+                        return next;
+                      });
+                    }}
+                    activeOpacity={hasItems ? 0.7 : 1}
+                  >
+                    <Text style={styles.rowTitle}>{participant.displayName}</Text>
+                    <View style={styles.rowRight}>
+                      <Text style={styles.rowValue}>{participant.totalPieces} pcs</Text>
+                      {hasItems && (
+                        <Text style={styles.rowChevron}>{isExpanded ? '▲' : '▼'}</Text>
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                  {isExpanded && (
+                    <View style={styles.participantBreakdown}>
+                      {Object.entries(itemsByCategory).map(([cat, catItems]) => {
+                        const catKey = `${participant.userId}:${cat}`;
+                        const catExpanded = expandedBreakdownCats.has(catKey);
+                        const catTotal = catItems.reduce((s, it) => s + it.count, 0);
+                        return (
+                          <View key={cat} style={styles.breakdownCatGroup}>
+                            <TouchableOpacity
+                              style={styles.breakdownCatRow}
+                              onPress={() => toggleBreakdownCat(participant.userId, cat)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.breakdownCatLabel}>{getCategoryLabel(cat)}</Text>
+                              <View style={styles.breakdownCatRight}>
+                                <Text style={styles.breakdownCatCount}>{catTotal}</Text>
+                                <Text style={styles.breakdownCatChevron}>{catExpanded ? '▲' : '▼'}</Text>
+                              </View>
+                            </TouchableOpacity>
+                            {catExpanded && catItems.map((item) => (
+                              <View key={item.id} style={styles.itemRow}>
+                                <View style={styles.itemLabelRow}>
+                                  <Text style={styles.itemEmoji}>{getItemEmoji(item.imageKey, item.category)}</Text>
+                                  <Text style={styles.itemName}>{item.name}</Text>
+                                </View>
+                                <Text style={styles.itemCount}>{item.count}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Post-game notes</Text>
-            <TouchableOpacity style={styles.actionChip} onPress={() => setShowNoteModal(true)}>
-              <Text style={styles.actionChipText}>{session.note?.trim() ? 'Edit Note' : 'Add Note'}</Text>
-            </TouchableOpacity>
+        {superlatives.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Party Awards</Text>
+            <View style={styles.superlativesGrid}>
+              {superlatives.map((s) => (
+                <View key={s.label} style={styles.superlativeCard}>
+                  <Text style={styles.superlativeEmoji}>{s.emoji}</Text>
+                  <Text style={styles.superlativeLabel}>{s.label}</Text>
+                  <Text style={styles.superlativeWinner}>{s.winners.join(' & ')}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-          <View style={styles.noteCard}>
-            <Text style={styles.noteBody}>
-              {session.note?.trim() || 'No story attached yet. Add a one-liner before everyone argues about who ordered the dragon roll.'}
-            </Text>
+        )}
+
+        {session.note?.trim() && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Notes</Text>
+              <TouchableOpacity style={styles.actionChip} onPress={() => setShowNoteModal(true)}>
+                <Text style={styles.actionChipText}>Edit Note</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.listCard}>
+              <Text style={styles.noteDisplay}>{session.note}</Text>
+            </View>
           </View>
-        </View>
+        )}
+
+        {!session.note?.trim() && (
+          <TouchableOpacity style={styles.addNoteButton} onPress={() => setShowNoteModal(true)}>
+            <Text style={styles.addNoteButtonText}>+ Add Note</Text>
+          </TouchableOpacity>
+        )}
 
         {earnedAchievements.length > 0 && (
           <View style={styles.section}>
@@ -399,32 +499,6 @@ export default function SessionSummaryScreen() {
             </View>
           </View>
         )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>What actually got eaten</Text>
-          {categories.map((category) => (
-            <View key={category.category} style={styles.breakdownCard}>
-              <View style={styles.breakdownHeader}>
-                <Text style={styles.breakdownTitle}>{category.label}</Text>
-                <Text style={styles.breakdownTotal}>{category.totalPieces}</Text>
-              </View>
-              {category.items.map((item) => (
-                <View key={item.id} style={styles.itemRow}>
-                  <View style={styles.itemLabelRow}>
-                    <Text style={styles.itemEmoji}>
-                      {getItemEmoji(
-                        menu.items.find((menuItem) => menuItem.id === getBaseItemId(item.id))?.imageKey,
-                        category.category,
-                      )}
-                    </Text>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                  </View>
-                  <Text style={styles.itemCount}>{item.count}</Text>
-                </View>
-              ))}
-            </View>
-          ))}
-        </View>
 
         <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
           <Text style={styles.doneButtonText}>Done</Text>
@@ -479,30 +553,32 @@ export default function SessionSummaryScreen() {
       </Modal>
 
       <Modal visible={showNoteModal} animationType="slide" onRequestClose={() => setShowNoteModal(false)}>
-        <SafeAreaView style={styles.modalContainer}>
+        <SafeAreaView style={styles.noteModalContainer}>
           <StatusBar style="dark" />
           <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Post-game note</Text>
+            <Text style={styles.modalTitle}>Note</Text>
             <TouchableOpacity onPress={() => setShowNoteModal(false)} disabled={savingNote}>
               <Text style={styles.modalClose}>Close</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={styles.noteInput}
-            value={draftNote}
-            onChangeText={setDraftNote}
-            placeholder="How did the sushi night go?"
-            placeholderTextColor="#9f8f86"
-            multiline
-            textAlignVertical="top"
-          />
-          <TouchableOpacity
-            style={[styles.saveButton, savingNote && styles.saveButtonDisabled]}
-            onPress={() => void handleSaveNote()}
-            disabled={savingNote}
-          >
-            {savingNote ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Note</Text>}
-          </TouchableOpacity>
+          <View style={styles.noteModalContent}>
+            <TextInput
+              style={styles.noteInput}
+              value={draftNote}
+              onChangeText={setDraftNote}
+              placeholder="Was it everything you ever hoped for?"
+              placeholderTextColor="#9f8f86"
+              multiline
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[styles.saveButton, savingNote && styles.saveButtonDisabled]}
+              onPress={() => void handleSaveNote()}
+              disabled={savingNote}
+            >
+              {savingNote ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Note</Text>}
+            </TouchableOpacity>
+          </View>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>
@@ -555,7 +631,6 @@ const styles = StyleSheet.create({
   plateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   plateTitle: { fontSize: 22, fontWeight: '900', color: '#2c211c' },
   plateSubtitle: { marginTop: 4, fontSize: 14, lineHeight: 20, color: '#7d6558' },
-  plateAccent: { width: 18, height: 18, borderRadius: 999 },
   plateSurface: {
     borderRadius: 999,
     backgroundColor: '#f9f4ef',
@@ -608,8 +683,47 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#ecd8cb',
   },
+  rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowTitle: { fontSize: 16, fontWeight: '700', color: '#2c211c' },
   rowValue: { fontSize: 15, fontWeight: '900', color: '#d7522e' },
+  rowChevron: { fontSize: 11, color: '#b09080' },
+  participantBreakdown: {
+    paddingHorizontal: 18,
+    paddingBottom: 14,
+    paddingTop: 4,
+    gap: 4,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ecd8cb',
+  },
+  breakdownCatGroup: { gap: 2 },
+  breakdownCatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  breakdownCatLabel: { fontSize: 13, fontWeight: '700', color: '#9a7a6e' },
+  breakdownCatRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  breakdownCatCount: { fontSize: 13, fontWeight: '700', color: '#5e4a3f' },
+  breakdownCatChevron: { fontSize: 10, color: '#bbb' },
+  superlativesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  superlativeCard: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    borderRadius: 18,
+    padding: 14,
+    backgroundColor: '#fffaf4',
+    borderWidth: 1,
+    borderColor: '#f2d6c8',
+    gap: 4,
+  },
+  superlativeEmoji: { fontSize: 28, lineHeight: 34 },
+  superlativeLabel: { fontSize: 12, fontWeight: '700', color: '#b07050', textTransform: 'uppercase', letterSpacing: 0.6 },
+  superlativeWinner: { fontSize: 15, fontWeight: '800', color: '#2c211c' },
   noteCard: {
     borderRadius: 24,
     padding: 18,
@@ -656,7 +770,9 @@ const styles = StyleSheet.create({
   },
   doneButtonText: { fontSize: 16, fontWeight: '800', color: '#fff7f1' },
   modalContainer: { flex: 1, backgroundColor: '#fff8f2', padding: 20 },
-  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  noteModalContainer: { flex: 1, backgroundColor: '#fff8f2', paddingHorizontal: 20, paddingTop: 16 },
+  noteModalContent: { paddingHorizontal: 6, paddingBottom: 20 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingHorizontal: 20 },
   modalTitle: { fontSize: 24, fontWeight: '900', color: '#2c211c' },
   modalClose: { fontSize: 16, fontWeight: '800', color: '#d7522e' },
   modalText: { fontSize: 14, lineHeight: 21, color: '#6e5a4f' },
@@ -678,16 +794,16 @@ const styles = StyleSheet.create({
   friendOptionCheck: { fontSize: 13, fontWeight: '800', color: '#9b8b81' },
   friendOptionCheckSelected: { color: '#d7522e' },
   saveButton: {
-    marginTop: 12,
     borderRadius: 999,
     paddingVertical: 15,
     alignItems: 'center',
     backgroundColor: '#d7522e',
+    marginBottom: 8,
   },
   saveButtonDisabled: { backgroundColor: '#f5b6a1' },
   saveButtonText: { fontSize: 16, fontWeight: '800', color: '#fff' },
   noteInput: {
-    minHeight: 180,
+    height: 80,
     borderRadius: 18,
     borderWidth: 1,
     borderColor: '#eed8cb',
@@ -695,6 +811,26 @@ const styles = StyleSheet.create({
     padding: 16,
     fontSize: 15,
     color: '#2c211c',
-    marginTop: 8,
+    marginBottom: 16,
+  },
+  noteDisplay: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#5e4a3f',
+    padding: 18,
+  },
+  addNoteButton: {
+    borderRadius: 999,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    backgroundColor: '#ffe1d2',
+    borderWidth: 1,
+    borderColor: '#f2d6c8',
+  },
+  addNoteButtonText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#d7522e',
   },
 });

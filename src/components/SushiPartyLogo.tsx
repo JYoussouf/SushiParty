@@ -43,9 +43,6 @@ export function SushiPartyLogo({ size = 'lg' }: SushiPartyLogoProps) {
         >
           !
         </Text>
-        <Text style={[styles.dotSushi, { fontSize: baseSize * 0.4, top: -baseSize * 0.15 }]}>
-          🍣
-        </Text>
       </View>
     </View>
   );

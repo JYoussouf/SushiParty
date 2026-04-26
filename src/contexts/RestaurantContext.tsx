@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { Restaurant, Menu } from '../types';
 import { globalMenu } from '../lib/menus/globalMenu';
-import { getMenu } from '../lib/firebase/menus';
+import { getMenu } from '../lib/cloudflare/menus';
 
 interface RestaurantContextValue {
   restaurant: Restaurant | null;

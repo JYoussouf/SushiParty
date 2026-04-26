@@ -62,10 +62,15 @@ export function calculateUserProfileStats(
     const pieces = getParticipantTotalPieces(participant);
 
     totalPieces += pieces;
-    restaurantVisits.set(
-      session.restaurantName,
-      (restaurantVisits.get(session.restaurantName) ?? 0) + 1,
-    );
+    const isUnknown =
+      session.restaurantId === 'unknown' ||
+      session.restaurantName.trim().toLowerCase() === 'unknown restaurant';
+    if (!isUnknown) {
+      restaurantVisits.set(
+        session.restaurantName,
+        (restaurantVisits.get(session.restaurantName) ?? 0) + 1,
+      );
+    }
 
     for (const [itemId, count] of Object.entries(participant.counts)) {
       itemCounts.set(itemId, (itemCounts.get(itemId) ?? 0) + count);

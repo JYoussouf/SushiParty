@@ -95,7 +95,7 @@ Based on the current app implementation in this repository:
 - We do not use third-party analytics SDKs in the shipped app code by default
 - We do not sell personal information
 
-The codebase includes Firebase-related modules for future or optional functionality. If you enable hosted backend services such as Firebase Auth, Firestore, Analytics, Crash Reporting, or Storage in production, you should update this Privacy Policy and your App Store privacy disclosures accordingly.
+The codebase includes Cloudflare Worker, D1, and Durable Object backend modules. Before production use, update this Privacy Policy and App Store privacy disclosures to describe any cloud-synced account, restaurant, session, group session, or profile data you actually enable.
 
 ## 8. Data Retention
 
@@ -152,4 +152,4 @@ Before publishing to the Apple App Store:
 - Replace all placeholders in this document.
 - Host this policy at a public HTTPS URL.
 - Make sure your App Privacy answers in App Store Connect match the app’s actual behavior.
-- Revisit this policy if you enable Firebase backend sync, analytics, crash reporting, ads, or any other remote data collection.
+- Revisit this policy if you enable Cloudflare backend sync, analytics, crash reporting, ads, or any other remote data collection.

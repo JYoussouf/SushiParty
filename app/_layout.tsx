@@ -3,7 +3,7 @@ import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-rout
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 import { View } from 'react-native';
-import { AuthProvider } from '../src/contexts/AuthContext';
+import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { RestaurantProvider } from '../src/contexts/RestaurantContext';
 import { SessionProvider, useSession } from '../src/contexts/SessionContext';
 import { IntroSplash } from '../src/components';
@@ -16,9 +16,20 @@ function RootLayoutNav() {
   const navState = useRootNavigationState();
   const segments = useSegments();
   const { hasActiveSession } = useSession();
+  const { onboardingDone, loading: authLoading } = useAuth();
 
+  // Onboarding gate — runs independently so the didInitialRedirect guard can't swallow it
   useEffect(() => {
-    if (!navState?.key) return;
+    if (!navState?.key || authLoading) return;
+    if (onboardingDone) return;
+    const currentPath = segments.join('/');
+    if (currentPath === 'onboarding') return;
+    router.replace('/onboarding');
+  }, [navState?.key, authLoading, onboardingDone, router, segments]);
+
+  // Initial home/scoreboard redirect for users who have completed onboarding
+  useEffect(() => {
+    if (!navState?.key || authLoading || !onboardingDone) return;
     if (didInitialRedirect) return;
     const currentPath = segments.join('/');
     if (currentPath && currentPath !== 'index') {
@@ -30,7 +41,7 @@ function RootLayoutNav() {
       router.replace(hasActiveSession ? '/(tabs)/scoreboard' : '/(tabs)/home');
     }, 0);
     return () => clearTimeout(t);
-  }, [router, navState?.key, hasActiveSession, segments]);
+  }, [router, navState?.key, hasActiveSession, segments, onboardingDone, authLoading]);
 
   useEffect(() => {
     if (!navState?.key || !hasActiveSession) {
@@ -61,6 +72,7 @@ function RootLayoutNav() {
     >
       <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
       <Stack.Screen name="(auth)" />
+      <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       <Stack.Screen
         name="restaurant/picker"
         options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}

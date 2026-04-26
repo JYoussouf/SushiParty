@@ -37,7 +37,14 @@
       [
         "expo-location",
         {
+          "locationWhenInUsePermission": "Sushi Party uses your location to find sushi spots near you.",
           "locationAlwaysAndWhenInUsePermission": "Allow Sushi Party to use your location to find nearby restaurants."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Sushi Party uses your camera to scan group QR codes."
         }
       ]
     ],

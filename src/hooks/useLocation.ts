@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
 import type { GeoPoint } from '../types';
 
-export type LocationPermissionStatus = 'undetermined' | 'granted' | 'denied';
+export type LocationPermissionStatus = 'undetermined' | 'granted' | 'denied' | 'denied-permanent';
 
 interface UseLocationReturn {
   location: GeoPoint | null;
@@ -11,6 +11,8 @@ interface UseLocationReturn {
   error: string | null;
   refresh: () => Promise<void>;
 }
+
+const LOCATION_TIMEOUT_MS = 5000;
 
 export function useLocation(autoRequest = true): UseLocationReturn {
   const [location, setLocation] = useState<GeoPoint | null>(null);
@@ -22,15 +24,20 @@ export function useLocation(autoRequest = true): UseLocationReturn {
     setLoading(true);
     setError(null);
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setPermission(status === 'granted' ? 'granted' : 'denied');
+      const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        setPermission(canAskAgain ? 'denied' : 'denied-permanent');
         setLoading(false);
         return;
       }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Low,
-      });
+      setPermission('granted');
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Location timed out — try again.')), LOCATION_TIMEOUT_MS),
+      );
+      const pos = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
+        timeout,
+      ]);
       setLocation({
         latitude: pos.coords.latitude,
         longitude: pos.coords.longitude,

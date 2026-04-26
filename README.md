@@ -2,7 +2,7 @@
 
 A mobile scoreboard for all-you-can-eat sushi restaurants. Tap to count, submit your tally, and share eating history with friends.
 
-Built with React Native + Expo, Firebase Firestore, and Reanimated.
+Built with React Native + Expo, a Cloudflare Worker API, D1, Durable Objects, and Reanimated.
 
 ---
 
@@ -20,28 +20,33 @@ cd sushi-party
 npm install --legacy-peer-deps
 ```
 
-> `--legacy-peer-deps` is required because Firebase 12 has a react-dom peer conflict with React 19.
+> `--legacy-peer-deps` is still useful with this Expo/React dependency set.
 
-### 2. Configure Firebase
+### 2. Configure Cloudflare API
 
 ```bash
 cp .env.example .env
 ```
 
-Fill in your values from the [Firebase console](https://console.firebase.google.com/):
+For local API development, keep:
 
 ```
-EXPO_PUBLIC_FIREBASE_API_KEY=...
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=...
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=...
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=...
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
-EXPO_PUBLIC_FIREBASE_APP_ID=...
+EXPO_PUBLIC_API_BASE_URL=http://127.0.0.1:8787
 ```
 
-> The app will boot without valid Firebase keys — screens that require Firestore will show errors until M1 is complete.
+After deploying the Worker, replace that with your `https://...workers.dev` or custom domain URL.
+If you test on a physical device with Expo Go, use your computer's LAN IP instead of `127.0.0.1`.
 
-### 3. Start the dev server
+### 3. Start the Cloudflare API
+
+```bash
+cd api
+npm install
+npm run d1:apply:local
+npm run dev
+```
+
+### 4. Start the Expo dev server
 
 ```bash
 npx expo start
@@ -79,10 +84,15 @@ sushi-party/
 │   │   ├── useMenu.ts          # Menu toggle
 │   │   └── useFriends.ts       # Friend list (M4)
 │   ├── lib/
-│   │   ├── firebase/           # Firebase init + Firestore constants
+│   │   ├── cloudflare/         # Worker API client + data helpers
 │   │   ├── menus/globalMenu.ts # 28-item default sushi menu
 │   │   └── stats/              # Anomaly detection (Welford algorithm)
 │   └── types/index.ts          # Shared TypeScript interfaces
+│
+├── api/                        # Cloudflare Worker + D1 + Durable Objects
+│   ├── src/index.ts            # HTTP API and group WebSocket backend
+│   ├── migrations/             # D1 schema migrations
+│   └── wrangler.jsonc          # Cloudflare bindings
 │
 ├── assets/
 │   └── images/sushi/           # Drop PNG sushi images here
@@ -93,7 +103,7 @@ sushi-party/
 │   ├── UX_FLOW.md              # Screen list, nav graph, per-screen spec
 │   └── ROADMAP.md              # Milestones M0–M7 with definition of done
 │
-├── .env.example                # Firebase config template
+├── .env.example                # Cloudflare API URL template
 ├── babel.config.js             # Reanimated plugin
 └── README.md
 ```
@@ -110,6 +120,28 @@ npm run lint
 npm run format
 ```
 
+## Cloudflare Deployment
+
+```bash
+cd api
+npx wrangler login
+npx wrangler d1 create sushi-party
+```
+
+Copy the returned `database_id` into `api/wrangler.jsonc`, then set a token signing secret and deploy:
+
+```bash
+npx wrangler secret put JWT_SECRET
+npm run d1:apply:remote
+npm run deploy
+```
+
+Set the app env var to the deployed Worker URL:
+
+```bash
+EXPO_PUBLIC_API_BASE_URL=https://<your-worker>.<your-account>.workers.dev
+```
+
 ---
 
 ## Tech Stack
@@ -119,8 +151,9 @@ npm run format
 | Framework | React Native + Expo SDK 54 |
 | Navigation | Expo Router 6 (file-based) |
 | Language | TypeScript (strict) |
-| Database | Firebase Firestore |
-| Auth | Firebase Auth |
+| Database | Cloudflare D1 |
+| Auth | Worker-issued device token |
+| Realtime | Cloudflare Durable Objects + WebSockets |
 | Animations | React Native Reanimated 4 |
 | Location | expo-location |
 | Secure storage | expo-secure-store |
@@ -147,7 +180,7 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for the full milestone breakdown.
 
 ## Architecture
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for Firestore schema, security rules, real-time sync strategy, and anomaly detection design.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the Cloudflare API, D1 schema, real-time sync strategy, and anomaly detection design.
 
 ## Privacy Policy
 

@@ -62,7 +62,7 @@ const SEEDED_SESSIONS: SushiSession[] = [
         displayName: 'Akira Ito',
         counts: {
           'nigiri-salmon': 6,
-          'roll-dragon': 3,
+          'special-roll-dragon': 3,
           'sashimi-tuna': 4,
           'special-gyoza': 2,
         },
@@ -84,9 +84,9 @@ const SEEDED_SESSIONS: SushiSession[] = [
         userId: 'friend-maya',
         displayName: 'Maya Lin',
         counts: {
-          'roll-rainbow': 4,
+          'special-roll-rainbow': 4,
           'roll-salmon-avocado': 3,
-          'special-miso-soup': 1,
+          'soup-miso': 1,
         },
       },
       {
@@ -114,7 +114,7 @@ const SEEDED_SESSIONS: SushiSession[] = [
         userId: 'friend-sam',
         displayName: 'Sam Park',
         counts: {
-          'roll-shrimp-tempura': 2,
+          'special-roll-shrimp-tempura': 2,
           'special-edamame': 1,
           'nigiri-eel': 4,
         },
@@ -138,7 +138,7 @@ const SEEDED_SESSIONS: SushiSession[] = [
         counts: {
           'nigiri-scallop': 4,
           'sashimi-salmon': 5,
-          'special-ice-cream': 1,
+          'dessert-ice-cream': 1,
         },
       },
     ],
@@ -160,7 +160,7 @@ const SEEDED_SESSIONS: SushiSession[] = [
         counts: {
           'nigiri-yellowtail': 4,
           'roll-california': 2,
-          'special-miso-soup': 1,
+          'soup-miso': 1,
         },
       },
       {

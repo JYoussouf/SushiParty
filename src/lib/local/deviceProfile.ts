@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { User } from '../../types';
 
 const DEVICE_PROFILE_KEY = 'sushi-party/device-profile';
+const ONBOARDING_KEY = 'sushi-party/onboarding-done';
 
 function randomId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -34,8 +35,16 @@ export async function getOrCreateDeviceProfile(): Promise<User> {
   return profile;
 }
 
+export async function isOnboardingComplete(): Promise<boolean> {
+  return (await AsyncStorage.getItem(ONBOARDING_KEY)) === '1';
+}
+
+export async function markOnboardingComplete(): Promise<void> {
+  await AsyncStorage.setItem(ONBOARDING_KEY, '1');
+}
+
 export async function updateDeviceProfile(
-  updates: Partial<Pick<User, 'displayName' | 'username' | 'email' | 'friendIds'>>,
+  updates: Partial<Pick<User, 'displayName' | 'username' | 'email' | 'friendIds' | 'avatar'>>,
 ): Promise<User> {
   const existing = await getOrCreateDeviceProfile();
   const next: User = {
@@ -45,6 +54,11 @@ export async function updateDeviceProfile(
     username: updates.username?.trim().toLowerCase() || existing.username,
     email: updates.email?.trim() || existing.email,
     friendIds: updates.friendIds ?? existing.friendIds,
+    ...(updates.avatar !== undefined
+      ? { avatar: updates.avatar }
+      : existing.avatar !== undefined
+        ? { avatar: existing.avatar }
+        : {}),
   };
   await AsyncStorage.setItem(DEVICE_PROFILE_KEY, JSON.stringify(next));
   return next;

@@ -8,6 +8,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.wrangler/
 
 # Native
 .kotlin/
@@ -30,7 +31,7 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files — mode-specific files (.env.development, .env.production) are committed
 .env
 .env*.local
 

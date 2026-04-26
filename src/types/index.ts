@@ -7,6 +7,7 @@ export interface User {
   email: string;
   createdAt: string; // ISO timestamp
   friendIds: string[];
+  avatar?: string;
 }
 
 // ─── Menu ─────────────────────────────────────────────────────────────────────
@@ -16,7 +17,7 @@ export type SushiSize = 'small' | 'medium' | 'large';
 export interface SushiItem {
   id: string;
   name: string;
-  category: 'nigiri' | 'sashimi' | 'roll' | 'soup' | 'special' | 'other';
+  category: 'nigiri' | 'sashimi' | 'roll' | 'handroll' | 'special_roll' | 'soup' | 'salad' | 'special' | 'dessert' | 'rice' | 'noodles' | 'teriyaki' | 'skewers' | 'spring_roll' | 'other';
   sizes?: SushiSize[]; // undefined = no size variant (one-size)
   imageKey?: string; // filename stem in assets/images/sushi/
 }
@@ -113,7 +114,9 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
+  emoji: string;
   earned: boolean;
+  hidden?: boolean;
   earnedAt?: string;
 }
 

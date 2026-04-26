@@ -5,9 +5,10 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { getFriendById, getFriendSessions } from '../../src/lib/local/friends';
 import { getSessionTotalPieces } from '../../src/lib/sessionSummary';
@@ -23,6 +24,7 @@ function getInitials(name: string): string {
 }
 
 export default function FriendProfileScreen() {
+  const router = useRouter();
   const params = useLocalSearchParams<{ id?: string }>();
   const [friend, setFriend] = useState<User | null>(null);
   const [sessions, setSessions] = useState<SushiSession[]>([]);
@@ -73,6 +75,11 @@ export default function FriendProfileScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backText}>← Back</Text>
+        </TouchableOpacity>
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
           <View style={styles.avatar}>
@@ -108,6 +115,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  header: { paddingHorizontal: 16, paddingVertical: 12 },
+  backBtn: { alignSelf: 'flex-start' },
+  backText: { fontSize: 16, fontWeight: '700', color: '#e53935' },
   loadingState: {
     flex: 1,
     backgroundColor: '#fff',

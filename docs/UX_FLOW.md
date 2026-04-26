@@ -64,15 +64,15 @@
 
 ### `(auth)/login`
 - Email + password fields
-- "Sign In" button → Firebase `signInWithEmailAndPassword`
+- "Sign In" button → update local profile and sync through `POST /auth/device`
 - Link to Register
 - Error display (wrong password, no account)
-- On success: onAuthStateChanged fires → redirects to tabs
+- On success: profile is synced and user returns to tabs
 
 ### `(auth)/register`
 - Email, password, display name, username fields
-- Username uniqueness check (Firestore query)
-- On submit: Firebase `createUserWithEmailAndPassword` → write `users/{uid}` doc
+- Username uniqueness check (Worker/D1 query)
+- On submit: update local profile → sync `users.uid` through the Worker
 - On success: redirects to tabs
 
 ### `(tabs)/scoreboard`
@@ -84,8 +84,8 @@
 - Sticky bottom footer: Reset button + Submit button (disabled if total = 0)
 - Submit flow:
   1. (M6) Check anomaly → show confirmation modal if flagged
-  2. Write session to Firestore (M1)
-  3. Update restaurant stats (M6, Cloud Function)
+  2. Write session to D1 through the Worker (M1)
+  3. Update restaurant stats in the Worker (M6)
   4. Navigate to session/summary (M3)
 
 ### `(tabs)/history`

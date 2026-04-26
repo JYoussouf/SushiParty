@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Modal,
   KeyboardAvoidingView,
   Platform,
+  Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,12 +22,14 @@ import {
   getNearbyRestaurants,
   searchRestaurantsByName,
   createRestaurant,
-  getRestaurant,
-} from '../../src/lib/firebase/restaurants';
+} from '../../src/lib/cloudflare/restaurants';
 import { formatDistance } from '../../src/lib/geo';
 import type { Restaurant } from '../../src/types';
 
 type RestaurantWithDistance = Restaurant & { distanceKm?: number };
+
+// Session-scoped cache so repeat searches are instant (cleared on app restart)
+const searchCache = new Map<string, RestaurantWithDistance[]>();
 
 export default function RestaurantPickerScreen() {
   const router = useRouter();
@@ -36,38 +39,76 @@ export default function RestaurantPickerScreen() {
   const [nearby, setNearby] = useState<RestaurantWithDistance[]>([]);
   const [searchResults, setSearchResults] = useState<RestaurantWithDistance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [listLoading, setListLoading] = useState(false);
+  const [nearbyLoading, setNearbyLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load nearby when location becomes available
+  // Load nearby when location becomes available; auto-select if one is within 100m
   useEffect(() => {
     if (!location) return;
-    setListLoading(true);
+    setNearbyLoading(true);
     getNearbyRestaurants(location)
-      .then(setNearby)
-      .catch((e: unknown) => {
-        const msg = e instanceof Error ? e.message : 'Could not load restaurants.';
-        Alert.alert('Error', msg);
+      .then((results) => {
+        const here = results.find((r) => r.distanceKm !== undefined && r.distanceKm <= 0.1);
+        if (here) {
+          setRestaurant(here);
+          router.back();
+          return;
+        }
+        setNearby(results);
       })
-      .finally(() => setListLoading(false));
+      .catch(() => {})
+      .finally(() => setNearbyLoading(false));
   }, [location]);
 
-  const handleSearchChange = useCallback((text: string) => {
-    setSearchQuery(text);
-    if (text.trim().length < 2) {
-      setSearchResults([]);
-      return;
-    }
-    void searchRestaurantsByName(text).then(setSearchResults);
+  const handleSearchChange = useCallback(
+    (text: string) => {
+      setSearchQuery(text);
+      setSearchError(null);
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+
+      if (text.trim().length < 2) {
+        setSearchResults([]);
+        setSearchLoading(false);
+        return;
+      }
+
+      const cacheKey = text.trim().toLowerCase();
+      if (searchCache.has(cacheKey)) {
+        setSearchResults(searchCache.get(cacheKey)!);
+        return;
+      }
+
+      setSearchLoading(true);
+      debounceRef.current = setTimeout(() => {
+        searchRestaurantsByName(text, location ?? undefined)
+          .then((results) => {
+            searchCache.set(cacheKey, results);
+            setSearchResults(results);
+          })
+          .catch((e: unknown) => {
+            setSearchError(e instanceof Error ? e.message : 'Search failed. Try again.');
+            setSearchResults([]);
+          })
+          .finally(() => setSearchLoading(false));
+      }, 350);
+    },
+    [location],
+  );
+
+  const clearSearch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchQuery('');
+    setSearchResults([]);
+    setSearchLoading(false);
+    setSearchError(null);
   }, []);
 
-  const handleSelect = async (restaurantId: string) => {
-    const full = await getRestaurant(restaurantId);
-    if (!full) {
-      Alert.alert('Error', 'Could not load restaurant details.');
-      return;
-    }
-    setRestaurant(full);
+  const handleSelect = (restaurant: RestaurantWithDistance) => {
+    setRestaurant(restaurant);
     router.back();
   };
 
@@ -79,6 +120,8 @@ export default function RestaurantPickerScreen() {
 
   const showSearch = searchQuery.trim().length >= 2;
   const displayList = showSearch ? searchResults : nearby;
+  const listLoading = showSearch ? searchLoading : nearbyLoading;
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -89,13 +132,26 @@ export default function RestaurantPickerScreen() {
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={handleSearchChange}
-          placeholder="Search restaurants by name…"
+          placeholder="Search by name or city…"
           placeholderTextColor="#bbb"
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
         />
+        {searchQuery.length > 0 ? (
+          <TouchableOpacity style={styles.searchAction} onPress={clearSearch}>
+            <Text style={styles.searchClear}>✕</Text>
+          </TouchableOpacity>
+        ) : searchLoading ? (
+          <ActivityIndicator style={styles.searchAction} size="small" color="#e53935" />
+        ) : null}
       </View>
+
+      {searchError && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{searchError}</Text>
+        </View>
+      )}
 
       {!showSearch && (
         <View style={styles.header}>
@@ -103,17 +159,27 @@ export default function RestaurantPickerScreen() {
             <View>
               <Text style={styles.sectionLabel}>Location access needed</Text>
               <Text style={styles.helperText}>
-                Grant location permission in Settings to see nearby restaurants, or search by name
-                above.
+                Location is needed to find nearby spots — enable it to search by distance.
               </Text>
               <TouchableOpacity style={styles.linkBtn} onPress={refresh}>
                 <Text style={styles.linkBtnText}>Try again</Text>
               </TouchableOpacity>
             </View>
+          ) : permission === 'denied-permanent' ? (
+            <View>
+              <Text style={styles.sectionLabel}>Location access needed</Text>
+              <Text style={styles.helperText}>
+                Location permission was denied. Open Settings to allow Sushi Party to access your
+                location, or search by name above.
+              </Text>
+              <TouchableOpacity style={styles.linkBtn} onPress={() => void Linking.openSettings()}>
+                <Text style={styles.linkBtnText}>Open Settings</Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <View style={styles.sectionRow}>
               <Text style={styles.sectionLabel}>Nearby</Text>
-              {locLoading && <ActivityIndicator size="small" color="#e53935" />}
+              {(locLoading || nearbyLoading) && <ActivityIndicator size="small" color="#e53935" />}
             </View>
           )}
         </View>
@@ -125,7 +191,7 @@ export default function RestaurantPickerScreen() {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onPress={() => handleSelect(item.id)}>
+          <TouchableOpacity style={styles.row} onPress={() => handleSelect(item)}>
             <View style={styles.rowBody}>
               <Text style={styles.rowName}>{item.name}</Text>
               <Text style={styles.rowAddress} numberOfLines={1}>
@@ -146,9 +212,9 @@ export default function RestaurantPickerScreen() {
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>
                 {showSearch
-                  ? 'No matching restaurants found.'
+                  ? 'No results. Try adding the city name, e.g. "Taka Sushi Windsor".'
                   : location
-                    ? 'No restaurants nearby yet.'
+                    ? 'No restaurants detected nearby.'
                     : 'Waiting for location…'}
               </Text>
             </View>
@@ -284,8 +350,12 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   searchInput: {
+    flex: 1,
     height: 44,
     borderRadius: 22,
     backgroundColor: '#f5f5f5',
@@ -293,6 +363,22 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#222',
   },
+  searchAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchClear: { fontSize: 14, color: '#aaa', fontWeight: '600' },
+  errorBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#fff3f2',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#ffd0cc',
+  },
+  errorText: { fontSize: 13, color: '#c0392b' },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionLabel: {

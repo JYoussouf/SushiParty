@@ -48,17 +48,31 @@ function ensureParticipant(
   participants: SessionParticipant[],
   userId: string,
   displayName: string,
+  avatar?: string,
 ): SessionParticipant[] {
   if (participants.some((participant) => participant.userId === userId)) {
-    return participants;
+    return participants.map((participant) =>
+      participant.userId === userId && avatar && participant.avatar !== avatar
+        ? { ...participant, avatar }
+        : participant,
+    );
   }
 
-  return [...participants, { userId, displayName, counts: {} }];
+  return [
+    ...participants,
+    {
+      userId,
+      displayName,
+      ...(avatar ? { avatar } : {}),
+      counts: {},
+    },
+  ];
 }
 
 export async function createGroupSession(
   ownerUid: string,
   displayName: string,
+  avatar?: string,
 ): Promise<GroupSessionDraft> {
   const drafts = await getFreshDrafts();
   let code = randomCode();
@@ -75,7 +89,14 @@ export async function createGroupSession(
     createdAt: now,
     updatedAt: now,
     expiresAt: new Date(Date.now() + GROUP_TTL_MS).toISOString(),
-    participants: [{ userId: ownerUid, displayName, counts: {} }],
+    participants: [
+      {
+        userId: ownerUid,
+        displayName,
+        ...(avatar ? { avatar } : {}),
+        counts: {},
+      },
+    ],
   };
 
   await writeDrafts([draft, ...drafts]);
@@ -97,6 +118,7 @@ export async function joinGroupSession(
   code: string,
   userId: string,
   displayName: string,
+  avatar?: string,
 ): Promise<GroupSessionDraft | null> {
   const drafts = await getFreshDrafts();
   const normalized = code.trim().toUpperCase();
@@ -110,7 +132,7 @@ export async function joinGroupSession(
     joinedDraft = {
       ...draft,
       updatedAt: new Date().toISOString(),
-      participants: ensureParticipant(draft.participants, userId, displayName),
+      participants: ensureParticipant(draft.participants, userId, displayName, avatar),
     };
     return joinedDraft;
   });
@@ -129,6 +151,7 @@ export async function updateGroupParticipantCounts(
   displayName: string,
   itemId: string,
   delta: number,
+  avatar?: string,
 ): Promise<GroupSessionDraft | null> {
   const drafts = await getFreshDrafts();
   let updatedDraft: GroupSessionDraft | null = null;
@@ -138,7 +161,7 @@ export async function updateGroupParticipantCounts(
       return draft;
     }
 
-    const participants = ensureParticipant(draft.participants, userId, displayName).map((participant) => {
+    const participants = ensureParticipant(draft.participants, userId, displayName, avatar).map((participant) => {
       if (participant.userId !== userId) {
         return participant;
       }
@@ -186,6 +209,36 @@ export async function resetGroupParticipantCounts(
       participants: draft.participants.map((participant) =>
         participant.userId === userId ? { ...participant, counts: {} } : participant,
       ),
+    };
+    return updatedDraft;
+  });
+
+  if (!updatedDraft) {
+    return null;
+  }
+
+  await writeDrafts(nextDrafts);
+  return updatedDraft;
+}
+
+export async function updateGroupParticipantAvatar(
+  groupSessionId: string,
+  userId: string,
+  displayName: string,
+  avatar: string,
+): Promise<GroupSessionDraft | null> {
+  const drafts = await getFreshDrafts();
+  let updatedDraft: GroupSessionDraft | null = null;
+
+  const nextDrafts = drafts.map((draft) => {
+    if (draft.id !== groupSessionId) {
+      return draft;
+    }
+
+    updatedDraft = {
+      ...draft,
+      updatedAt: new Date().toISOString(),
+      participants: ensureParticipant(draft.participants, userId, displayName, avatar),
     };
     return updatedDraft;
   });

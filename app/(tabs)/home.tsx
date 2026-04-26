@@ -8,7 +8,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SushiPartyLogo } from '../../src/components';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { useSession } from '../../src/hooks/useSession';
 
 interface HomeButton {
   label: string;
@@ -19,32 +22,36 @@ interface HomeButton {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { userProfile } = useAuth();
+  const { participants, currentUserParticipantIndex, hasActiveSession } = useSession();
+  const avatar = participants[currentUserParticipantIndex]?.avatar ?? '🐱';
 
   const buttons: HomeButton[] = [
     {
-      label: "Let's Eat!",
-      emoji: '🍣',
+      label: 'Start a Sushi Party',
+      emoji: '🎉',
       accent: '#e53935',
       onPress: () => router.push('/session/mode-select'),
     },
-    {
-      label: 'History',
-      emoji: '📋',
+    ...(!hasActiveSession ? [{
+      label: 'Join a Sushi Party',
+      emoji: '🔗',
       accent: '#1565c0',
-      onPress: () => router.push('/(tabs)/history'),
-    },
-    {
-      label: 'Profile',
-      emoji: '👤',
-      accent: '#43a047',
-      onPress: () => router.push('/(tabs)/profile'),
-    },
+      onPress: () => router.push('/session/group-join'),
+    }] : []),
   ];
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, { top: insets.top + 8 }]}>
+        <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
+          <Text style={styles.profileAvatar}>{avatar}</Text>
+          {userProfile?.displayName ? (
+            <Text style={styles.profileName} numberOfLines={1}>{userProfile.displayName}</Text>
+          ) : null}
+        </TouchableOpacity>
         <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
           <Text style={styles.settingsIcon}>⚙️</Text>
         </TouchableOpacity>
@@ -89,9 +96,39 @@ const styles = StyleSheet.create({
   },
   topBar: {
     position: 'absolute',
-    top: 16,
+    left: 20,
     right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     zIndex: 2,
+  },
+  profileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#ead7ca',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+    maxWidth: 180,
+  },
+  profileAvatar: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  profileName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#5a3e2b',
+    flexShrink: 1,
   },
   settingsButton: {
     width: 48,

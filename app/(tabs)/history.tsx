@@ -16,19 +16,36 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { SessionCard } from '../../src/components';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { buildSessionExportText } from '../../src/lib/exportSessions';
-import { getAllSessions } from '../../src/lib/local/sessions';
-import type { SessionMode, SushiSession } from '../../src/types';
+import { getAllSessions } from '../../src/lib/cloudflare/sessions';
+import { getSessionTotalPieces } from '../../src/lib/sessionSummary';
+import type { SushiSession } from '../../src/types';
 
 const PAGE_SIZE = 20;
 
-type DateFilter = 'all' | '7d' | '30d';
-type ModeFilter = 'all' | SessionMode;
+type SortOption = 'newest' | 'oldest' | 'mostPieces' | 'fewestPieces';
 
-function matchesDateFilter(session: SushiSession, filter: DateFilter): boolean {
-  if (filter === 'all') return true;
-  const submittedAt = new Date(session.submittedAt ?? session.startedAt).getTime();
-  const days = filter === '7d' ? 7 : 30;
-  return submittedAt >= Date.now() - days * 24 * 60 * 60 * 1000;
+const SORT_OPTIONS: Array<{ key: SortOption; label: string }> = [
+  { key: 'newest', label: 'Newest' },
+  { key: 'oldest', label: 'Oldest' },
+  { key: 'mostPieces', label: 'Most pieces' },
+  { key: 'fewestPieces', label: 'Fewest pieces' },
+];
+
+function sessionTimestamp(session: SushiSession): number {
+  return new Date(session.submittedAt ?? session.startedAt).getTime();
+}
+
+function compareSessions(left: SushiSession, right: SushiSession, sort: SortOption): number {
+  switch (sort) {
+    case 'newest':
+      return sessionTimestamp(right) - sessionTimestamp(left);
+    case 'oldest':
+      return sessionTimestamp(left) - sessionTimestamp(right);
+    case 'mostPieces':
+      return getSessionTotalPieces(right) - getSessionTotalPieces(left);
+    case 'fewestPieces':
+      return getSessionTotalPieces(left) - getSessionTotalPieces(right);
+  }
 }
 
 export default function HistoryScreen() {
@@ -39,8 +56,7 @@ export default function HistoryScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [query, setQuery] = useState('');
-  const [modeFilter, setModeFilter] = useState<ModeFilter>('all');
-  const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  const [sortOption, setSortOption] = useState<SortOption>('newest');
 
   const loadSessions = useCallback(async () => {
     if (!userProfile) {
@@ -52,15 +68,9 @@ export default function HistoryScreen() {
     setRefreshing(true);
     try {
       const sessions = await getAllSessions();
-      const userSessions = sessions
-        .filter((session) =>
-          session.participants.some((participant) => participant.userId === userProfile.uid),
-        )
-        .sort(
-          (left, right) =>
-            new Date(right.submittedAt ?? right.startedAt).getTime() -
-            new Date(left.submittedAt ?? left.startedAt).getTime(),
-        );
+      const userSessions = sessions.filter((session) =>
+        session.participants.some((participant) => participant.userId === userProfile.uid),
+      );
       setAllSessions(userSessions);
       setVisibleCount(PAGE_SIZE);
     } finally {
@@ -78,21 +88,20 @@ export default function HistoryScreen() {
   const filteredSessions = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
 
-    return allSessions.filter((session) => {
-      const matchesQuery =
-        normalizedQuery.length === 0 ||
-        session.restaurantName.toLowerCase().includes(normalizedQuery) ||
-        session.note?.toLowerCase().includes(normalizedQuery) ||
-        session.participants.some((participant) =>
-          participant.displayName.toLowerCase().includes(normalizedQuery),
-        );
+    const matched =
+      normalizedQuery.length === 0
+        ? allSessions
+        : allSessions.filter(
+            (session) =>
+              session.restaurantName.toLowerCase().includes(normalizedQuery) ||
+              session.note?.toLowerCase().includes(normalizedQuery) ||
+              session.participants.some((participant) =>
+                participant.displayName.toLowerCase().includes(normalizedQuery),
+              ),
+          );
 
-      const matchesMode = modeFilter === 'all' || session.mode === modeFilter;
-      const matchesDate = matchesDateFilter(session, dateFilter);
-
-      return matchesQuery && matchesMode && matchesDate;
-    });
-  }, [allSessions, dateFilter, modeFilter, query]);
+    return [...matched].sort((left, right) => compareSessions(left, right, sortOption));
+  }, [allSessions, query, sortOption]);
 
   const displayedSessions = filteredSessions.slice(0, visibleCount);
 
@@ -117,6 +126,14 @@ export default function HistoryScreen() {
     return (
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
+        <View style={styles.backRow}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.replace('/(tabs)/home')}
+          >
+            <Text style={styles.backButtonText}>← Home</Text>
+          </TouchableOpacity>
+        </View>
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📋</Text>
           <Text style={styles.emptyTitle}>No sushi history yet</Text>
@@ -151,6 +168,12 @@ export default function HistoryScreen() {
         )}
         ListHeaderComponent={
           <View style={styles.header}>
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => router.replace('/(tabs)/home')}
+            >
+              <Text style={styles.backButtonText}>← Home</Text>
+            </TouchableOpacity>
             <View style={styles.headerTop}>
               <View>
                 <Text style={styles.title}>History</Text>
@@ -170,28 +193,15 @@ export default function HistoryScreen() {
             />
 
             <View style={styles.filterRow}>
-              {(['all', 'single', 'individual', 'group'] as ModeFilter[]).map((filter) => (
+              <Text style={styles.sortLabel}>Sort by</Text>
+              {SORT_OPTIONS.map(({ key, label }) => (
                 <TouchableOpacity
-                  key={filter}
-                  style={[styles.filterChip, modeFilter === filter && styles.filterChipActive]}
-                  onPress={() => setModeFilter(filter)}
+                  key={key}
+                  style={[styles.filterChip, sortOption === key && styles.filterChipActive]}
+                  onPress={() => setSortOption(key)}
                 >
-                  <Text style={[styles.filterChipText, modeFilter === filter && styles.filterChipTextActive]}>
-                    {filter === 'all' ? 'All Modes' : filter}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.filterRow}>
-              {(['all', '7d', '30d'] as DateFilter[]).map((filter) => (
-                <TouchableOpacity
-                  key={filter}
-                  style={[styles.filterChip, dateFilter === filter && styles.filterChipActive]}
-                  onPress={() => setDateFilter(filter)}
-                >
-                  <Text style={[styles.filterChipText, dateFilter === filter && styles.filterChipTextActive]}>
-                    {filter === 'all' ? 'Any Time' : filter === '7d' ? 'Last 7 Days' : 'Last 30 Days'}
+                  <Text style={[styles.filterChipText, sortOption === key && styles.filterChipTextActive]}>
+                    {label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -199,8 +209,8 @@ export default function HistoryScreen() {
 
             {filteredSessions.length === 0 && (
               <View style={styles.filteredEmptyCard}>
-                <Text style={styles.filteredEmptyTitle}>No parties match these filters</Text>
-                <Text style={styles.filteredEmptyText}>Try clearing a filter or broadening the search.</Text>
+                <Text style={styles.filteredEmptyTitle}>No parties match your search</Text>
+                <Text style={styles.filteredEmptyText}>Try a different restaurant, note, or attendee.</Text>
               </View>
             )}
           </View>
@@ -228,6 +238,9 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: '#777' },
   exportButton: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#ffeaea' },
   exportButtonText: { fontSize: 14, fontWeight: '700', color: '#e53935' },
+  backRow: { paddingHorizontal: 20, paddingTop: 16 },
+  backButton: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
+  backButtonText: { fontSize: 15, fontWeight: '600', color: '#e53935' },
   searchInput: {
     height: 48,
     borderRadius: 14,
@@ -238,7 +251,8 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#222',
   },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  sortLabel: { fontSize: 12, fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: 0.6, marginRight: 2 },
   filterChip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f5f5f5' },
   filterChipActive: { backgroundColor: '#ffeaea' },
   filterChipText: { fontSize: 12, fontWeight: '700', color: '#777' },
