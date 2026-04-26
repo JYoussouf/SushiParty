@@ -24,23 +24,32 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { userProfile } = useAuth();
-  const { participants, currentUserParticipantIndex, hasActiveSession } = useSession();
+  const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
   const avatar = participants[currentUserParticipantIndex]?.avatar ?? '🐱';
 
-  const buttons: HomeButton[] = [
-    {
-      label: 'Start a Sushi Party',
-      emoji: '🎉',
-      accent: '#e53935',
-      onPress: () => router.push('/session/mode-select'),
-    },
-    ...(!hasActiveSession ? [{
-      label: 'Join a Sushi Party',
-      emoji: '🔗',
-      accent: '#1565c0',
-      onPress: () => router.push('/session/group-join'),
-    }] : []),
-  ];
+  const buttons: HomeButton[] = hasActiveSession
+    ? [
+        {
+          label: groupCode ? 'Resume Lobby' : 'Resume Party',
+          emoji: groupCode ? '🎉' : '🍣',
+          accent: '#e53935',
+          onPress: () => router.push(groupCode ? '/session/lobby' : '/session/mode-select'),
+        },
+      ]
+    : [
+        {
+          label: 'Start a Sushi Party',
+          emoji: '🎉',
+          accent: '#e53935',
+          onPress: () => router.push('/session/mode-select'),
+        },
+        {
+          label: 'Join a Sushi Party',
+          emoji: '🔗',
+          accent: '#1565c0',
+          onPress: () => router.push('/session/group-join'),
+        },
+      ];
 
   return (
     <SafeAreaView style={styles.container}>

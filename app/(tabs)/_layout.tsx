@@ -23,13 +23,6 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="scoreboard"
-        options={{
-          title: 'Scoreboard',
-          tabBarIcon: () => <TabIcon emoji="🍣" />,
-        }}
-      />
-      <Tabs.Screen
         name="history"
         options={{
           title: 'History',

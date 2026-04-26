@@ -140,7 +140,7 @@ export default function HistoryScreen() {
           <Text style={styles.emptySubtitle}>
             Finish your first party and it will show up here with a full breakdown.
           </Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/scoreboard')}>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/session/scoreboard')}>
             <Text style={styles.emptyButtonText}>Start counting</Text>
           </TouchableOpacity>
         </View>

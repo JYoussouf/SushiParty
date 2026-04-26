@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { RestaurantProvider } from '../src/contexts/RestaurantContext';
 import { SessionProvider, useSession } from '../src/contexts/SessionContext';
+import { TransitionProvider } from '../src/contexts/TransitionContext';
 import { IntroSplash } from '../src/components';
 import { palette } from '../src/theme/pixel';
 
@@ -52,7 +53,7 @@ function RootLayoutNav() {
     }
     const t = setTimeout(() => {
       didInitialRedirect = true;
-      router.replace(hasActiveSession ? '/(tabs)/scoreboard' : '/(tabs)/home');
+      router.replace(hasActiveSession ? '/session/scoreboard' : '/(tabs)/home');
     }, 0);
     return () => clearTimeout(t);
   }, [
@@ -72,15 +73,17 @@ function RootLayoutNav() {
 
     const currentPath = segments.join('/');
     const allowedPaths = new Set([
-      '(tabs)/scoreboard',
+      'session/scoreboard',
       'restaurant/picker',
       'session/mode-select',
       'session/group-join',
       'session/restaurant-confirm',
+      'session/lobby',
+      'session/party-intro',
     ]);
 
     if (!allowedPaths.has(currentPath)) {
-      router.replace('/(tabs)/scoreboard');
+      router.replace('/session/scoreboard');
     }
   }, [accountBacked, hasActiveSession, navState?.key, router, segments]);
 
@@ -102,6 +105,18 @@ function RootLayoutNav() {
       <Stack.Screen
         name="session/mode-select"
         options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="session/lobby"
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+      />
+      <Stack.Screen
+        name="session/scoreboard"
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'none' }}
+      />
+      <Stack.Screen
+        name="session/party-intro"
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }}
       />
       <Stack.Screen
         name="session/group-join"
@@ -132,9 +147,11 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <AuthProvider>
         <SessionProvider>
-          <RestaurantProvider>
-            <RootLayoutNav />
-          </RestaurantProvider>
+          <TransitionProvider>
+            <RestaurantProvider>
+              <RootLayoutNav />
+            </RestaurantProvider>
+          </TransitionProvider>
         </SessionProvider>
       </AuthProvider>
       {!introDone && <IntroSplash onFinish={() => setIntroDone(true)} />}

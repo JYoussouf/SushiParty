@@ -15,6 +15,7 @@ interface User {
   email: string;
   createdAt: string;
   friendIds: string[];
+  avatar?: string;
 }
 
 interface GeoPoint {
@@ -85,6 +86,7 @@ interface UserRow {
   display_name: string;
   email: string;
   friend_ids_json: string;
+  avatar: string | null;
   created_at: string;
 }
 
@@ -377,6 +379,7 @@ function rowToUser(row: UserRow): User {
     email: row.email,
     createdAt: row.created_at,
     friendIds: safeJson<string[]>(row.friend_ids_json, []),
+    ...(row.avatar ? { avatar: row.avatar } : {}),
   };
 }
 
@@ -500,19 +503,21 @@ async function upsertUser(env: Env, input: Partial<User> & { uid: string }): Pro
   const displayName = input.displayName?.trim() || existing?.display_name || 'Sushi Friend';
   const email = normalizeEmail(input.email) || existing?.email || '';
   const friendIds = input.friendIds ?? safeJson<string[]>(existing?.friend_ids_json, []);
+  const avatar = input.avatar?.trim() || existing?.avatar || null;
 
   try {
     await env.DB.prepare(
-      `INSERT INTO users (uid, username, display_name, email, friend_ids_json, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO users (uid, username, display_name, email, friend_ids_json, avatar, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(uid) DO UPDATE SET
          username = excluded.username,
          display_name = excluded.display_name,
          email = excluded.email,
          friend_ids_json = excluded.friend_ids_json,
+         avatar = excluded.avatar,
          updated_at = excluded.updated_at`,
     )
-      .bind(input.uid, username, displayName, email, JSON.stringify(friendIds), existing?.created_at ?? now, now)
+      .bind(input.uid, username, displayName, email, JSON.stringify(friendIds), avatar, existing?.created_at ?? now, now)
       .run();
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
@@ -662,76 +667,67 @@ async function handleAuthLogin(request: Request, env: Env): Promise<Response> {
 
 async function handleAuthOAuth(request: Request, env: Env, provider: 'apple' | 'google' | 'facebook'): Promise<Response> {
   const body = await readJson<{
-    token?: string;
-    idToken?: string;
-    accessToken?: string;
-    code?: string;
+    providerUid?: string;
     email?: string;
     displayName?: string;
+    avatar?: string;
   }>(request);
 
-  let email: string;
-  let displayName: string;
+  if (!body.providerUid) {
+    throw new HttpError(400, 'providerUid is required.');
+  }
+  const providerUid = body.providerUid.trim();
+  const email = normalizeEmail(body.email);
+  const displayName = body.displayName?.trim() || 'Sushi Friend';
 
-  if (provider === 'apple') {
-    // Apple provides email and displayName from the client
-    if (!body.email || !body.displayName) {
-      throw new HttpError(400, 'Email and display name required for Apple Sign In.');
-    }
-    email = body.email;
-    displayName = body.displayName;
-  } else if (provider === 'google' || provider === 'facebook') {
-    // For Google and Facebook, we'd normally exchange the code for tokens here
-    // For now, we'll just accept the code and create a placeholder user
-    // In production, you'd call the provider's token endpoint
-    if (!body.code) {
-      throw new HttpError(400, 'Authorization code required.');
-    }
+  const now = new Date().toISOString();
 
-    // TODO: Exchange code for token with provider
-    // For now, use a placeholder email based on the code
-    email = normalizeEmail(`${provider}-${body.code.substring(0, 8)}@${provider}.local`);
-    displayName = `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`;
+  // Look up by (provider, provider_uid) first — canonical path
+  const oauthRow = await env.DB
+    .prepare('SELECT user_uid FROM oauth_accounts WHERE provider = ? AND provider_uid = ?')
+    .bind(provider, providerUid)
+    .first<{ user_uid: string }>();
+
+  let uid: string;
+
+  if (oauthRow) {
+    uid = oauthRow.user_uid;
   } else {
-    throw new HttpError(400, 'Invalid provider.');
-  }
+    // Migration path: try to find existing user by email
+    const existingByEmail = email
+      ? await env.DB.prepare('SELECT uid FROM users WHERE email = ?').bind(email).first<{ uid: string }>()
+      : null;
 
-  if (!isValidEmail(email)) {
-    throw new HttpError(400, 'Invalid email address.');
-  }
-
-  // Check if user exists
-  let userRow = await env.DB.prepare('SELECT * FROM users WHERE email = ?')
-    .bind(email)
-    .first<UserRow>();
-
-  if (!userRow) {
-    // Create new user for OAuth
-    const uid = randomId('user');
+    uid = existingByEmail?.uid ?? randomId('user');
     const username = normalizeUsername(displayName.toLowerCase().replace(/\s+/g, '_'), uid);
-    
-    await upsertUser(env, {
-      uid,
-      email,
-      displayName,
-      username,
-    });
 
-    userRow = await env.DB.prepare('SELECT * FROM users WHERE uid = ?')
-      .bind(uid)
-      .first<UserRow>();
-    
-    if (!userRow) {
-      throw new HttpError(500, 'Failed to create user.');
-    }
+    await upsertUser(env, { uid, email, displayName, username, ...(body.avatar ? { avatar: body.avatar } : {}) });
+
+    // Link this provider to the user
+    await env.DB
+      .prepare(
+        `INSERT INTO oauth_accounts (provider, provider_uid, user_uid, email, created_at)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(provider, provider_uid) DO NOTHING`,
+      )
+      .bind(provider, providerUid, uid, email || null, now)
+      .run();
   }
 
-  const user = rowToUser(userRow);
+  // Update avatar / displayName if provided (user may have changed them)
+  if (body.avatar || body.displayName) {
+    await upsertUser(env, { uid, ...(body.avatar ? { avatar: body.avatar } : {}), ...(body.displayName ? { displayName: body.displayName } : {}) });
+  }
+
+  const row = await env.DB.prepare('SELECT * FROM users WHERE uid = ?').bind(uid).first<UserRow>();
+  if (!row) throw new HttpError(500, 'Failed to load user.');
+
+  const user = rowToUser(row);
   const token = await signToken(user.uid, env);
   return json(request, env, { token, user, accountBacked: true });
 }
 
-async function handleUsers(request: Request, env: Env, parts: string[]): Promise<Response> {
+async function handleUsers(request: Request, env: Env, parts: string[], url: URL): Promise<Response> {
   const uid = await requireAuth(request, env);
 
   if (request.method === 'GET' && parts[1] === 'me') {
@@ -750,6 +746,88 @@ async function handleUsers(request: Request, env: Env, parts: string[]): Promise
     const username = normalizeUsername(decodeURIComponent(parts[2]), '');
     const row = await env.DB.prepare('SELECT uid FROM users WHERE username = ?').bind(username).first<{ uid: string }>();
     return json(request, env, { taken: !!row && row.uid !== uid });
+  }
+
+  // Search users by username prefix (for adding friends)
+  if (request.method === 'GET' && parts[1] === 'search') {
+    const q = (url.searchParams.get('q') ?? '').trim().toLowerCase();
+    if (q.length < 2) return json(request, env, { users: [] });
+    const rows = await env.DB.prepare(
+      `SELECT uid, username, display_name, avatar FROM users
+       WHERE username >= ? AND username <= ? AND uid != ?
+       ORDER BY username ASC LIMIT 20`,
+    )
+      .bind(q, `${q}￿`, uid)
+      .all<Pick<UserRow, 'uid' | 'username' | 'display_name' | 'avatar'>>();
+    return json(request, env, {
+      users: (rows.results ?? []).map((r) => ({
+        uid: r.uid,
+        username: r.username,
+        displayName: r.display_name,
+        ...(r.avatar ? { avatar: r.avatar } : {}),
+      })),
+    });
+  }
+
+  // Add friend
+  if (request.method === 'POST' && parts[1] === 'me' && parts[2] === 'friends') {
+    const body = await readJson<{ friendUid: string }>(request);
+    if (!body.friendUid?.trim()) throw new HttpError(400, 'friendUid is required.');
+    const friendUid = body.friendUid.trim();
+    if (friendUid === uid) throw new HttpError(400, 'Cannot add yourself as a friend.');
+
+    const friendRow = await env.DB.prepare('SELECT uid FROM users WHERE uid = ?').bind(friendUid).first<{ uid: string }>();
+    if (!friendRow) throw new HttpError(404, 'User not found.');
+
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      `INSERT INTO friendships (user_uid, friend_uid, created_at) VALUES (?, ?, ?)
+       ON CONFLICT(user_uid, friend_uid) DO NOTHING`,
+    )
+      .bind(uid, friendUid, now)
+      .run();
+
+    // Keep friend_ids_json in sync
+    const meRow = await env.DB.prepare('SELECT friend_ids_json FROM users WHERE uid = ?').bind(uid).first<{ friend_ids_json: string }>();
+    const ids = safeJson<string[]>(meRow?.friend_ids_json, []);
+    if (!ids.includes(friendUid)) {
+      await env.DB.prepare('UPDATE users SET friend_ids_json = ?, updated_at = ? WHERE uid = ?')
+        .bind(JSON.stringify([...ids, friendUid]), now, uid)
+        .run();
+    }
+
+    return empty(request, env, 204);
+  }
+
+  // Remove friend
+  if (request.method === 'DELETE' && parts[1] === 'me' && parts[2] === 'friends' && parts[3]) {
+    const friendUid = parts[3];
+    await env.DB.prepare('DELETE FROM friendships WHERE user_uid = ? AND friend_uid = ?').bind(uid, friendUid).run();
+
+    const now = new Date().toISOString();
+    const meRow = await env.DB.prepare('SELECT friend_ids_json FROM users WHERE uid = ?').bind(uid).first<{ friend_ids_json: string }>();
+    const ids = safeJson<string[]>(meRow?.friend_ids_json, []).filter((id) => id !== friendUid);
+    await env.DB.prepare('UPDATE users SET friend_ids_json = ?, updated_at = ? WHERE uid = ?')
+      .bind(JSON.stringify(ids), now, uid)
+      .run();
+
+    return empty(request, env, 204);
+  }
+
+  // Friend activity feed
+  if (request.method === 'GET' && parts[1] === 'me' && parts[2] === 'friends' && parts[3] === 'feed') {
+    const limit = Math.min(Number(url.searchParams.get('limit') ?? '50'), 100);
+    const rows = await env.DB.prepare(
+      `SELECT DISTINCT s.* FROM sessions s
+       JOIN session_participants sp ON sp.session_id = s.id
+       JOIN friendships f ON f.friend_uid = sp.user_uid
+       WHERE f.user_uid = ?
+       ORDER BY s.submitted_at DESC
+       LIMIT ?`,
+    )
+      .bind(uid, limit)
+      .all<SessionRow>();
+    return json(request, env, { sessions: (rows.results ?? []).map(rowToSession) });
   }
 
   throw new HttpError(404, 'Route not found.');
@@ -795,18 +873,33 @@ async function handleSessions(request: Request, env: Env, parts: string[], url: 
       await updateRestaurantStats(env.DB, restaurantId, sessionTotalPieces(participants));
     }
 
+    // Index participants for efficient lookup (owner always included)
+    const participantUids = new Set<string>([uid]);
+    for (const p of participants) participantUids.add(p.userId);
+    await Promise.all(
+      Array.from(participantUids).map((pUid) =>
+        env.DB.prepare(
+          `INSERT INTO session_participants (session_id, user_uid) VALUES (?, ?)
+           ON CONFLICT(session_id, user_uid) DO NOTHING`,
+        )
+          .bind(id, pUid)
+          .run(),
+      ),
+    );
+
     return json(request, env, { id }, 201);
   }
 
   if (request.method === 'GET' && parts[1] === 'me') {
     const limit = Math.min(Number(url.searchParams.get('limit') ?? '100'), 200);
     const rows = await env.DB.prepare(
-      `SELECT * FROM sessions
-       WHERE owner_uid = ? OR participants_json LIKE ?
-       ORDER BY submitted_at DESC
+      `SELECT DISTINCT s.* FROM sessions s
+       JOIN session_participants sp ON sp.session_id = s.id
+       WHERE sp.user_uid = ?
+       ORDER BY s.submitted_at DESC
        LIMIT ?`,
     )
-      .bind(uid, `%${uid}%`, limit)
+      .bind(uid, limit)
       .all<SessionRow>();
     return json(request, env, { sessions: (rows.results ?? []).map(rowToSession) });
   }
@@ -859,6 +952,22 @@ async function handleSessions(request: Request, env: Env, parts: string[], url: 
         session.id,
       )
       .run();
+
+    // Sync participant index if participants changed
+    if (body.participants) {
+      const uids = new Set<string>([session.ownerUid]);
+      for (const p of next.participants) uids.add(p.userId);
+      await Promise.all(
+        Array.from(uids).map((pUid) =>
+          env.DB.prepare(
+            `INSERT INTO session_participants (session_id, user_uid) VALUES (?, ?)
+             ON CONFLICT(session_id, user_uid) DO NOTHING`,
+          )
+            .bind(session.id, pUid)
+            .run(),
+        ),
+      );
+    }
 
     const updated = await env.DB.prepare('SELECT * FROM sessions WHERE id = ?').bind(session.id).first<SessionRow>();
     return json(request, env, { session: rowToSession(updated ?? row) });
@@ -1395,7 +1504,7 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   switch (parts[0]) {
     case 'users':
-      return handleUsers(request, env, parts);
+      return handleUsers(request, env, parts, url);
     case 'sessions':
       return handleSessions(request, env, parts, url);
     case 'restaurants':

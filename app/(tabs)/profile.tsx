@@ -20,6 +20,8 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  Easing,
   interpolate,
   Extrapolation,
   runOnJS,
@@ -56,18 +58,18 @@ export default function ProfileScreen() {
   const { userProfile, remoteUser, updateLocalProfile } = useAuth();
   const [stats, setStats] = useState<UserProfileStats>(EMPTY_STATS);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [achievementsLoaded, setAchievementsLoaded] = useState(false);
   const levelInfo = calculateLevel(achievements);
   const [loading, setLoading] = useState(true);
   const [editingProfile, setEditingProfile] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [draftAvatar, setDraftAvatar] = useState('🐱');
   const [saving, setSaving] = useState(false);
-  const [lockedExpanded, setLockedExpanded] = useState(false);
-
   const loadProfile = useCallback(async () => {
     if (!userProfile) {
       setStats(EMPTY_STATS);
       setAchievements([]);
+      setAchievementsLoaded(false);
       setLoading(false);
       return;
     }
@@ -76,8 +78,25 @@ export default function ProfileScreen() {
     try {
       const sessions = await getAllSessions();
       setStats(calculateUserProfileStats(sessions, userProfile.uid));
-      setAchievements(getAchievements(sessions, userProfile.uid));
+      try {
+        const allAchievements = getAchievements(sessions, userProfile.uid);
+        setAchievements(allAchievements);
+      } catch (achievementError) {
+        console.error('Error calculating achievements:', achievementError);
+        // Fallback: create achievements with empty sessions
+        setAchievements(getAchievements([], userProfile.uid));
+      }
+    } catch (error) {
+      console.error('Error loading profile:', error);
+      // Even on error, show locked achievements
+      try {
+        setAchievements(getAchievements([], userProfile.uid));
+      } catch (fallbackError) {
+        console.error('Error loading fallback achievements:', fallbackError);
+        setAchievements([]);
+      }
     } finally {
+      setAchievementsLoaded(true);
       setLoading(false);
     }
   }, [userProfile]);
@@ -185,6 +204,8 @@ export default function ProfileScreen() {
 
         <LevelCard levelInfo={levelInfo} />
 
+        <AchievementsSection achievements={achievements} />
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Stats</Text>
           {loading ? (
@@ -216,37 +237,19 @@ export default function ProfileScreen() {
                     : 'No item data yet'
                 }
               />
+              <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/favorites')}>
+                <Text style={styles.listRowText}>Top dishes</Text>
+                <Text style={styles.listRowChevron}>Open</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.listRow} onPress={() => router.push('../profile/restaurants')}>
+                <Text style={styles.listRowText}>Restaurant insights</Text>
+                <Text style={styles.listRowChevron}>Open</Text>
+              </TouchableOpacity>
             </>
           )}
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Insights</Text>
-          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/favorites')}>
-            <Text style={styles.listRowText}>Top dishes</Text>
-            <Text style={styles.listRowChevron}>Open</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.listRow} onPress={() => router.push('../profile/restaurants')}>
-            <Text style={styles.listRowText}>Restaurant insights</Text>
-            <Text style={styles.listRowChevron}>Open</Text>
-          </TouchableOpacity>
-        </View>
 
-        <AchievementsSection
-          achievements={achievements}
-          lockedExpanded={lockedExpanded}
-          onToggleLocked={() => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-            setLockedExpanded((v) => !v);
-          }}
-        />
-
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/settings')}>
-            <Text style={styles.listRowText}>App settings</Text>
-            <Text style={styles.listRowChevron}>Open</Text>
-          </TouchableOpacity>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -300,17 +303,17 @@ function LevelCard({ levelInfo: li }: { levelInfo: LevelInfo }) {
   );
 }
 
-function AchievementBadge({ achievement: a }: { achievement: Achievement }) {
+function AchievementBadge({ achievement: a, locked }: { achievement: Achievement; locked?: boolean }) {
   const [open, setOpen] = useState(false);
   const progress = useSharedValue(0);
 
   const show = () => {
     setOpen(true);
-    progress.value = withSpring(1, { damping: 28, stiffness: 140, mass: 1.1 });
+    progress.value = withSpring(1, { damping: 28, stiffness: 160, mass: 1.1 });
   };
 
   const hide = () => {
-    progress.value = withSpring(0, { damping: 30, stiffness: 180, mass: 0.9 }, (done) => {
+    progress.value = withTiming(0, { duration: 150, easing: Easing.in(Easing.quad) }, (done) => {
       if (done) runOnJS(setOpen)(false);
     });
   };
@@ -326,29 +329,42 @@ function AchievementBadge({ achievement: a }: { achievement: Achievement }) {
     opacity: interpolate(progress.value, [0, 0.3, 1], [0, 1, 1], Extrapolation.CLAMP),
   }));
 
+  const isHiddenLocked = locked && a.hidden;
+  const displayEmoji = isHiddenLocked ? '🔒' : a.emoji;
+  const displayTitle = isHiddenLocked ? '???' : a.title;
+  const modalTitle = isHiddenLocked ? 'Hidden Achievement' : a.title;
+  const modalDesc = isHiddenLocked ? 'Keep playing to discover this secret badge.' : a.description;
+
   return (
     <>
-      <TouchableOpacity style={achStyles.badge} onPress={show} activeOpacity={0.8}>
-        <Text style={achStyles.badgeEmoji}>{a.emoji}</Text>
-        <Text style={achStyles.badgeTitle} numberOfLines={2}>{a.title}</Text>
+      <TouchableOpacity
+        style={[achStyles.badge, locked && achStyles.badgeLocked]}
+        onPress={show}
+        activeOpacity={1}
+      >
+        <Text style={achStyles.badgeEmoji}>{displayEmoji}</Text>
+        <Text style={achStyles.badgeTitle} numberOfLines={1} ellipsizeMode="tail">{displayTitle}</Text>
       </TouchableOpacity>
 
       <Modal visible={open} transparent animationType="none" onRequestClose={hide}>
         <Pressable style={StyleSheet.absoluteFill} onPress={hide}>
-          <Animated.View style={[StyleSheet.absoluteFill, achStyles.backdrop]} pointerEvents="none">
-            <BlurView style={StyleSheet.absoluteFill} intensity={40} tint="dark" />
+          <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} pointerEvents="none">
+            <BlurView style={StyleSheet.absoluteFill} intensity={24} tint="light" />
           </Animated.View>
-          <Animated.View style={[achStyles.backdropDim, backdropStyle]} pointerEvents="none" />
         </Pressable>
 
         <View style={achStyles.modalCenter} pointerEvents="box-none">
           <Animated.View style={[achStyles.glassCard, cardStyle]}>
             <BlurView style={achStyles.glassBlur} intensity={80} tint="light" />
             <View style={achStyles.glassContent}>
-              <Text style={achStyles.glassEmoji}>{a.emoji}</Text>
-              <Text style={achStyles.glassTitle}>{a.title}</Text>
-              <Text style={achStyles.glassDesc}>{a.description}</Text>
-              {(a.earnedAt || a.earnedAtRestaurant) && (
+              <Text style={achStyles.glassEmoji}>{isHiddenLocked ? '🔒' : a.emoji}</Text>
+              <Text style={achStyles.glassTitle}>{modalTitle}</Text>
+              <Text style={achStyles.glassDesc}>{modalDesc}</Text>
+              {locked ? (
+                <View style={achStyles.glassPillLocked}>
+                  <Text style={achStyles.glassPillLockedText}>Not yet unlocked</Text>
+                </View>
+              ) : (a.earnedAt || a.earnedAtRestaurant) ? (
                 <View style={achStyles.glassPill}>
                   <Text style={achStyles.glassPillText}>
                     {a.earnedAt
@@ -358,7 +374,7 @@ function AchievementBadge({ achievement: a }: { achievement: Achievement }) {
                     {a.earnedAtRestaurant ? `at ${a.earnedAtRestaurant}` : ''}
                   </Text>
                 </View>
-              )}
+              ) : null}
             </View>
           </Animated.View>
         </View>
@@ -367,59 +383,90 @@ function AchievementBadge({ achievement: a }: { achievement: Achievement }) {
   );
 }
 
-function AchievementsSection({
-  achievements,
-  lockedExpanded,
-  onToggleLocked,
-}: {
-  achievements: Achievement[];
-  lockedExpanded: boolean;
-  onToggleLocked: () => void;
-}) {
-  const earned = achievements
-    .filter((a) => a.earned)
-    .sort((a, b) => (b.earnedAt ?? '').localeCompare(a.earnedAt ?? ''));
-  const locked = achievements.filter((a) => !a.earned);
-  const recent = earned.slice(0, 3);
+const PREVIEW_COUNT = 8; // 2 rows × 4 cols
+
+function achCategory(id: string): string {
+  if (id.startsWith('first-') || id === 'world-tour') return 'debut';
+  if (['habit-forming','regular','committed','on-a-roll','sushi-devotee','unstoppable'].includes(id)) return 'session';
+  if (['ten-in-one','twenty-in-one','thirty-in-one','forty-in-one','fifty-in-one'].includes(id)) return 'single';
+  if (['friday-night','monday-warrior','weekend-warrior','late-night-craving','lunch-break','early-bird','all-days-of-week'].includes(id)) return 'time';
+  if (['solo-debut','me-time','solo-twenty'].includes(id)) return 'solo';
+  if (['first-group','social-butterfly','party-animal','sushi-party-legend','big-party','crowd-pleaser','balanced'].includes(id)) return 'group';
+  if (id.includes('restaurant') || ['loyal-regular','home-base','truly-devoted','adventure-week','world-tour-sessions'].includes(id)) return 'restaurant';
+  if (['five-nights','ten-nights','twenty-nights','three-months','half-year','ten-weeks','back-to-back','double-feature'].includes(id)) return 'consistency';
+  if (['menu-tourist','connoisseur','researcher','menu-master','variety-eater'].includes(id)) return 'variety';
+  if (['tasting-menu','rainbow-session','the-purist','full-course','surf-and-turf'].includes(id)) return 'combo';
+  if (['note-taker','journaling','food-critic'].includes(id)) return 'notes';
+  return 'pieces';
+}
+
+function interleaveByCategory(list: Achievement[]): Achievement[] {
+  const buckets = new Map<string, Achievement[]>();
+  list.forEach((a) => {
+    const c = achCategory(a.id);
+    if (!buckets.has(c)) buckets.set(c, []);
+    buckets.get(c)!.push(a);
+  });
+  const lanes = Array.from(buckets.values());
+  const result: Achievement[] = [];
+  const maxLen = Math.max(0, ...lanes.map((l) => l.length));
+  for (let i = 0; i < maxLen; i++) {
+    lanes.forEach((lane) => { if (i < lane.length) result.push(lane[i]!); });
+  }
+  return result;
+}
+
+function AchievementsSection({ achievements }: { achievements: Achievement[] }) {
+  const [allOpen, setAllOpen] = useState(false);
+
+  const earned = achievements.filter((a) => a.earned).sort((a, b) => (b.earnedAt ?? '').localeCompare(a.earnedAt ?? ''));
+  const lockedVisible = interleaveByCategory(achievements.filter((a) => !a.earned && !a.hidden));
+  const lockedHidden = achievements.filter((a) => !a.earned && a.hidden);
+  const sorted = [...earned, ...lockedVisible, ...lockedHidden];
+  const earnedCount = achievements.filter((a) => a.earned).length;
+  const preview = sorted.slice(0, PREVIEW_COUNT);
+  const hasMore = sorted.length > PREVIEW_COUNT;
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Achievements</Text>
-
-      {earned.length === 0 ? (
-        <EmptyCard text="No badges yet. Keep logging parties to unlock milestones." />
+      <Text style={styles.sectionTitle}>
+        Achievements · {earnedCount}/{achievements.length}
+      </Text>
+      {achievements.length === 0 ? (
+        <EmptyCard text="No achievements yet. Keep logging parties to unlock milestones." />
       ) : (
-        <View style={achStyles.row}>
-          {recent.map((a) => (
-            <AchievementBadge key={a.id} achievement={a} />
-          ))}
-          {earned.length > 3 && (
-            <View style={[achStyles.badge, achStyles.badgeMore]}>
-              <Text style={achStyles.moreCount}>+{earned.length - 3}</Text>
-              <Text style={achStyles.moreLabel}>more</Text>
-            </View>
-          )}
-        </View>
-      )}
-
-      {locked.length > 0 && (
-        <TouchableOpacity style={achStyles.lockedBtn} onPress={onToggleLocked} activeOpacity={0.75}>
-          <Text style={achStyles.lockedBtnText}>
-            {lockedExpanded ? 'Hide locked' : `+${locked.length} locked achievements`}
-          </Text>
-          <Text style={achStyles.lockedChevron}>{lockedExpanded ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
-      )}
-
-      {lockedExpanded && locked.map((a) => (
-        <View key={a.id} style={achStyles.lockedCard}>
-          <Text style={achStyles.lockedEmoji}>{a.hidden ? '🔒' : a.emoji}</Text>
-          <View style={achStyles.lockedBody}>
-            <Text style={achStyles.lockedTitle}>{a.hidden ? 'Hidden Achievement' : a.title}</Text>
-            <Text style={achStyles.lockedDesc}>{a.hidden ? 'Keep playing to unlock this secret badge.' : a.description}</Text>
+        <>
+          <View style={achStyles.grid}>
+            {preview.map((a) => (
+              <AchievementBadge key={a.id} achievement={a} locked={!a.earned} />
+            ))}
           </View>
-        </View>
-      ))}
+          {hasMore && (
+            <TouchableOpacity style={achStyles.seeAllBtn} onPress={() => setAllOpen(true)} activeOpacity={0.75}>
+              <Text style={achStyles.seeAllText}>See all {sorted.length} achievements</Text>
+              <Text style={achStyles.seeAllChevron}>→</Text>
+            </TouchableOpacity>
+          )}
+        </>
+      )}
+
+      <Modal visible={allOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAllOpen(false)}>
+        <SafeAreaView style={achStyles.sheetContainer}>
+          <View style={achStyles.sheetHeader}>
+            <Text style={achStyles.sheetTitle}>Achievements · {earnedCount}/{achievements.length}</Text>
+            <TouchableOpacity onPress={() => setAllOpen(false)} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+              <Text style={achStyles.sheetClose}>Done</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView contentContainerStyle={achStyles.sheetScroll} showsVerticalScrollIndicator={false}>
+            <View style={achStyles.grid}>
+              {sorted.map((a) => (
+                <AchievementBadge key={a.id} achievement={a} locked={!a.earned} />
+              ))}
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }
@@ -538,51 +585,26 @@ const styles = StyleSheet.create({
   },
 });
 
+const BADGE_SIZE = (SCREEN_WIDTH - 48 - 24) / 4; // 4 cols, 24px side padding, 3×8px gaps
+
 const achStyles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: 10 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   badge: {
-    flex: 1,
-    aspectRatio: 1,
+    width: BADGE_SIZE,
+    height: BADGE_SIZE,
     borderRadius: 16,
     backgroundColor: '#fff6e7',
     borderWidth: 1,
     borderColor: '#f0d7a0',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 10,
+    padding: 8,
     gap: 4,
   },
-  badgeEmoji: { fontSize: 28 },
-  badgeTitle: { fontSize: 11, fontWeight: '700', color: '#8b6a1d', textAlign: 'center', lineHeight: 14 },
-  badgeMore: { backgroundColor: '#fafafa', borderColor: '#e8e8e8' },
-  moreCount: { fontSize: 22, fontWeight: '800', color: '#aaa' },
-  moreLabel: { fontSize: 11, color: '#bbb', fontWeight: '600' },
-  lockedBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#f0f0f0',
-    marginTop: 4,
-  },
-  lockedBtnText: { fontSize: 14, color: '#999', fontWeight: '600' },
-  lockedChevron: { fontSize: 10, color: '#bbb' },
-  lockedCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#f5f5f5',
-  },
-  lockedEmoji: { fontSize: 28, opacity: 0.4, width: 40, textAlign: 'center' },
-  lockedBody: { flex: 1, gap: 2 },
-  lockedTitle: { fontSize: 14, fontWeight: '700', color: '#bbb' },
-  lockedDesc: { fontSize: 12, color: '#ccc', lineHeight: 17 },
+  badgeLocked: { opacity: 0.38 },
+  badgeEmoji: { fontSize: 24 },
+  badgeTitle: { fontSize: 10, fontWeight: '700', color: '#8b6a1d', textAlign: 'center', lineHeight: 13 },
   // liquid glass modal
-  backdrop: { backgroundColor: 'transparent' },
-  backdropDim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.18)' },
   modalCenter: {
     flex: 1,
     alignItems: 'center',
@@ -622,6 +644,40 @@ const achStyles = StyleSheet.create({
     borderColor: 'rgba(229,57,53,0.2)',
   },
   glassPillText: { fontSize: 12, fontWeight: '700', color: '#e53935' },
+  glassPillLocked: {
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  glassPillLockedText: { fontSize: 12, fontWeight: '700', color: '#999' },
+  seeAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#f0f0f0',
+    marginTop: 4,
+  },
+  seeAllText: { fontSize: 14, fontWeight: '600', color: '#e53935' },
+  seeAllChevron: { fontSize: 16, color: '#e53935' },
+  sheetContainer: { flex: 1, backgroundColor: '#fff' },
+  sheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#f0f0f0',
+  },
+  sheetTitle: { fontSize: 16, fontWeight: '800', color: '#222' },
+  sheetClose: { fontSize: 16, fontWeight: '600', color: '#e53935' },
+  sheetScroll: { padding: 24 },
 });
 
 const levelStyles = StyleSheet.create({

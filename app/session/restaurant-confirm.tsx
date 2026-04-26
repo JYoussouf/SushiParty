@@ -70,7 +70,7 @@ export default function SessionRestaurantConfirmScreen() {
   const goToSummary = useCallback(
     (allowUnknown: '0' | '1') => {
       if (!sessionId) {
-        router.replace('/(tabs)/scoreboard');
+        router.replace('/session/scoreboard');
         return;
       }
 

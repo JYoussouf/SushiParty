@@ -114,7 +114,7 @@ export default function ScoreboardScreen() {
       setShowAnomalyModal(false);
       setPendingSubmit(null);
       router.push({
-        pathname: '../session/summary',
+        pathname: '/session/summary',
         params: { id: sessionId, origin: 'submit' },
       });
     } catch (e: unknown) {

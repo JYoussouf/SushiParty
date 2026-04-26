@@ -2,12 +2,14 @@ import type { Achievement, SushiSession } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function sd(s: SushiSession): string | undefined {
+function sd(s: SushiSession | undefined): string | undefined {
+  if (!s) return undefined;
   return s.submittedAt ?? s.startedAt;
 }
 
 function latestDate(sessions: SushiSession[]): string | undefined {
-  return sd(sessions[sessions.length - 1]!);
+  if (sessions.length === 0) return undefined;
+  return sd(sessions[sessions.length - 1]);
 }
 
 function restaurantName(session: SushiSession | undefined): string | undefined {
@@ -38,23 +40,26 @@ function make(
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export function getAchievements(sessions: SushiSession[], userId: string): Achievement[] {
-  const us = sessions.filter((s) => s.participants.some((p) => p.userId === userId));
-  if (us.length === 0) {
-    // Return all unearned so the locked list renders without crashing
+  try {
+    const us = sessions.filter((s) => s.participants.some((p) => p.userId === userId));
     return buildAll(us, userId);
+  } catch (error) {
+    console.error('Error in getAchievements:', error);
+    // Return minimal list to avoid crashing
+    return buildAll([], userId);
   }
-  return buildAll(us, userId);
 }
 
 function buildAll(us: SushiSession[], userId: string): Achievement[] {
-  // ── Piece counts ────────────────────────────────────────────────────────
-  const piecesPerSession = us.map((s) => {
-    const p = s.participants.find((pp) => pp.userId === userId);
-    return p ? Object.values(p.counts).reduce((a, c) => a + c, 0) : 0;
-  });
-  const totalPieces = piecesPerSession.reduce((a, c) => a + c, 0);
-  const maxSingle = piecesPerSession.length > 0 ? Math.max(...piecesPerSession) : 0;
-  const maxIdx = piecesPerSession.indexOf(maxSingle);
+  try {
+    // ── Piece counts ────────────────────────────────────────────────────────
+    const piecesPerSession = us.map((s) => {
+      const p = s.participants.find((pp) => pp.userId === userId);
+      return p ? Object.values(p.counts || {}).reduce((a, c) => a + c, 0) : 0;
+    });
+    const totalPieces = piecesPerSession.reduce((a, c) => a + c, 0);
+    const maxSingle = piecesPerSession.length > 0 ? Math.max(...piecesPerSession) : 0;
+    const maxIdx = piecesPerSession.indexOf(maxSingle);
 
   // ── Category totals & unique items ──────────────────────────────────────
   const cat: Record<string, number> = {};
@@ -333,13 +338,25 @@ function buildAll(us: SushiSession[], userId: string): Achievement[] {
         if (!d) return;
         const mk = `${d.getFullYear()}-${d.getMonth()}`;
         if (!monthRests.has(mk)) monthRests.set(mk, new Set());
-        const key = s.restaurantId !== 'unknown' ? s.restaurantId : s.restaurantName.trim().toLowerCase();
+        const key = s.restaurantId !== 'unknown' ? s.restaurantId : (s.restaurantName?.trim()?.toLowerCase() ?? 'unknown');
         if (key && key !== 'unknown restaurant') monthRests.get(mk)!.add(key);
       });
       return Array.from(monthRests.values()).some((rs) => rs.size >= 5);
     })(), ld),
   ];
   /* eslint-enable @typescript-eslint/no-non-null-assertion */
+  } catch (error) {
+    console.error('Error in buildAll:', error);
+    // Return a minimal list of achievements with all unearned
+    return [
+      make('first-session',        '🍣', 'First Plate',       'Log your first sushi party.',                        100,  false),
+      make('habit-forming',        '📅', 'Habit Forming',     'Complete 5 parties.',                                100,  false),
+      make('regular',              '🎌', 'Regular',           'Complete 10 parties.',                               250,  false),
+      make('committed',            '🗓️', 'Committed',         'Complete 20 parties.',                               350,  false),
+      make('fifty-pieces',         '🍙', 'Half Century',      'Eat 50 total pieces.',                               75,   false),
+      make('hundred-pieces',       '💯', 'Century Club',      'Eat 100 total pieces.',                              200,  false),
+    ];
+  }
 }
 
 export function getNewlyEarnedAchievements(

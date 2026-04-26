@@ -15,7 +15,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useFriends } from '../../src/hooks/useFriends';
-import { getNewlyEarnedAchievements } from '../../src/lib/achievements';
+import { getNewlyEarnedAchievements, getAchievements } from '../../src/lib/achievements';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { getMenu } from '../../src/lib/cloudflare/menus';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
@@ -238,6 +238,22 @@ export default function SessionSummaryScreen() {
     () => (session && menu ? getSessionSuperlatives(session, menu.items) : []),
     [session, menu],
   );
+
+  const allAchievements = useMemo(() => {
+    if (!session || !userProfile) return [];
+    // Get all sessions for achievement calculation - in real app would load all user sessions
+    // For now, just use current session for calculating achievements
+    return getAchievements([session], userProfile.uid);
+  }, [session, userProfile]);
+
+  const displayAchievements = useMemo(() => {
+    // If we have earned achievements, show only those
+    if (earnedAchievements.length > 0) {
+      return allAchievements.filter((a) => earnedAchievements.includes(a.title));
+    }
+    // Otherwise show a preview of the first 6 achievements (non-hidden)
+    return allAchievements.filter((a) => !a.hidden).slice(0, 6);
+  }, [earnedAchievements, allAchievements]);
 
   const handleDone = () => {
     if (origin === 'history') {
@@ -486,16 +502,31 @@ export default function SessionSummaryScreen() {
           </TouchableOpacity>
         )}
 
-        {earnedAchievements.length > 0 && (
+        {displayAchievements.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tiny trophies</Text>
             <View style={styles.achievementList}>
-              {earnedAchievements.map((title) => (
-                <View key={title} style={styles.achievementCard}>
-                  <Text style={styles.achievementEmoji}>🏆</Text>
-                  <Text style={styles.achievementTitle}>{title}</Text>
-                </View>
-              ))}
+              {displayAchievements.map((achievement) => {
+                const isEarned = earnedAchievements.includes(achievement.title);
+                return (
+                  <View
+                    key={achievement.id}
+                    style={[styles.achievementCard, !isEarned && styles.achievementCardLocked]}
+                  >
+                    <Text style={[styles.achievementEmoji, !isEarned && styles.achievementEmojiLocked]}>
+                      {isEarned ? '🏆' : '🔒'}
+                    </Text>
+                    <View style={styles.achievementCardContent}>
+                      <Text style={[styles.achievementTitle, !isEarned && styles.achievementTitleLocked]}>
+                        {isEarned ? achievement.title : '???'}
+                      </Text>
+                      <Text style={[styles.achievementDescription, !isEarned && styles.achievementDescriptionLocked]}>
+                        {isEarned ? achievement.description : 'Complete challenges to unlock'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
             </View>
           </View>
         )}
@@ -745,6 +776,15 @@ const styles = StyleSheet.create({
   },
   achievementEmoji: { fontSize: 20 },
   achievementTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: '#725000' },
+  achievementCardLocked: {
+    backgroundColor: '#f0ebe5',
+    borderColor: '#d9cdc2',
+  },
+  achievementEmojiLocked: { opacity: 0.5 },
+  achievementCardContent: { flex: 1 },
+  achievementTitleLocked: { color: '#9a8977' },
+  achievementDescription: { fontSize: 12, lineHeight: 16, color: '#8a6f55', marginTop: 2 },
+  achievementDescriptionLocked: { color: '#a89878' },
   breakdownCard: {
     gap: 10,
     borderRadius: 22,
