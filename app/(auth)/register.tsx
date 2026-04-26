@@ -40,8 +40,8 @@ export default function RegisterScreen() {
       );
       return;
     }
-    if (password.length < 6) {
-      Alert.alert('Weak password', 'Password must be at least 6 characters.');
+    if (password.length < 8) {
+      Alert.alert('Weak password', 'Password must be at least 8 characters.');
       return;
     }
     if (password !== confirmPassword) {
@@ -125,7 +125,7 @@ export default function RegisterScreen() {
             secureTextEntry
             textContentType="newPassword"
           />
-          <Text style={styles.hint}>At least 6 characters</Text>
+          <Text style={styles.hint}>At least 8 characters</Text>
 
           <Text style={styles.label}>Confirm Password</Text>
           <TextInput

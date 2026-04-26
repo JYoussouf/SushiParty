@@ -115,9 +115,11 @@ export interface Achievement {
   title: string;
   description: string;
   emoji: string;
+  xp: number;
   earned: boolean;
   hidden?: boolean;
   earnedAt?: string;
+  earnedAtRestaurant?: string;
 }
 
 export interface FriendChallengeProgress {

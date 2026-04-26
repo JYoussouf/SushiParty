@@ -152,7 +152,7 @@ EXPO_PUBLIC_API_BASE_URL=https://<your-worker>.<your-account>.workers.dev
 | Navigation | Expo Router 6 (file-based) |
 | Language | TypeScript (strict) |
 | Database | Cloudflare D1 |
-| Auth | Worker-issued device token |
+| Auth | Worker-issued account/device token in SecureStore |
 | Realtime | Cloudflare Durable Objects + WebSockets |
 | Animations | React Native Reanimated 4 |
 | Location | expo-location |

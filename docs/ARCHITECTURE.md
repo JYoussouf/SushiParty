@@ -12,7 +12,7 @@ React Native / Expo app
 Cloudflare Worker API
   ├─ D1 SQL database: users, sessions, restaurants, menus
   ├─ Durable Object: group party realtime state
-  └─ Worker-issued device token stored in SecureStore
+  └─ Worker-issued account/device token stored in SecureStore
 ```
 
 The mobile app never talks to D1 directly. It calls the Worker over HTTPS using
@@ -41,6 +41,18 @@ username TEXT UNIQUE
 display_name TEXT
 email TEXT
 friend_ids_json TEXT
+created_at TEXT
+updated_at TEXT
+```
+
+### `account_credentials`
+
+```
+user_uid TEXT PRIMARY KEY
+email_normalized TEXT UNIQUE
+password_hash TEXT
+password_salt TEXT
+password_iterations INTEGER
 created_at TEXT
 updated_at TEXT
 ```
@@ -104,6 +116,8 @@ updated_at TEXT
 ## 4. Worker API
 
 ```
+POST   /auth/register
+POST   /auth/login
 POST   /auth/device
 GET    /users/me
 PATCH  /users/me
@@ -138,13 +152,20 @@ App start
   ├─ Load local device profile from AsyncStorage
   ├─ POST /auth/device
   │    ├─ Worker creates/updates users.uid
-  │    └─ Worker returns signed device token
+  │    └─ Worker returns signed token and whether this uid has account credentials
+  ├─ If no account is attached, route to /(auth)/login
+  ├─ POST /auth/register or /auth/login
+  │    ├─ Worker validates account credentials
+  │    ├─ Passwords are PBKDF2-SHA256 hashes with per-account salts
+  │    └─ Worker returns signed account token
   ├─ Store token in expo-secure-store
   └─ Send Authorization: Bearer <token> on API calls
 ```
 
 For development, the Worker uses a fallback signing secret. Before a real deploy,
-set `JWT_SECRET` with `wrangler secret put JWT_SECRET`.
+set `JWT_SECRET` with `wrangler secret put JWT_SECRET`. OAuth provider buttons
+must stay disabled until native client IDs and server-side token verification are
+configured.
 
 ## 6. Real-Time Group Sessions
 

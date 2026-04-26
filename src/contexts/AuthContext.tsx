@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { clearLocalSessions } from '../lib/local/sessions';
 import {
   getOrCreateDeviceProfile,
@@ -8,7 +8,14 @@ import {
   resetDeviceProfile,
   updateDeviceProfile,
 } from '../lib/local/deviceProfile';
-import { signOutRemote, syncDeviceIdentity } from '../lib/cloudflare/auth';
+import {
+  registerAccount,
+  signInWithEmail,
+  signOutRemote,
+  syncDeviceIdentity,
+  type AuthSession,
+} from '../lib/cloudflare/auth';
+import { signInWithApple, signInWithGoogle, signInWithFacebook } from '../lib/oauth';
 import type { User } from '../types';
 
 interface LocalIdentity {
@@ -18,17 +25,16 @@ interface LocalIdentity {
 interface AuthContextValue {
   remoteUser: LocalIdentity | null;
   userProfile: User | null;
+  accountBacked: boolean;
   loading: boolean;
   onboardingDone: boolean;
   completeOnboarding: (displayName: string, avatar: string) => Promise<void>;
   updateLocalProfile: (updates: Partial<Pick<User, 'displayName' | 'avatar'>>) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (
-    email: string,
-    password: string,
-    displayName: string,
-    username: string,
-  ) => Promise<void>;
+  signUp: (email: string, password: string, displayName: string, username: string) => Promise<void>;
+  signInWithAppleOAuth: () => Promise<void>;
+  signInWithGoogleOAuth: (clientId: string) => Promise<void>;
+  signInWithFacebookOAuth: (appId: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
@@ -38,8 +44,21 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [remoteUser, setRemoteUser] = useState<LocalIdentity | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [accountBacked, setAccountBacked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [onboardingDone, setOnboardingDone] = useState(false);
+
+  const applyAuthSession = useCallback(async (session: AuthSession, markOnboarded = false) => {
+    const stored = await replaceDeviceProfile(session.user);
+    setUserProfile(stored);
+    setAccountBacked(session.accountBacked);
+    setRemoteUser(session.accountBacked && stored.email ? { email: stored.email } : null);
+
+    if (session.accountBacked && markOnboarded) {
+      await markOnboardingComplete();
+      setOnboardingDone(true);
+    }
+  }, []);
 
   useEffect(() => {
     void (async () => {
@@ -47,20 +66,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         getOrCreateDeviceProfile(),
         isOnboardingComplete(),
       ]);
-      setOnboardingDone(obDone);
+      let onboardingComplete = obDone;
       try {
-        const synced = await syncDeviceIdentity(profile);
-        const stored = await replaceDeviceProfile(synced);
-        setUserProfile(stored);
-        setRemoteUser(stored.email ? { email: stored.email } : null);
+        const session = await syncDeviceIdentity(profile);
+        await applyAuthSession(session);
+        if (session.accountBacked && !onboardingComplete) {
+          await markOnboardingComplete();
+          onboardingComplete = true;
+        }
       } catch {
         setUserProfile(profile);
-        setRemoteUser(profile.email ? { email: profile.email } : null);
+        setAccountBacked(false);
+        setRemoteUser(null);
       } finally {
+        setOnboardingDone(onboardingComplete);
         setLoading(false);
       }
     })();
-  }, []);
+  }, [applyAuthSession]);
 
   const updateLocalProfile = async (updates: Partial<Pick<User, 'displayName' | 'avatar'>>) => {
     const updated = await updateDeviceProfile(updates);
@@ -74,12 +97,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setOnboardingDone(true);
   };
 
-  const signIn = async (email: string) => {
-    const localProfile = await updateDeviceProfile({ email });
-    const profile = await syncDeviceIdentity(localProfile);
-    await replaceDeviceProfile(profile);
-    setUserProfile(profile);
-    setRemoteUser(profile.email ? { email: profile.email } : null);
+  const signIn = async (email: string, password: string) => {
+    const session = await signInWithEmail(email.trim(), password);
+    await applyAuthSession(session, true);
   };
 
   const signUp = async (
@@ -88,15 +108,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     displayName: string,
     username: string,
   ) => {
-    const localProfile = await updateDeviceProfile({
+    const existingProfile = await getOrCreateDeviceProfile();
+    const localProfile: User = {
+      ...existingProfile,
       email,
       displayName,
       username,
-    });
-    const profile = await syncDeviceIdentity(localProfile);
-    await replaceDeviceProfile(profile);
-    setUserProfile(profile);
-    setRemoteUser(profile.email ? { email: profile.email } : null);
+    };
+    const session = await registerAccount(localProfile, _password);
+    await applyAuthSession(session, true);
   };
 
   const signOut = async () => {
@@ -104,27 +124,52 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOutRemote();
     const freshProfile = await resetDeviceProfile();
     try {
-      const synced = await syncDeviceIdentity(freshProfile);
-      const stored = await replaceDeviceProfile(synced);
-      setUserProfile(stored);
-      setRemoteUser(stored.email ? { email: stored.email } : null);
+      const session = await syncDeviceIdentity(freshProfile);
+      await applyAuthSession(session);
     } catch {
       setUserProfile(freshProfile);
-      setRemoteUser(freshProfile.email ? { email: freshProfile.email } : null);
+      setAccountBacked(false);
+      setRemoteUser(null);
     }
   };
 
   const refreshProfile = async () => {
     const localProfile = await getOrCreateDeviceProfile();
     try {
-      const profile = await syncDeviceIdentity(localProfile);
-      await replaceDeviceProfile(profile);
-      setUserProfile(profile);
-      setRemoteUser(profile.email ? { email: profile.email } : null);
+      const session = await syncDeviceIdentity(localProfile);
+      await applyAuthSession(session);
     } catch {
       setUserProfile(localProfile);
-      setRemoteUser(localProfile.email ? { email: localProfile.email } : null);
+      setAccountBacked(false);
+      setRemoteUser(null);
     }
+  };
+
+  const signInWithAppleOAuth = async () => {
+    const response = await signInWithApple();
+    const oauthSession: AuthSession = {
+      user: response.user,
+      accountBacked: response.accountBacked,
+    };
+    await applyAuthSession(oauthSession, true);
+  };
+
+  const signInWithGoogleOAuth = async (clientId: string) => {
+    const response = await signInWithGoogle(clientId);
+    const oauthSession: AuthSession = {
+      user: response.user,
+      accountBacked: response.accountBacked,
+    };
+    await applyAuthSession(oauthSession, true);
+  };
+
+  const signInWithFacebookOAuth = async (appId: string) => {
+    const response = await signInWithFacebook(appId);
+    const oauthSession: AuthSession = {
+      user: response.user,
+      accountBacked: response.accountBacked,
+    };
+    await applyAuthSession(oauthSession, true);
   };
 
   return (
@@ -132,12 +177,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         remoteUser,
         userProfile,
+        accountBacked,
         loading,
         onboardingDone,
         completeOnboarding,
         updateLocalProfile,
         signIn,
         signUp,
+        signInWithAppleOAuth,
+        signInWithGoogleOAuth,
+        signInWithFacebookOAuth,
         signOut,
         refreshProfile,
       }}

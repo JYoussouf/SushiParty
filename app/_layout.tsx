@@ -16,20 +16,34 @@ function RootLayoutNav() {
   const navState = useRootNavigationState();
   const segments = useSegments();
   const { hasActiveSession } = useSession();
-  const { onboardingDone, loading: authLoading } = useAuth();
+  const { accountBacked, onboardingDone, loading: authLoading } = useAuth();
 
-  // Onboarding gate — runs independently so the didInitialRedirect guard can't swallow it
+  // Account gate runs before onboarding because long-term tracking needs a real login.
   useEffect(() => {
     if (!navState?.key || authLoading) return;
-    if (onboardingDone) return;
     const currentPath = segments.join('/');
-    if (currentPath === 'onboarding') return;
-    router.replace('/onboarding');
-  }, [navState?.key, authLoading, onboardingDone, router, segments]);
+    const inAuth = segments[0] === '(auth)';
+
+    if (!accountBacked) {
+      if (!inAuth) {
+        router.replace('/(auth)/login');
+      }
+      return;
+    }
+
+    if (inAuth) {
+      router.replace(onboardingDone ? '/(tabs)/home' : '/onboarding');
+      return;
+    }
+
+    if (!onboardingDone && currentPath !== 'onboarding') {
+      router.replace('/onboarding');
+    }
+  }, [accountBacked, navState?.key, authLoading, onboardingDone, router, segments]);
 
   // Initial home/scoreboard redirect for users who have completed onboarding
   useEffect(() => {
-    if (!navState?.key || authLoading || !onboardingDone) return;
+    if (!navState?.key || authLoading || !accountBacked || !onboardingDone) return;
     if (didInitialRedirect) return;
     const currentPath = segments.join('/');
     if (currentPath && currentPath !== 'index') {
@@ -41,10 +55,18 @@ function RootLayoutNav() {
       router.replace(hasActiveSession ? '/(tabs)/scoreboard' : '/(tabs)/home');
     }, 0);
     return () => clearTimeout(t);
-  }, [router, navState?.key, hasActiveSession, segments, onboardingDone, authLoading]);
+  }, [
+    router,
+    navState?.key,
+    hasActiveSession,
+    segments,
+    accountBacked,
+    onboardingDone,
+    authLoading,
+  ]);
 
   useEffect(() => {
-    if (!navState?.key || !hasActiveSession) {
+    if (!navState?.key || !accountBacked || !hasActiveSession) {
       return;
     }
 
@@ -60,7 +82,7 @@ function RootLayoutNav() {
     if (!allowedPaths.has(currentPath)) {
       router.replace('/(tabs)/scoreboard');
     }
-  }, [hasActiveSession, navState?.key, router, segments]);
+  }, [accountBacked, hasActiveSession, navState?.key, router, segments]);
 
   return (
     <Stack
@@ -89,26 +111,11 @@ function RootLayoutNav() {
         name="session/restaurant-confirm"
         options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
       />
-      <Stack.Screen
-        name="session/summary"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="settings"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="friend/[id]"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="profile/favorites"
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="profile/restaurants"
-        options={{ headerShown: false }}
-      />
+      <Stack.Screen name="session/summary" options={{ headerShown: false }} />
+      <Stack.Screen name="settings" options={{ headerShown: false }} />
+      <Stack.Screen name="friend/[id]" options={{ headerShown: false }} />
+      <Stack.Screen name="profile/favorites" options={{ headerShown: false }} />
+      <Stack.Screen name="profile/restaurants" options={{ headerShown: false }} />
     </Stack>
   );
 }

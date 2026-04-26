@@ -4,8 +4,8 @@
   "main": "expo-router/entry",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "eslint .",
     "format": "prettier --write ."
@@ -14,6 +14,9 @@
     "@expo-google-fonts/press-start-2p": "^0.4.1",
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~54.0.33",
+    "expo-apple-authentication": "^55.0.13",
+    "expo-auth-session": "^55.0.15",
+    "expo-blur": "~15.0.8",
     "expo-camera": "~17.0.10",
     "expo-constants": "~18.0.13",
     "expo-font": "^55.0.6",
@@ -22,6 +25,7 @@
     "expo-router": "~6.0.23",
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
+    "expo-web-browser": "^55.0.14",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",

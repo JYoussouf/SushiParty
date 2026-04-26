@@ -88,6 +88,14 @@ interface UserRow {
   created_at: string;
 }
 
+interface AccountCredentialRow {
+  user_uid: string;
+  email_normalized: string;
+  password_hash: string;
+  password_salt: string;
+  password_iterations: number;
+}
+
 interface SessionRow {
   id: string;
   owner_uid: string;
@@ -123,6 +131,16 @@ interface MenuRow {
   items_json: string;
 }
 
+interface TokenPayload {
+  uid?: string;
+  iat?: number;
+  exp?: number;
+}
+
+interface AccountAuthBody extends Partial<User> {
+  password?: string;
+}
+
 class HttpError extends Error {
   constructor(
     public status: number,
@@ -137,8 +155,14 @@ const GROUP_TTL_MS = 8 * 60 * 60 * 1000;
 const MAX_RESTAURANT_CANDIDATES = 50;
 const MAX_RESTAURANT_RESULTS = 10;
 const DEFAULT_RADIUS_KM = 10;
+const TOKEN_TTL_SECONDS = 90 * 24 * 60 * 60;
+const PASSWORD_ITERATIONS = 100_000;
+const PASSWORD_SALT_BYTES = 16;
+const PASSWORD_MIN_LENGTH = 8;
+const PASSWORD_MAX_LENGTH = 256;
 
 const encoder = new TextEncoder();
+const DUMMY_PASSWORD_SALT = utf8ArrayBuffer('sushi-party/auth/dummy-salt/v1');
 
 function headers(request: Request, env: Env): HeadersInit {
   const origin = request.headers.get('Origin');
@@ -192,6 +216,31 @@ function normalizeUsername(username: string | undefined, fallback: string): stri
   return normalized || fallback;
 }
 
+function normalizeEmail(email: string | undefined): string {
+  return email?.trim().toLowerCase() ?? '';
+}
+
+function isValidEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function isValidAccountUsername(username: string): boolean {
+  return /^[a-z0-9_]{3,20}$/.test(username);
+}
+
+function utf8ArrayBuffer(value: string): ArrayBuffer {
+  const bytes = encoder.encode(value);
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
+function randomBytes(length: number): ArrayBuffer {
+  const buffer = new ArrayBuffer(length);
+  crypto.getRandomValues(new Uint8Array(buffer));
+  return buffer;
+}
+
 function bytesToBase64Url(bytes: ArrayBuffer | Uint8Array): string {
   const view = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
   let binary = '';
@@ -211,6 +260,62 @@ function base64UrlToBytes(value: string): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
 }
 
+async function derivePasswordHash(
+  password: string,
+  salt: ArrayBuffer,
+  iterations: number,
+): Promise<string> {
+  const passwordKey = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(password),
+    'PBKDF2',
+    false,
+    ['deriveBits'],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    passwordKey,
+    256,
+  );
+  return bytesToBase64Url(bits);
+}
+
+async function createPasswordCredential(password: string): Promise<{
+  passwordHash: string;
+  passwordSalt: string;
+  passwordIterations: number;
+}> {
+  const salt = randomBytes(PASSWORD_SALT_BYTES);
+  const passwordHash = await derivePasswordHash(password, salt, PASSWORD_ITERATIONS);
+  return {
+    passwordHash,
+    passwordSalt: bytesToBase64Url(salt),
+    passwordIterations: PASSWORD_ITERATIONS,
+  };
+}
+
+function timingSafeEqual(leftValue: string, rightValue: string): boolean {
+  const left = encoder.encode(leftValue);
+  const right = encoder.encode(rightValue);
+  const length = Math.max(left.length, right.length);
+  let difference = left.length ^ right.length;
+
+  for (let index = 0; index < length; index += 1) {
+    difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
+  }
+
+  return difference === 0;
+}
+
+async function verifyPassword(password: string, credential: AccountCredentialRow): Promise<boolean> {
+  const candidate = await derivePasswordHash(
+    password,
+    base64UrlToBytes(credential.password_salt),
+    credential.password_iterations,
+  );
+  return timingSafeEqual(candidate, credential.password_hash);
+}
+
 async function hmacKey(env: Env): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     'raw',
@@ -222,8 +327,9 @@ async function hmacKey(env: Env): Promise<CryptoKey> {
 }
 
 async function signToken(uid: string, env: Env): Promise<string> {
+  const issuedAt = Math.floor(Date.now() / 1000);
   const payload = bytesToBase64Url(
-    encoder.encode(JSON.stringify({ uid, iat: Math.floor(Date.now() / 1000) })),
+    encoder.encode(JSON.stringify({ uid, iat: issuedAt, exp: issuedAt + TOKEN_TTL_SECONDS })),
   );
   const signature = await crypto.subtle.sign('HMAC', await hmacKey(env), encoder.encode(payload));
   return `${payload}.${bytesToBase64Url(signature)}`;
@@ -237,16 +343,22 @@ async function getAuthUid(request: Request, env: Env): Promise<string | null> {
   const [payload, signature] = token.split('.');
   if (!payload || !signature) return null;
 
-  const verified = await crypto.subtle.verify(
-    'HMAC',
-    await hmacKey(env),
-    base64UrlToBytes(signature),
-    encoder.encode(payload),
-  );
-  if (!verified) return null;
+  try {
+    const verified = await crypto.subtle.verify(
+      'HMAC',
+      await hmacKey(env),
+      base64UrlToBytes(signature),
+      encoder.encode(payload),
+    );
+    if (!verified) return null;
 
-  const parsed = safeJson<{ uid?: string }>(new TextDecoder().decode(base64UrlToBytes(payload)), {});
-  return parsed.uid ?? null;
+    const parsed = safeJson<TokenPayload>(new TextDecoder().decode(base64UrlToBytes(payload)), {});
+    if (!parsed.uid || !parsed.exp) return null;
+    if (parsed.exp < Math.floor(Date.now() / 1000)) return null;
+    return parsed.uid;
+  } catch {
+    return null;
+  }
 }
 
 async function requireAuth(request: Request, env: Env): Promise<string> {
@@ -386,7 +498,7 @@ async function upsertUser(env: Env, input: Partial<User> & { uid: string }): Pro
     .first<UserRow>();
   const username = normalizeUsername(input.username, existing?.username ?? input.uid);
   const displayName = input.displayName?.trim() || existing?.display_name || 'Sushi Friend';
-  const email = input.email?.trim() ?? existing?.email ?? '';
+  const email = normalizeEmail(input.email) || existing?.email || '';
   const friendIds = input.friendIds ?? safeJson<string[]>(existing?.friend_ids_json, []);
 
   try {
@@ -415,12 +527,208 @@ async function upsertUser(env: Env, input: Partial<User> & { uid: string }): Pro
   return rowToUser(row);
 }
 
+async function hasAccountCredential(env: Env, uid: string): Promise<boolean> {
+  try {
+    const row = await env.DB.prepare('SELECT user_uid FROM account_credentials WHERE user_uid = ?')
+      .bind(uid)
+      .first<{ user_uid: string }>();
+    return !!row;
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('no such table')) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 async function handleAuthDevice(request: Request, env: Env): Promise<Response> {
   const body = await readJson<Partial<User> & { uid?: string }>(request);
   const uid = body.uid?.trim() || randomId('device');
   const user = await upsertUser(env, { ...body, uid });
   const token = await signToken(user.uid, env);
-  return json(request, env, { token, user });
+  const accountBacked = await hasAccountCredential(env, user.uid);
+  return json(request, env, { token, user, accountBacked });
+}
+
+async function handleAuthRegister(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<AccountAuthBody>(request);
+  const email = normalizeEmail(body.email);
+  const password = typeof body.password === 'string' ? body.password : '';
+  const username = body.username?.trim().toLowerCase() ?? '';
+  const displayName = body.displayName?.trim() ?? '';
+
+  if (!isValidEmail(email)) {
+    throw new HttpError(400, 'Please enter a valid email address.');
+  }
+  if (!isValidAccountUsername(username)) {
+    throw new HttpError(400, 'Username must be 3-20 characters and contain only letters, numbers, and underscores.');
+  }
+  if (!displayName) {
+    throw new HttpError(400, 'Display name is required.');
+  }
+  if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
+    throw new HttpError(400, `Password must be ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} characters.`);
+  }
+
+  const existingEmail = await env.DB.prepare('SELECT user_uid FROM account_credentials WHERE email_normalized = ?')
+    .bind(email)
+    .first<{ user_uid: string }>();
+  if (existingEmail) {
+    throw new HttpError(409, 'An account already exists with that email.');
+  }
+
+  const uid = body.uid?.trim() || randomId('user');
+  const existingAccount = await env.DB.prepare('SELECT email_normalized FROM account_credentials WHERE user_uid = ?')
+    .bind(uid)
+    .first<{ email_normalized: string }>();
+  if (existingAccount) {
+    throw new HttpError(409, 'This profile already has an account.');
+  }
+
+  const user = await upsertUser(env, {
+    ...body,
+    uid,
+    email,
+    username,
+    displayName,
+  });
+  const credential = await createPasswordCredential(password);
+  const now = new Date().toISOString();
+
+  try {
+    await env.DB.prepare(
+      `INSERT INTO account_credentials (
+        user_uid, email_normalized, password_hash, password_salt,
+        password_iterations, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+      .bind(
+        user.uid,
+        email,
+        credential.passwordHash,
+        credential.passwordSalt,
+        credential.passwordIterations,
+        now,
+        now,
+      )
+      .run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
+    if (message.includes('unique')) {
+      throw new HttpError(409, 'An account already exists with that email.');
+    }
+    throw error;
+  }
+
+  const token = await signToken(user.uid, env);
+  return json(request, env, { token, user, accountBacked: true }, 201);
+}
+
+async function handleAuthLogin(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<AccountAuthBody>(request);
+  const email = normalizeEmail(body.email);
+  const password = typeof body.password === 'string' ? body.password : '';
+
+  if (!isValidEmail(email) || !password) {
+    throw new HttpError(401, 'Incorrect email or password.');
+  }
+
+  const credential = await env.DB.prepare('SELECT * FROM account_credentials WHERE email_normalized = ?')
+    .bind(email)
+    .first<AccountCredentialRow>();
+
+  if (!credential) {
+    await derivePasswordHash(password, DUMMY_PASSWORD_SALT, PASSWORD_ITERATIONS);
+    throw new HttpError(401, 'Incorrect email or password.');
+  }
+
+  const valid = await verifyPassword(password, credential);
+  if (!valid) {
+    throw new HttpError(401, 'Incorrect email or password.');
+  }
+
+  const row = await env.DB.prepare('SELECT * FROM users WHERE uid = ?')
+    .bind(credential.user_uid)
+    .first<UserRow>();
+  if (!row) {
+    throw new HttpError(404, 'User not found.');
+  }
+
+  const user = rowToUser(row);
+  const token = await signToken(user.uid, env);
+  return json(request, env, { token, user, accountBacked: true });
+}
+
+async function handleAuthOAuth(request: Request, env: Env, provider: 'apple' | 'google' | 'facebook'): Promise<Response> {
+  const body = await readJson<{
+    token?: string;
+    idToken?: string;
+    accessToken?: string;
+    code?: string;
+    email?: string;
+    displayName?: string;
+  }>(request);
+
+  let email: string;
+  let displayName: string;
+
+  if (provider === 'apple') {
+    // Apple provides email and displayName from the client
+    if (!body.email || !body.displayName) {
+      throw new HttpError(400, 'Email and display name required for Apple Sign In.');
+    }
+    email = body.email;
+    displayName = body.displayName;
+  } else if (provider === 'google' || provider === 'facebook') {
+    // For Google and Facebook, we'd normally exchange the code for tokens here
+    // For now, we'll just accept the code and create a placeholder user
+    // In production, you'd call the provider's token endpoint
+    if (!body.code) {
+      throw new HttpError(400, 'Authorization code required.');
+    }
+
+    // TODO: Exchange code for token with provider
+    // For now, use a placeholder email based on the code
+    email = normalizeEmail(`${provider}-${body.code.substring(0, 8)}@${provider}.local`);
+    displayName = `${provider.charAt(0).toUpperCase() + provider.slice(1)} User`;
+  } else {
+    throw new HttpError(400, 'Invalid provider.');
+  }
+
+  if (!isValidEmail(email)) {
+    throw new HttpError(400, 'Invalid email address.');
+  }
+
+  // Check if user exists
+  let userRow = await env.DB.prepare('SELECT * FROM users WHERE email = ?')
+    .bind(email)
+    .first<UserRow>();
+
+  if (!userRow) {
+    // Create new user for OAuth
+    const uid = randomId('user');
+    const username = normalizeUsername(displayName.toLowerCase().replace(/\s+/g, '_'), uid);
+    
+    await upsertUser(env, {
+      uid,
+      email,
+      displayName,
+      username,
+    });
+
+    userRow = await env.DB.prepare('SELECT * FROM users WHERE uid = ?')
+      .bind(uid)
+      .first<UserRow>();
+    
+    if (!userRow) {
+      throw new HttpError(500, 'Failed to create user.');
+    }
+  }
+
+  const user = rowToUser(userRow);
+  const token = await signToken(user.uid, env);
+  return json(request, env, { token, user, accountBacked: true });
 }
 
 async function handleUsers(request: Request, env: Env, parts: string[]): Promise<Response> {
@@ -1008,7 +1316,7 @@ async function handlePlaces(request: Request, env: Env, parts: string[], url: UR
   const apiKey = env.GOOGLE_PLACES_API_KEY?.trim();
   if (!apiKey) throw new HttpError(503, 'Places service not configured.');
 
-  const cache = caches.default;
+  const cache = (caches as unknown as { default: Cache }).default;
 
   if (request.method === 'GET' && parts[1] === 'nearby') {
     const lat = Number(url.searchParams.get('lat'));
@@ -1068,6 +1376,21 @@ async function route(request: Request, env: Env): Promise<Response> {
 
   if (request.method === 'POST' && url.pathname === '/auth/device') {
     return handleAuthDevice(request, env);
+  }
+  if (request.method === 'POST' && url.pathname === '/auth/register') {
+    return handleAuthRegister(request, env);
+  }
+  if (request.method === 'POST' && url.pathname === '/auth/login') {
+    return handleAuthLogin(request, env);
+  }
+  if (request.method === 'POST' && url.pathname === '/auth/apple') {
+    return handleAuthOAuth(request, env, 'apple');
+  }
+  if (request.method === 'POST' && url.pathname === '/auth/google') {
+    return handleAuthOAuth(request, env, 'google');
+  }
+  if (request.method === 'POST' && url.pathname === '/auth/facebook') {
+    return handleAuthOAuth(request, env, 'facebook');
   }
 
   switch (parts[0]) {
