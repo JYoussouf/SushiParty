@@ -5,11 +5,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BackButton } from '../../src/components';
 import { getFriendById, getFriendSessions } from '../../src/lib/local/friends';
 import { getSessionTotalPieces } from '../../src/lib/sessionSummary';
 import type { SushiSession, User } from '../../src/types';
@@ -76,9 +76,7 @@ export default function FriendProfileScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
       </View>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.hero}>
@@ -116,8 +114,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
-  backBtn: { alignSelf: 'flex-start' },
-  backText: { fontSize: 16, fontWeight: '700', color: '#e53935' },
   loadingState: {
     flex: 1,
     backgroundColor: '#fff',

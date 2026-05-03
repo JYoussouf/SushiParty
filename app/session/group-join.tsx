@@ -4,6 +4,7 @@ import {
   Alert,
   Linking,
   Modal,
+  Pressable,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -15,15 +16,16 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Camera, CameraView, type BarcodeScanningResult } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BackButton } from '../../src/components';
 import { useSession } from '../../src/hooks/useSession';
 
 type CameraPermState = 'undetermined' | 'granted' | 'denied' | 'denied-permanent';
 
+const CODE_LENGTH = 6;
+
 function extractGroupCode(scanned: string): string | null {
-  // Deep-link: sushiparty://session/group-join?code=ABC123
   const match = /[?&]code=([A-Z0-9]{6})/i.exec(scanned);
   if (match?.[1]) return match[1].toUpperCase();
-  // Raw 6-char code fallback
   const raw = scanned.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (raw.length === 6) return raw;
   return null;
@@ -39,8 +41,10 @@ export default function GroupJoinScreen() {
   const [scanning, setScanning] = useState(false);
   const [cameraPermission, setCameraPermission] = useState<CameraPermState>('undetermined');
   const [scanError, setScanError] = useState<string | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
   const scannedRef = useRef(false);
   const handledDeepLinkRef = useRef<string | null>(null);
+  const inputRef = useRef<TextInput>(null);
 
   const deepLinkedCode = useMemo(
     () => (Array.isArray(params.code) ? params.code[0] : params.code)?.toUpperCase() ?? '',
@@ -49,7 +53,7 @@ export default function GroupJoinScreen() {
 
   const handleJoinGroup = useCallback(async (codeOverride?: string) => {
     const code = (codeOverride ?? joinCode).trim();
-    if (code.length !== 6) {
+    if (code.length !== CODE_LENGTH) {
       Alert.alert('Invalid code', 'Enter the full 6-character party code first.');
       return;
     }
@@ -57,7 +61,7 @@ export default function GroupJoinScreen() {
     setLoading(true);
     try {
       await joinGroup(code);
-      router.replace('/session/mode-select');
+      router.replace('/session/lobby');
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unable to join that party.';
       Alert.alert('Join failed', message);
@@ -72,7 +76,7 @@ export default function GroupJoinScreen() {
 
     const normalized = extractGroupCode(deepLinkedCode);
     if (!normalized) {
-      setJoinCode(deepLinkedCode.replace(/[^A-Z0-9]/g, '').slice(0, 6));
+      setJoinCode(deepLinkedCode.replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH));
       return;
     }
 
@@ -115,79 +119,110 @@ export default function GroupJoinScreen() {
     setScanError(null);
   };
 
-  const canJoin = joinCode.length === 6;
+  const focusInput = () => inputRef.current?.focus();
+  const canJoin = joinCode.length === CODE_LENGTH;
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
+      {/* Top bar */}
+      <View style={styles.topBar}>
+        <BackButton onPress={() => router.back()} disabled={loading} />
+      </View>
+
+      {/* Hero */}
       <View style={styles.hero}>
-        <Text style={styles.emoji}>🍣</Text>
-        <Text style={styles.title}>Join a Sushi Party</Text>
-        <Text style={styles.subtitle}>
-          Scan your friend's QR code, or type the 6-character party code below.
+        <View style={styles.ribbon}>
+          <Text style={styles.ribbonText}>Join</Text>
+        </View>
+        <Text style={styles.heroTitle}>
+          Drop the{'\n'}6-letter <Text style={styles.heroTitleAccent}>code</Text>
+        </Text>
+        <Text style={styles.heroSubtitle}>
+          Ask the host — it's on their lobby screen.
         </Text>
       </View>
 
-      <View style={styles.card}>
-        <TouchableOpacity
-          style={[styles.scanButton, loading && styles.scanButtonDisabled]}
-          onPress={() => void handleOpenScanner()}
-          disabled={loading}
-        >
-          <Text style={styles.scanButtonText}>📷  Scan QR Code</Text>
-        </TouchableOpacity>
-
-        {cameraPermission === 'denied' && (
-          <View style={styles.permissionBanner}>
-            <Text style={styles.permissionText}>Camera access is needed to scan QR codes.</Text>
-            <TouchableOpacity onPress={() => void handleOpenScanner()}>
-              <Text style={styles.permissionAction}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-        {cameraPermission === 'denied-permanent' && (
-          <View style={styles.permissionBanner}>
-            <Text style={styles.permissionText}>Camera access is blocked. Enable it in Settings.</Text>
-            <TouchableOpacity onPress={() => void Linking.openSettings()}>
-              <Text style={styles.permissionAction}>Open Settings</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>or enter code</Text>
-          <View style={styles.dividerLine} />
+      {/* Code input */}
+      <Pressable style={styles.codeWrap} onPress={focusInput}>
+        <View style={styles.codeRow}>
+          {Array.from({ length: CODE_LENGTH }).map((_, i) => {
+            const char = joinCode[i] ?? '';
+            const isFilled = !!char;
+            const isActive = inputFocused && i === joinCode.length;
+            return (
+              <View
+                key={i}
+                style={[
+                  styles.codeBox,
+                  isFilled && styles.codeBoxFilled,
+                  isActive && styles.codeBoxActive,
+                ]}
+              >
+                <Text style={styles.codeBoxText}>{char}</Text>
+              </View>
+            );
+          })}
         </View>
-
-        <Text style={styles.label}>Party code</Text>
         <TextInput
-          style={styles.input}
+          ref={inputRef}
+          style={styles.hiddenInput}
           value={joinCode}
           onChangeText={(text) =>
-            setJoinCode(text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))
+            setJoinCode(text.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, CODE_LENGTH))
           }
-          placeholder="ABC123"
-          placeholderTextColor="#aa9a92"
+          onFocus={() => setInputFocused(true)}
+          onBlur={() => setInputFocused(false)}
           autoCapitalize="characters"
           autoCorrect={false}
-          maxLength={6}
+          maxLength={CODE_LENGTH}
+          caretHidden
+          selectionColor="transparent"
         />
+      </Pressable>
 
+      {/* Permission banner */}
+      {cameraPermission === 'denied' && (
+        <View style={styles.permissionBanner}>
+          <Text style={styles.permissionText}>Camera access is needed to scan QR codes.</Text>
+          <TouchableOpacity onPress={() => void handleOpenScanner()}>
+            <Text style={styles.permissionAction}>Try again</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {cameraPermission === 'denied-permanent' && (
+        <View style={styles.permissionBanner}>
+          <Text style={styles.permissionText}>Camera access is blocked. Enable it in Settings.</Text>
+          <TouchableOpacity onPress={() => void Linking.openSettings()}>
+            <Text style={styles.permissionAction}>Open Settings</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Footer actions */}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
         <TouchableOpacity
-          style={[styles.joinButton, (!canJoin || loading) && styles.joinButtonDisabled]}
+          style={[styles.primaryBtn, (!canJoin || loading) && styles.primaryBtnDisabled]}
           onPress={() => void handleJoinGroup()}
           disabled={loading || !canJoin}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#fffaf2" />
           ) : (
-            <Text style={styles.joinButtonText}>Jump In</Text>
+            <Text style={styles.primaryBtnText}>Join the party</Text>
           )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.ghostBtn}
+          onPress={() => void handleOpenScanner()}
+          disabled={loading}
+        >
+          <Text style={styles.ghostBtnText}>Scan QR code instead</Text>
         </TouchableOpacity>
       </View>
 
+      {/* QR scanner modal */}
       <Modal visible={scanning} animationType="fade" statusBarTranslucent>
         <View style={styles.cameraOverlay}>
           <CameraView
@@ -221,87 +256,172 @@ export default function GroupJoinScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff5ec',
-    padding: 20,
-    gap: 18,
+    backgroundColor: '#fdf3e3',
   },
+
+  // ── Top bar ─────────────────────────────────────────────
+  topBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  // ── Hero ────────────────────────────────────────────────
   hero: {
-    borderRadius: 28,
-    padding: 22,
-    backgroundColor: '#ffe4d1',
-    borderWidth: 1,
-    borderColor: '#f5c6aa',
-    gap: 8,
-  },
-  emoji: { fontSize: 42 },
-  title: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: '#2d2019' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6f594d' },
-  card: {
-    borderRadius: 26,
-    padding: 18,
-    gap: 14,
-    backgroundColor: '#fffdf9',
-    borderWidth: 1,
-    borderColor: '#efd8ca',
-  },
-  scanButton: {
-    borderRadius: 18,
-    paddingVertical: 16,
-    alignItems: 'center',
-    backgroundColor: '#2d2019',
-  },
-  scanButtonDisabled: { backgroundColor: '#7a6a62' },
-  scanButtonText: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  permissionBanner: {
-    borderRadius: 14,
-    padding: 12,
-    backgroundColor: '#fff0e8',
-    borderWidth: 1,
-    borderColor: '#f5c6aa',
+    paddingHorizontal: 24,
+    paddingTop: 16,
     gap: 6,
   },
-  permissionText: { fontSize: 13, color: '#6f594d' },
-  permissionAction: { fontSize: 13, fontWeight: '800', color: '#df5a31' },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
+  ribbon: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#ffeed6',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#ead5ca' },
-  dividerText: {
-    fontSize: 12,
+  ribbonText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#aa9a92',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '800',
+    color: '#8a4a14',
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: '#aa6a49',
   },
-  input: {
-    height: 58,
+  heroTitle: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#21160d',
+    lineHeight: 40,
+    letterSpacing: -1,
+    marginTop: 12,
+  },
+  heroTitleAccent: {
+    color: '#ee5d52',
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#7a6452',
+    marginTop: 6,
+    lineHeight: 20,
+  },
+
+  // ── Code input boxes ────────────────────────────────────
+  codeWrap: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    position: 'relative',
+  },
+  codeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 6,
+  },
+  codeBox: {
+    flex: 1,
+    aspectRatio: 0.84,
     borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#e5d1c6',
-    backgroundColor: '#fff',
-    paddingHorizontal: 18,
-    fontSize: 24,
-    fontWeight: '900',
-    letterSpacing: 3,
-    color: '#2d2019',
-  },
-  joinButton: {
-    borderRadius: 999,
-    paddingVertical: 16,
+    backgroundColor: '#ffffff',
     alignItems: 'center',
-    backgroundColor: '#df5a31',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.07)',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  joinButtonDisabled: { backgroundColor: '#efb39d' },
-  joinButtonText: { fontSize: 16, fontWeight: '900', color: '#fff' },
+  codeBoxFilled: {
+    borderColor: 'rgba(40,22,12,0.12)',
+  },
+  codeBoxActive: {
+    borderColor: '#ee5d52',
+    borderWidth: 2,
+    shadowColor: '#ee5d52',
+    shadowOpacity: 0.30,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
+  codeBoxText: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#21160d',
+    letterSpacing: -0.5,
+    fontStyle: 'italic',
+  },
+  hiddenInput: {
+    position: 'absolute',
+    opacity: 0,
+    width: '100%',
+    height: '100%',
+    color: 'transparent',
+  },
+
+  // ── Permission banner ───────────────────────────────────
+  permissionBanner: {
+    marginHorizontal: 24,
+    marginTop: 20,
+    borderRadius: 16,
+    padding: 14,
+    backgroundColor: '#ffe5e0',
+    borderWidth: 1,
+    borderColor: 'rgba(238,93,82,0.25)',
+    gap: 6,
+  },
+  permissionText: {
+    fontSize: 13,
+    color: '#7a6452',
+    lineHeight: 18,
+  },
+  permissionAction: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#b3372d',
+  },
+
+  // ── Footer ──────────────────────────────────────────────
+  footer: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 0,
+    gap: 10,
+  },
+  primaryBtn: {
+    height: 56,
+    borderRadius: 999,
+    backgroundColor: '#ee5d52',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ee5d52',
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  primaryBtnDisabled: {
+    backgroundColor: '#f7c9c6',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  primaryBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fffaf2',
+    letterSpacing: -0.2,
+  },
+  ghostBtn: {
+    height: 44,
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ghostBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a3624',
+  },
+
+  // ── Camera modal ────────────────────────────────────────
   cameraOverlay: {
     flex: 1,
     backgroundColor: '#000',
@@ -320,7 +440,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     zIndex: 10,
   },
-  closeButtonText: { fontSize: 18, color: '#fff', fontWeight: '700' },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#fff',
+    fontWeight: '700',
+  },
   scanCenter: {
     flex: 1,
     alignItems: 'center',
@@ -340,5 +464,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     alignItems: 'center',
   },
-  scanErrorText: { fontSize: 15, fontWeight: '700', color: '#fff', textAlign: 'center' },
+  scanErrorText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#fff',
+    textAlign: 'center',
+  },
 });

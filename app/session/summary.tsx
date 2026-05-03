@@ -30,7 +30,7 @@ import {
   getSessionSuperlatives,
   getSessionTotalPieces,
 } from '../../src/lib/sessionSummary';
-import type { Menu, SushiSession } from '../../src/types';
+import type { Achievement, Menu, SushiSession } from '../../src/types';
 
 const MAX_PLATE_PIECES = 48;
 
@@ -134,7 +134,8 @@ export default function SessionSummaryScreen() {
   const [savingNote, setSavingNote] = useState(false);
   const [selectedFriendIds, setSelectedFriendIds] = useState<string[]>([]);
   const [draftNote, setDraftNote] = useState('');
-  const [earnedAchievements, setEarnedAchievements] = useState<string[]>([]);
+  const [newlyEarnedAchievementIds, setNewlyEarnedAchievementIds] = useState<string[]>([]);
+  const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   const [expandedBreakdownCats, setExpandedBreakdownCats] = useState<Set<string>>(new Set());
 
@@ -187,15 +188,22 @@ export default function SessionSummaryScreen() {
       setMenu(sessionMenu);
       setDraftNote(foundSession.note ?? '');
 
-      if (origin === 'submit' && userProfile) {
+      if (userProfile) {
         const allSessions = await getAllSessions();
-        const previousSessions = allSessions.filter((session) => session.id !== foundSession.id);
-        const achievements = getNewlyEarnedAchievements(allSessions, previousSessions, userProfile.uid)
-          .slice(0, 3)
-          .map((achievement) => achievement.title);
-        setEarnedAchievements(achievements);
+        setAllAchievements(getAchievements(allSessions, userProfile.uid));
+
+        if (origin === 'submit') {
+          const previousSessions = allSessions.filter((session) => session.id !== foundSession.id);
+          const achievements = getNewlyEarnedAchievements(allSessions, previousSessions, userProfile.uid)
+            .slice(0, 3)
+            .map((achievement) => achievement.id);
+          setNewlyEarnedAchievementIds(achievements);
+        } else {
+          setNewlyEarnedAchievementIds([]);
+        }
       } else {
-        setEarnedAchievements([]);
+        setAllAchievements([]);
+        setNewlyEarnedAchievementIds([]);
       }
     } finally {
       setLoading(false);
@@ -239,28 +247,25 @@ export default function SessionSummaryScreen() {
     [session, menu],
   );
 
-  const allAchievements = useMemo(() => {
-    if (!session || !userProfile) return [];
-    // Get all sessions for achievement calculation - in real app would load all user sessions
-    // For now, just use current session for calculating achievements
-    return getAchievements([session], userProfile.uid);
-  }, [session, userProfile]);
+  const newlyEarnedAchievementCount = newlyEarnedAchievementIds.length;
 
   const displayAchievements = useMemo(() => {
-    // If we have earned achievements, show only those
-    if (earnedAchievements.length > 0) {
-      return allAchievements.filter((a) => earnedAchievements.includes(a.title));
+    if (newlyEarnedAchievementIds.length > 0) {
+      return allAchievements.filter((achievement) => newlyEarnedAchievementIds.includes(achievement.id));
     }
-    // Otherwise show a preview of the first 6 achievements (non-hidden)
-    return allAchievements.filter((a) => !a.hidden).slice(0, 6);
-  }, [earnedAchievements, allAchievements]);
+    return allAchievements.filter((achievement) => !achievement.hidden).slice(0, 6);
+  }, [newlyEarnedAchievementIds, allAchievements]);
+
+  const openAchievements = () => {
+    router.push({ pathname: '/(tabs)/profile', params: { achievements: '1' } });
+  };
 
   const handleDone = () => {
     if (origin === 'history') {
       router.back();
       return;
     }
-    router.replace('/(tabs)/home');
+    router.replace({ pathname: '/session/party-intro', params: { next: 'home' } });
   };
 
   const toggleFriendSelection = (friendId: string) => {
@@ -504,27 +509,41 @@ export default function SessionSummaryScreen() {
 
         {displayAchievements.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tiny trophies</Text>
+            <TouchableOpacity
+              style={styles.sectionTitleRow}
+              onPress={openAchievements}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.sectionTitle}>
+                {newlyEarnedAchievementCount > 0
+                  ? `${newlyEarnedAchievementCount} achievement${newlyEarnedAchievementCount === 1 ? '' : 's'} unlocked`
+                  : 'Achievements'}
+              </Text>
+              <Text style={styles.sectionTitleLink}>Open</Text>
+            </TouchableOpacity>
             <View style={styles.achievementList}>
               {displayAchievements.map((achievement) => {
-                const isEarned = earnedAchievements.includes(achievement.title);
+                const isEarned = achievement.earned;
+                const isHiddenLocked = !isEarned && achievement.hidden;
                 return (
-                  <View
+                  <TouchableOpacity
                     key={achievement.id}
                     style={[styles.achievementCard, !isEarned && styles.achievementCardLocked]}
+                    onPress={openAchievements}
+                    activeOpacity={0.75}
                   >
                     <Text style={[styles.achievementEmoji, !isEarned && styles.achievementEmojiLocked]}>
-                      {isEarned ? '🏆' : '🔒'}
+                      {isHiddenLocked ? '🔒' : achievement.emoji}
                     </Text>
                     <View style={styles.achievementCardContent}>
                       <Text style={[styles.achievementTitle, !isEarned && styles.achievementTitleLocked]}>
-                        {isEarned ? achievement.title : '???'}
+                        {isHiddenLocked ? '???' : achievement.title}
                       </Text>
                       <Text style={[styles.achievementDescription, !isEarned && styles.achievementDescriptionLocked]}>
-                        {isEarned ? achievement.description : 'Complete challenges to unlock'}
+                        {isHiddenLocked ? 'Keep logging parties to discover this badge.' : achievement.description}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -532,7 +551,7 @@ export default function SessionSummaryScreen() {
         )}
 
         <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-          <Text style={styles.doneButtonText}>Done</Text>
+          <Text style={styles.doneButtonText}>Let's Go Home!</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -763,6 +782,13 @@ const styles = StyleSheet.create({
     borderColor: '#f2d6c8',
   },
   noteBody: { fontSize: 15, lineHeight: 22, color: '#5e4a3f' },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  sectionTitleLink: { fontSize: 13, fontWeight: '800', color: '#d7522e' },
   achievementList: { gap: 10 },
   achievementCard: {
     flexDirection: 'row',

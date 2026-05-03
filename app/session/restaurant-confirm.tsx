@@ -134,7 +134,7 @@ export default function SessionRestaurantConfirmScreen() {
 
       <View style={styles.hero}>
         <Text style={styles.eyebrow}>One last detail</Text>
-        <Text style={styles.title}>Where did this sushi happen?</Text>
+        <Text style={styles.title}>Where did this party happen?</Text>
         <Text style={styles.subtitle}>
           Pick the restaurant if you know it. If not, skip and keep the recap rolling.
         </Text>

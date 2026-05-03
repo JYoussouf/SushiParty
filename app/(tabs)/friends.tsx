@@ -168,7 +168,7 @@ export default function FriendsScreen() {
                 key={friend.user.uid}
                 style={styles.friendCard}
                 onPress={() =>
-                  router.push({ pathname: '../friend/[id]', params: { id: friend.user.uid } })
+                  router.push({ pathname: '/friend/[id]', params: { id: friend.user.uid } })
                 }
               >
                 <View style={styles.avatar}>

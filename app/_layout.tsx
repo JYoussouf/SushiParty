@@ -12,12 +12,36 @@ import { palette } from '../src/theme/pixel';
 
 let didInitialRedirect = false;
 
+const logPartyFlow = (...args: unknown[]) => {
+  console.log('[party-flow]', Date.now(), ...args);
+};
+
 function RootLayoutNav() {
   const router = useRouter();
   const navState = useRootNavigationState();
   const segments = useSegments();
-  const { hasActiveSession } = useSession();
+  const { hasActiveSession, groupSessionId } = useSession();
   const { accountBacked, onboardingDone, loading: authLoading } = useAuth();
+
+  useEffect(() => {
+    logPartyFlow('root segments changed', {
+      segments: segments.join('/'),
+      navReady: !!navState?.key,
+      authLoading,
+      accountBacked,
+      onboardingDone,
+      hasActiveSession,
+      groupSessionId,
+    });
+  }, [
+    accountBacked,
+    authLoading,
+    groupSessionId,
+    hasActiveSession,
+    navState?.key,
+    onboardingDone,
+    segments,
+  ]);
 
   // Account gate runs before onboarding because long-term tracking needs a real login.
   useEffect(() => {
@@ -27,17 +51,23 @@ function RootLayoutNav() {
 
     if (!accountBacked) {
       if (!inAuth) {
+        logPartyFlow('root auth gate replace login', { currentPath });
         router.replace('/(auth)/login');
       }
       return;
     }
 
     if (inAuth) {
+      logPartyFlow('root auth route exit replace', {
+        currentPath,
+        target: onboardingDone ? '/(tabs)/home' : '/onboarding',
+      });
       router.replace(onboardingDone ? '/(tabs)/home' : '/onboarding');
       return;
     }
 
     if (!onboardingDone && currentPath !== 'onboarding') {
+      logPartyFlow('root onboarding gate replace', { currentPath });
       router.replace('/onboarding');
     }
   }, [accountBacked, navState?.key, authLoading, onboardingDone, router, segments]);
@@ -53,39 +83,27 @@ function RootLayoutNav() {
     }
     const t = setTimeout(() => {
       didInitialRedirect = true;
-      router.replace(hasActiveSession ? '/session/scoreboard' : '/(tabs)/home');
+      const target = hasActiveSession
+        ? (groupSessionId ? '/session/lobby' : '/session/scoreboard')
+        : '/(tabs)/home';
+      logPartyFlow('root initial redirect replace', { currentPath, target });
+      router.replace(
+        hasActiveSession
+          ? (groupSessionId ? '/session/lobby' : '/session/scoreboard')
+          : '/(tabs)/home',
+      );
     }, 0);
     return () => clearTimeout(t);
   }, [
     router,
     navState?.key,
     hasActiveSession,
+    groupSessionId,
     segments,
     accountBacked,
     onboardingDone,
     authLoading,
   ]);
-
-  useEffect(() => {
-    if (!navState?.key || !accountBacked || !hasActiveSession) {
-      return;
-    }
-
-    const currentPath = segments.join('/');
-    const allowedPaths = new Set([
-      'session/scoreboard',
-      'restaurant/picker',
-      'session/mode-select',
-      'session/group-join',
-      'session/restaurant-confirm',
-      'session/lobby',
-      'session/party-intro',
-    ]);
-
-    if (!allowedPaths.has(currentPath)) {
-      router.replace('/session/scoreboard');
-    }
-  }, [accountBacked, hasActiveSession, navState?.key, router, segments]);
 
   return (
     <Stack
@@ -93,44 +111,45 @@ function RootLayoutNav() {
         headerShown: false,
         animation: 'fade_from_bottom',
         animationDuration: 280,
+        gestureEnabled: false,
       }}
     >
-      <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
-      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" options={{ animation: 'none', gestureEnabled: false }} />
+      <Stack.Screen name="(auth)" options={{ gestureEnabled: false }} />
       <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       <Stack.Screen
         name="restaurant/picker"
-        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/mode-select"
-        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/lobby"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom' }}
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/scoreboard"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'none' }}
+        options={{ headerShown: false, animation: 'none', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/party-intro"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'fade' }}
+        options={{ headerShown: false, animation: 'none', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/group-join"
-        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/restaurant-confirm"
-        options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
+        options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }}
       />
-      <Stack.Screen name="session/summary" options={{ headerShown: false }} />
-      <Stack.Screen name="settings" options={{ headerShown: false }} />
-      <Stack.Screen name="friend/[id]" options={{ headerShown: false }} />
-      <Stack.Screen name="profile/favorites" options={{ headerShown: false }} />
-      <Stack.Screen name="profile/restaurants" options={{ headerShown: false }} />
+      <Stack.Screen name="session/summary" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
+      <Stack.Screen name="settings" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="friend/[id]" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="profile/favorites" options={{ headerShown: false, gestureEnabled: false }} />
+      <Stack.Screen name="profile/restaurants" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
   );
 }

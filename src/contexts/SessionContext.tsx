@@ -49,6 +49,7 @@ function createLocalParticipant(userId?: string, displayName?: string, avatar?: 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const { userProfile } = useAuth();
   const [mode, setModeState] = useState<SessionMode>('single');
+  const [draftActive, setDraftActive] = useState(false);
   const [participants, setParticipants] = useState<SessionParticipant[]>([createLocalParticipant()]);
   const [activeParticipantIndex, setActiveParticipantIndex] = useState(0);
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
@@ -76,6 +77,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setGroupCode(draft.code);
       setGroupOwnerUid(draft.ownerUid);
       setModeState('group');
+      setDraftActive(true);
 
       const participantIndex = draft.participants.findIndex(
         (participant) => participant.userId === userProfile?.uid,
@@ -107,6 +109,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupCode(null);
         setGroupOwnerUid(null);
         setModeState('single');
+        setDraftActive(false);
         setParticipants([localParticipant]);
         setActiveParticipantIndex(0);
         return;
@@ -118,6 +121,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const setMode = useCallback(
     async (nextMode: SessionMode) => {
+      const leavingGroup = !!groupSessionId && nextMode !== 'group';
+
       if (nextMode !== 'group' && groupSessionId) {
         await removeGroupParty(groupSessionId);
         setGroupSessionId(null);
@@ -126,6 +131,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
 
       setModeState(nextMode);
+      setDraftActive(nextMode === 'group' || !leavingGroup);
       setParticipants([localParticipant]);
       setActiveParticipantIndex(0);
     },
@@ -202,6 +208,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     setModeState('single');
+    setDraftActive(false);
     setParticipants([localParticipant]);
     setActiveParticipantIndex(0);
   }, [groupSessionId, localParticipant]);
@@ -261,6 +268,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   );
 
   const hasActiveSession =
+    draftActive ||
     !!groupSessionId ||
     participants.some((participant) =>
       Object.values(participant.counts).some((count) => count > 0),

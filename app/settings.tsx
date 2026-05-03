@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BackButton } from '../src/components';
 import { useAuth } from '../src/contexts/AuthContext';
 import { buildSessionExportCsv, buildSessionExportText } from '../src/lib/exportSessions';
 import {
@@ -80,9 +81,7 @@ export default function SettingsScreen() {
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.topRow}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>Close</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => router.back()} />
         </View>
 
         <View style={styles.hero}>
@@ -200,16 +199,7 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff6ee' },
   scroll: { padding: 20, gap: 18, paddingBottom: 32 },
-  topRow: { flexDirection: 'row', justifyContent: 'flex-end' },
-  backButton: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#efd8ca',
-  },
-  backButtonText: { fontSize: 14, fontWeight: '800', color: '#6f4d3d' },
+  topRow: { flexDirection: 'row', justifyContent: 'flex-start' },
   hero: {
     borderRadius: 28,
     padding: 22,

@@ -27,18 +27,20 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
+import Svg, { Circle } from 'react-native-svg';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 import { StatusBar } from 'expo-status-bar';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { BackButton } from '../../src/components';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { CAT_AVATARS } from '../../src/lib/catAvatars';
 import { getAchievements } from '../../src/lib/achievements';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 import { calculateUserProfileStats, type UserProfileStats } from '../../src/lib/profileStats';
-import { calculateLevel, levelTitle, type LevelInfo } from '../../src/lib/leveling';
+import { calculateLevel, levelTitle } from '../../src/lib/leveling';
 import type { Achievement } from '../../src/types';
 
 const EMPTY_STATS: UserProfileStats = {
@@ -55,10 +57,10 @@ const EMPTY_STATS: UserProfileStats = {
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const { userProfile, remoteUser, updateLocalProfile } = useAuth();
+  const params = useLocalSearchParams<{ achievements?: string }>();
+  const { userProfile, updateLocalProfile } = useAuth();
   const [stats, setStats] = useState<UserProfileStats>(EMPTY_STATS);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [achievementsLoaded, setAchievementsLoaded] = useState(false);
   const levelInfo = calculateLevel(achievements);
   const [loading, setLoading] = useState(true);
   const [editingProfile, setEditingProfile] = useState(false);
@@ -69,7 +71,6 @@ export default function ProfileScreen() {
     if (!userProfile) {
       setStats(EMPTY_STATS);
       setAchievements([]);
-      setAchievementsLoaded(false);
       setLoading(false);
       return;
     }
@@ -96,7 +97,6 @@ export default function ProfileScreen() {
         setAchievements([]);
       }
     } finally {
-      setAchievementsLoaded(true);
       setLoading(false);
     }
   }, [userProfile]);
@@ -141,27 +141,20 @@ export default function ProfileScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>← Back</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.avatarCard}>
-          <TouchableOpacity
-            style={styles.avatarBtn}
-            onPress={editingProfile ? undefined : openEdit}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.avatarEmoji}>{editingProfile ? draftAvatar : (userProfile?.avatar ?? '🐱')}</Text>
-            {!editingProfile && (
-              <View style={styles.avatarEditBadge}>
-                <Text style={styles.avatarEditBadgeText}>✏️</Text>
-              </View>
-            )}
+        <View style={styles.profileTitleRow}>
+          <Text style={styles.profileTitle}>You</Text>
+          <TouchableOpacity onPress={openEdit} disabled={editingProfile}>
+            <Text style={[styles.profileEdit, editingProfile && styles.profileEditDisabled]}>Edit</Text>
           </TouchableOpacity>
+        </View>
 
+        <View style={styles.avatarCard}>
           {editingProfile ? (
             <View style={styles.inlineEdit}>
+              <AvatarProgressRing emoji={draftAvatar} progress={levelInfo.progress} />
               <View style={styles.catGrid}>
                 {CAT_AVATARS.map((cat) => (
                   <TouchableOpacity
@@ -195,16 +188,28 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View style={styles.avatarMeta}>
+              <TouchableOpacity
+                onPress={openEdit}
+                activeOpacity={0.8}
+              >
+                <AvatarProgressRing emoji={userProfile?.avatar ?? '🐱'} progress={levelInfo.progress} />
+              </TouchableOpacity>
               <Text style={styles.displayName}>{userProfile?.displayName ?? '—'}</Text>
-              <Text style={styles.username}>{userProfile?.username ? `@${userProfile.username}` : ''}</Text>
-              <Text style={styles.email}>{remoteUser?.email || 'Local-only profile'}</Text>
+              <View style={styles.levelPill}>
+                <Text style={styles.levelPillText}>
+                  • Level {levelInfo.level} · {levelTitle(levelInfo.level)}
+                </Text>
+              </View>
+              <Text style={styles.levelProgressText}>
+                {levelInfo.isMaxLevel
+                  ? 'Max level reached'
+                  : `${Math.round(levelInfo.progress * 100)}% to Level ${levelInfo.level + 1} · ${levelInfo.nextLevelXp - levelInfo.currentLevelXp} XP to go`}
+              </Text>
             </View>
           )}
         </View>
 
-        <LevelCard levelInfo={levelInfo} />
-
-        <AchievementsSection achievements={achievements} />
+        <AchievementsSection achievements={achievements} autoOpen={params.achievements === '1'} />
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Your Stats</Text>
@@ -241,7 +246,7 @@ export default function ProfileScreen() {
                 <Text style={styles.listRowText}>Top dishes</Text>
                 <Text style={styles.listRowChevron}>Open</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.listRow} onPress={() => router.push('../profile/restaurants')}>
+              <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/restaurants')}>
                 <Text style={styles.listRowText}>Restaurant insights</Text>
                 <Text style={styles.listRowChevron}>Open</Text>
               </TouchableOpacity>
@@ -257,47 +262,41 @@ export default function ProfileScreen() {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-function LevelCard({ levelInfo: li }: { levelInfo: LevelInfo }) {
-  const barWidth = useSharedValue(0);
-
-  React.useEffect(() => {
-    barWidth.value = withSpring(li.progress, { damping: 28, stiffness: 120, mass: 1 });
-  }, [li.progress]);
-
-  const barStyle = useAnimatedStyle(() => ({
-    width: `${barWidth.value * 100}%` as `${number}%`,
-  }));
+function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: number }) {
+  const size = 132;
+  const stroke = 10;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clampedProgress = Math.max(0.04, Math.min(1, progress));
 
   return (
-    <View style={levelStyles.card}>
-      {/* Mascot placeholder */}
-      <View style={levelStyles.mascotWrap}>
-        <Text style={levelStyles.mascotEmoji}>🐟</Text>
-        <Text style={levelStyles.mascotLabel}>Party Sashimi</Text>
-        <Text style={levelStyles.mascotSub}>coming soon</Text>
-      </View>
-
-      {/* Level info */}
-      <View style={levelStyles.info}>
-        <View style={levelStyles.titleRow}>
-          <View style={levelStyles.levelBadge}>
-            <Text style={levelStyles.levelNum}>{li.level}</Text>
-          </View>
-          <View style={levelStyles.titleBlock}>
-            <Text style={levelStyles.titleText}>{levelTitle(li.level)}</Text>
-            <Text style={levelStyles.xpText}>{li.totalXp} XP total</Text>
-          </View>
-        </View>
-
-        <View style={levelStyles.barTrack}>
-          <Animated.View style={[levelStyles.barFill, barStyle]} />
-        </View>
-
-        {li.isMaxLevel ? (
-          <Text style={levelStyles.barLabel}>Max level reached</Text>
-        ) : (
-          <Text style={levelStyles.barLabel}>{li.currentLevelXp} / {li.nextLevelXp} XP to level {li.level + 1}</Text>
-        )}
+    <View style={styles.avatarRing}>
+      <Svg width={size} height={size} style={styles.avatarRingSvg}>
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#fff7e8"
+          strokeWidth={stroke}
+          fill="none"
+        />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#f45750"
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={`${circumference} ${circumference}`}
+          strokeDashoffset={circumference * (1 - clampedProgress)}
+          rotation="-90"
+          originX={size / 2}
+          originY={size / 2}
+        />
+      </Svg>
+      <View style={styles.avatarCore}>
+        <Text style={styles.avatarEmoji}>{emoji}</Text>
       </View>
     </View>
   );
@@ -416,7 +415,13 @@ function interleaveByCategory(list: Achievement[]): Achievement[] {
   return result;
 }
 
-function AchievementsSection({ achievements }: { achievements: Achievement[] }) {
+function AchievementsSection({
+  achievements,
+  autoOpen,
+}: {
+  achievements: Achievement[];
+  autoOpen?: boolean;
+}) {
   const [allOpen, setAllOpen] = useState(false);
 
   const earned = achievements.filter((a) => a.earned).sort((a, b) => (b.earnedAt ?? '').localeCompare(a.earnedAt ?? ''));
@@ -425,29 +430,34 @@ function AchievementsSection({ achievements }: { achievements: Achievement[] }) 
   const sorted = [...earned, ...lockedVisible, ...lockedHidden];
   const earnedCount = achievements.filter((a) => a.earned).length;
   const preview = sorted.slice(0, PREVIEW_COUNT);
-  const hasMore = sorted.length > PREVIEW_COUNT;
+
+  React.useEffect(() => {
+    if (autoOpen && achievements.length > 0) {
+      setAllOpen(true);
+    }
+  }, [achievements.length, autoOpen]);
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>
-        Achievements · {earnedCount}/{achievements.length}
-      </Text>
+      <TouchableOpacity
+        style={achStyles.headerButton}
+        onPress={() => setAllOpen(true)}
+        activeOpacity={0.75}
+        disabled={achievements.length === 0}
+      >
+        <Text style={styles.sectionTitle}>
+          Achievements · {earnedCount}/{achievements.length}
+        </Text>
+        {achievements.length > 0 && <Text style={achStyles.headerArrow}>→</Text>}
+      </TouchableOpacity>
       {achievements.length === 0 ? (
         <EmptyCard text="No achievements yet. Keep logging parties to unlock milestones." />
       ) : (
-        <>
-          <View style={achStyles.grid}>
-            {preview.map((a) => (
-              <AchievementBadge key={a.id} achievement={a} locked={!a.earned} />
-            ))}
-          </View>
-          {hasMore && (
-            <TouchableOpacity style={achStyles.seeAllBtn} onPress={() => setAllOpen(true)} activeOpacity={0.75}>
-              <Text style={achStyles.seeAllText}>See all {sorted.length} achievements</Text>
-              <Text style={achStyles.seeAllChevron}>→</Text>
-            </TouchableOpacity>
-          )}
-        </>
+        <View style={achStyles.grid}>
+          {preview.map((a) => (
+            <AchievementBadge key={a.id} achievement={a} locked={!a.earned} />
+          ))}
+        </View>
       )}
 
       <Modal visible={allOpen} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setAllOpen(false)}>
@@ -516,38 +526,76 @@ const statStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
-  backBtn: { alignSelf: 'flex-start' },
-  backText: { fontSize: 16, fontWeight: '700', color: '#e53935' },
-  scroll: { padding: 24, gap: 28 },
-  avatarCard: { alignItems: 'center', gap: 12, paddingTop: 16 },
-  avatarMeta: { alignItems: 'center', gap: 4 },
-  inlineEdit: { width: '100%', gap: 12, paddingHorizontal: 4 },
-  catGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
-  editActions: { flexDirection: 'row', gap: 12 },
+  scroll: { padding: 24, gap: 24 },
+  profileTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileTitle: { fontSize: 38, lineHeight: 44, fontWeight: '900', color: '#21160d' },
+  profileEdit: { fontSize: 18, fontWeight: '800', color: '#5e4a3f' },
+  profileEditDisabled: { opacity: 0.4 },
+  avatarCard: {
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 24,
+    paddingVertical: 34,
+    borderRadius: 32,
+    backgroundColor: '#fff8e9',
+    borderWidth: 1,
+    borderColor: '#f4e4ca',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 5,
+  },
+  avatarMeta: { alignItems: 'center', gap: 8 },
+  inlineEdit: { width: '100%', gap: 12, paddingHorizontal: 4, alignItems: 'center' },
+  catGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
+  editActions: { width: '100%', flexDirection: 'row', gap: 12 },
   cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: '#e0e0e0', alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '700', color: '#888' },
   saveBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: '#e53935', alignItems: 'center' },
   saveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
-  avatarWrap: { alignItems: 'center', gap: 6, paddingTop: 16 },
-  avatarBtn: { position: 'relative', marginBottom: 8 },
-  avatarEmoji: { fontSize: 72, lineHeight: 84 },
-  avatarEditBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: -4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderColor: '#e0e0e0',
+  avatarRing: {
+    width: 132,
+    height: 132,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 7 },
+    elevation: 5,
   },
-  avatarEditBadgeText: { fontSize: 14 },
-  displayName: { fontSize: 22, fontWeight: '700', color: '#222' },
-  username: { fontSize: 15, color: '#888' },
-  email: { fontSize: 13, color: '#bbb' },
+  avatarRingSvg: { position: 'absolute' },
+  avatarCore: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fff9ec',
+    borderWidth: 6,
+    borderColor: '#fff',
+  },
+  avatarEmoji: { fontSize: 54, lineHeight: 64 },
+  displayName: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#21160d', textAlign: 'center' },
+  levelPill: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    backgroundColor: '#ead9ff',
+  },
+  levelPillText: { fontSize: 14, fontWeight: '900', color: '#68408e' },
+  levelProgressText: {
+    marginTop: 6,
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#8d7768',
+    textAlign: 'center',
+  },
   section: { gap: 12 },
   sectionTitle: { fontSize: 13, fontWeight: '700', color: '#aaa', letterSpacing: 0.8, textTransform: 'uppercase' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
@@ -574,6 +622,7 @@ const styles = StyleSheet.create({
   catBtnSelected: { borderColor: '#e53935', backgroundColor: '#fff0f0' },
   catEmoji: { fontSize: 28 },
   nameInput: {
+    width: '100%',
     height: 52,
     borderRadius: 14,
     borderWidth: 1.5,
@@ -588,6 +637,13 @@ const styles = StyleSheet.create({
 const BADGE_SIZE = (SCREEN_WIDTH - 48 - 24) / 4; // 4 cols, 24px side padding, 3×8px gaps
 
 const achStyles = StyleSheet.create({
+  headerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  headerArrow: { fontSize: 20, color: '#e53935', fontWeight: '800' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   badge: {
     width: BADGE_SIZE,
@@ -654,17 +710,6 @@ const achStyles = StyleSheet.create({
     borderColor: 'rgba(0,0,0,0.1)',
   },
   glassPillLockedText: { fontSize: 12, fontWeight: '700', color: '#999' },
-  seeAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#f0f0f0',
-    marginTop: 4,
-  },
-  seeAllText: { fontSize: 14, fontWeight: '600', color: '#e53935' },
-  seeAllChevron: { fontSize: 16, color: '#e53935' },
   sheetContainer: { flex: 1, backgroundColor: '#fff' },
   sheetHeader: {
     flexDirection: 'row',
@@ -678,58 +723,4 @@ const achStyles = StyleSheet.create({
   sheetTitle: { fontSize: 16, fontWeight: '800', color: '#222' },
   sheetClose: { fontSize: 16, fontWeight: '600', color: '#e53935' },
   sheetScroll: { padding: 24 },
-});
-
-const levelStyles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    gap: 16,
-    borderRadius: 20,
-    backgroundColor: '#fff7f5',
-    borderWidth: 1,
-    borderColor: '#f4d7d4',
-    padding: 16,
-    alignItems: 'center',
-  },
-  mascotWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: '#fff0f0',
-    borderWidth: 1.5,
-    borderColor: '#f4d7d4',
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 1,
-  },
-  mascotEmoji: { fontSize: 28 },
-  mascotLabel: { fontSize: 9, fontWeight: '700', color: '#e53935', letterSpacing: 0.4 },
-  mascotSub: { fontSize: 8, color: '#e09090' },
-  info: { flex: 1, gap: 8 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  levelBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#e53935',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  levelNum: { fontSize: 18, fontWeight: '900', color: '#fff' },
-  titleBlock: { gap: 1 },
-  titleText: { fontSize: 15, fontWeight: '800', color: '#222' },
-  xpText: { fontSize: 12, color: '#c26a62' },
-  barTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#f4d7d4',
-    overflow: 'hidden',
-  },
-  barFill: {
-    height: '100%',
-    borderRadius: 3,
-    backgroundColor: '#e53935',
-  },
-  barLabel: { fontSize: 11, color: '#c26a62', fontWeight: '600' },
 });

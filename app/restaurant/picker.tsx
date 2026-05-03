@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BackButton } from '../../src/components';
 import { useLocation } from '../../src/hooks/useLocation';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
 import {
@@ -61,7 +62,7 @@ export default function RestaurantPickerScreen() {
       })
       .catch(() => {})
       .finally(() => setNearbyLoading(false));
-  }, [location]);
+  }, [location, router, setRestaurant]);
 
   const handleSearchChange = useCallback(
     (text: string) => {
@@ -126,6 +127,10 @@ export default function RestaurantPickerScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+
+      <View style={styles.topBar}>
+        <BackButton onPress={() => router.back()} />
+      </View>
 
       <View style={styles.searchBar}>
         <TextInput
@@ -346,8 +351,15 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff' },
+  topBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
   searchBar: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#e0e0e0',
     flexDirection: 'row',

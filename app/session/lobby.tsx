@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
 import {
   Alert,
@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import QRCode from 'react-native-qrcode-svg';
+import { BackButton } from '../../src/components';
 import Animated, {
   Easing,
   interpolate,
@@ -28,6 +29,10 @@ import { useSession } from '../../src/hooks/useSession';
 import { useAuth } from '../../src/contexts/AuthContext';
 
 const EMOTES = ['👋', '🎉', '🍣', '🔥', '😂'] as const;
+
+const logPartyFlow = (...args: unknown[]) => {
+  console.log('[party-flow]', Date.now(), ...args);
+};
 
 // toggle(28) + 5×emote(30) + 6×gap(3) + padding(3×2) = 206
 const PILL_WIDTH = 206;
@@ -153,6 +158,7 @@ export default function LobbyScreen() {
   const {
     participants,
     groupCode,
+    groupSessionId,
     groupOwnerUid,
     currentUserParticipantIndex,
     setParticipantAvatar,
@@ -166,6 +172,12 @@ export default function LobbyScreen() {
 
   const myAvatar = participants[currentUserParticipantIndex]?.avatar ?? '🐱';
   const reactionTravel = Math.max(320, height * 0.72);
+
+  useEffect(() => {
+    if (!groupSessionId || !groupCode) {
+      router.replace('/(tabs)/home');
+    }
+  }, [groupCode, groupSessionId, router]);
 
   const joinLink = useMemo(
     () =>
@@ -187,7 +199,7 @@ export default function LobbyScreen() {
           text: 'Leave',
           style: 'destructive',
           onPress: () => {
-            void setMode('single').then(() => router.back());
+            void setMode('single').then(() => router.replace('/(tabs)/home'));
           },
         },
       ],
@@ -210,9 +222,7 @@ export default function LobbyScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navBack} onPress={confirmLeave}>
-          <Text style={styles.navBackText}>✕ Leave</Text>
-        </TouchableOpacity>
+        <BackButton onPress={confirmLeave} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
@@ -274,7 +284,10 @@ export default function LobbyScreen() {
 
         <TouchableOpacity
           style={styles.startButton}
-          onPress={() => router.push('/session/party-intro')}
+          onPress={() => {
+            logPartyFlow('lobby start pressed, replace party-intro', { groupCode, groupSessionId });
+            router.replace('/session/party-intro');
+          }}
         >
           <Text style={styles.startButtonText}>
             {isHost ? 'Start the Party 🍣' : 'Join the Scoreboard 🍣'}
@@ -302,8 +315,6 @@ export default function LobbyScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff5ec' },
   navBar: { paddingHorizontal: 16, paddingVertical: 8 },
-  navBack: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 4 },
-  navBackText: { fontSize: 15, fontWeight: '700', color: '#c46738' },
   scroll: { padding: 20, gap: 18, paddingBottom: 30 },
   hero: {
     borderRadius: 28,

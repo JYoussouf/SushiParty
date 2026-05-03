@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { SessionCard } from '../../src/components';
+import { BackButton, SessionCard } from '../../src/components';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { buildSessionExportText } from '../../src/lib/exportSessions';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
@@ -127,12 +127,7 @@ export default function HistoryScreen() {
       <SafeAreaView style={styles.container}>
         <StatusBar style="dark" />
         <View style={styles.backRow}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.replace('/(tabs)/home')}
-          >
-            <Text style={styles.backButtonText}>← Home</Text>
-          </TouchableOpacity>
+          <BackButton onPress={() => router.replace('/(tabs)/home')} />
         </View>
         <View style={styles.emptyState}>
           <Text style={styles.emptyEmoji}>📋</Text>
@@ -140,7 +135,7 @@ export default function HistoryScreen() {
           <Text style={styles.emptySubtitle}>
             Finish your first party and it will show up here with a full breakdown.
           </Text>
-          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/session/scoreboard')}>
+          <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/session/mode-select')}>
             <Text style={styles.emptyButtonText}>Start counting</Text>
           </TouchableOpacity>
         </View>
@@ -162,18 +157,13 @@ export default function HistoryScreen() {
           <SessionCard
             session={item}
             onPress={() =>
-              router.push({ pathname: '../session/summary', params: { id: item.id, origin: 'history' } })
+              router.push({ pathname: '/session/summary', params: { id: item.id, origin: 'history' } })
             }
           />
         )}
         ListHeaderComponent={
           <View style={styles.header}>
-            <TouchableOpacity
-              style={styles.backButton}
-              onPress={() => router.replace('/(tabs)/home')}
-            >
-              <Text style={styles.backButtonText}>← Home</Text>
-            </TouchableOpacity>
+            <BackButton onPress={() => router.replace('/(tabs)/home')} />
             <View style={styles.headerTop}>
               <View>
                 <Text style={styles.title}>History</Text>
@@ -239,8 +229,6 @@ const styles = StyleSheet.create({
   exportButton: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#ffeaea' },
   exportButtonText: { fontSize: 14, fontWeight: '700', color: '#e53935' },
   backRow: { paddingHorizontal: 20, paddingTop: 16 },
-  backButton: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 2 },
-  backButtonText: { fontSize: 15, fontWeight: '600', color: '#e53935' },
   searchInput: {
     height: 48,
     borderRadius: 14,

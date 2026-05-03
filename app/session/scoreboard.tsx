@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BackButton } from '../../src/components';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { useSession } from '../../src/hooks/useSession';
@@ -24,6 +25,10 @@ import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
 import { getSessionTemplates } from '../../src/lib/local/templates';
 import { isAnomaly } from '../../src/lib/stats/anomalyDetection';
 import type { SessionTemplate } from '../../src/types';
+
+const logPartyFlow = (...args: unknown[]) => {
+  console.log('[party-flow]', Date.now(), ...args);
+};
 
 function getCategoryChipColors(category: string): { bg: string; text: string } {
   const map: Record<string, { bg: string; text: string }> = {
@@ -67,11 +72,6 @@ export default function ScoreboardScreen() {
   const [scoreboardMode, setScoreboardMode] = useState<'simple' | 'detailed'>('simple');
   const scrollRef = useRef<ScrollView>(null);
 
-  const activeParticipant = participants[activeParticipantIndex];
-  const activeParticipantTotal = Object.values(activeParticipant?.counts ?? {}).reduce(
-    (sum, count) => sum + count,
-    0,
-  );
   const sessionTotalPieces = participants.reduce(
     (sum, participant) =>
       sum + Object.values(participant.counts).reduce((participantSum, count) => participantSum + count, 0),
@@ -79,13 +79,25 @@ export default function ScoreboardScreen() {
   );
 
   useEffect(() => {
-    if (activeParticipantTotal > 0) {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }
-  }, [activeParticipantTotal]);
+    logPartyFlow('scoreboard mounted');
+    return () => logPartyFlow('scoreboard unmounted');
+  }, []);
 
   useEffect(() => {
-    void getSessionTemplates().then(setTemplates);
+    logPartyFlow('scoreboard state snapshot', {
+      mode,
+      groupCode,
+      participants: participants.length,
+      sessionTotalPieces,
+    });
+  }, [groupCode, mode, participants.length, sessionTotalPieces]);
+
+  useEffect(() => {
+    logPartyFlow('scoreboard templates load start');
+    void getSessionTemplates().then((nextTemplates) => {
+      logPartyFlow('scoreboard templates load complete', { count: nextTemplates.length });
+      setTemplates(nextTemplates);
+    });
   }, []);
 
   const categorized = activeMenu.items.reduce<Record<string, typeof activeMenu.items>>(
@@ -240,10 +252,17 @@ export default function ScoreboardScreen() {
       clearRestaurant();
       setShowAnomalyModal(false);
       setPendingSubmit(null);
-      router.push({
-        pathname: '/session/summary',
-        params: { id: sessionId, origin: 'submit' },
-      });
+      if (!restaurant?.id) {
+        router.replace({
+          pathname: '/session/restaurant-confirm',
+          params: { id: sessionId, origin: 'submit' },
+        });
+      } else {
+        router.replace({
+          pathname: '/session/summary',
+          params: { id: sessionId, origin: 'submit' },
+        });
+      }
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Something went wrong.';
       Alert.alert('Submit failed', msg);
@@ -287,11 +306,13 @@ export default function ScoreboardScreen() {
   const handleCancel = () => {
     Alert.alert(
       'Cancel this party?',
-      'Nothing will be saved.',
+      mode === 'group'
+        ? 'This will disband the party for everyone. Nothing will be saved.'
+        : 'This will end the party. Nothing will be saved.',
       [
         { text: 'Keep going', style: 'cancel' },
         {
-          text: 'Cancel party',
+          text: mode === 'group' ? 'Disband party' : 'Cancel party',
           style: 'destructive',
           onPress: () => {
             void completeSession().then(() => {
@@ -310,9 +331,7 @@ export default function ScoreboardScreen() {
 
       {/* Header: back | center | menu */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} disabled={submitting}>
-          <Text style={styles.headerBtnIcon}>‹</Text>
-        </TouchableOpacity>
+        <BackButton onPress={handleCancel} disabled={submitting} />
         <TouchableOpacity style={styles.headerCenter} onPress={() => router.push('/restaurant/picker')}>
           <Text style={styles.headerRestaurant} numberOfLines={1}>
             {restaurant?.name ?? 'Choose restaurant'}
@@ -502,8 +521,7 @@ export default function ScoreboardScreen() {
               <ActivityIndicator color="#fffaf2" />
             ) : (
               <>
-                <Text style={styles.submitBtnCheck}>✓</Text>
-                <Text style={styles.submitBtnText}>Submit & cheers</Text>
+                <Text style={styles.submitBtnText}>Party's Over!</Text>
               </>
             )}
           </TouchableOpacity>

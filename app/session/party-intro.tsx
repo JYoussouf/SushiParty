@@ -1,81 +1,32 @@
-import React, { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import Animated, {
-  Easing,
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withDelay,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
-import { SushiPartyLogo } from '../../src/components';
-import { useTransition } from '../../src/contexts/TransitionContext';
+import { PartySplash } from '../../src/components';
+
+const logPartyFlow = (...args: unknown[]) => {
+  console.log('[party-flow]', Date.now(), ...args);
+};
 
 export default function PartyIntroScreen() {
   const router = useRouter();
-  const { startTransition } = useTransition();
-  const opacity = useSharedValue(0);
-  const scale = useSharedValue(0.7);
+  const params = useLocalSearchParams<{ next?: string }>();
+  const next = Array.isArray(params.next) ? params.next[0] : params.next;
+  const target = next === 'home' ? '/(tabs)/home' : '/session/scoreboard';
 
-  useEffect(() => {
-    // Start the transition - this manages the entire flow
-    void startTransition('party-intro', async () => {
-      // Wait for animations to complete
-      await new Promise<void>((resolve) => {
-        const completeAnimation = () => {
-          resolve();
-        };
+  const finishSplash = useCallback(() => {
+    logPartyFlow('party-intro onFinish replace target', { target });
+    router.replace(target);
+  }, [router, target]);
 
-        opacity.value = withSequence(
-          withTiming(1, { duration: 550, easing: Easing.out(Easing.quad) }),
-          withDelay(250, withTiming(0, { duration: 420, easing: Easing.in(Easing.quad) })),
-        );
-        scale.value = withSequence(
-          withTiming(1, { duration: 550, easing: Easing.out(Easing.back(1.4)) }),
-          withDelay(
-            250,
-            withTiming(14, { duration: 420, easing: Easing.in(Easing.quad) }, (finished) => {
-              if (finished) {
-                runOnJS(completeAnimation)();
-              }
-            }),
-          ),
-        );
-      });
-
-      // Navigate to scoreboard after animation + small buffer for loading
-      await new Promise<void>((resolve) => {
-        setTimeout(() => {
-          router.replace('/session/scoreboard');
-          resolve();
-        }, 200);
-      });
-    });
-  }, [startTransition, router, opacity, scale]);
-
-  const animStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ scale: scale.value }],
-  }));
+  React.useEffect(() => {
+    logPartyFlow('party-intro mounted');
+    return () => logPartyFlow('party-intro unmounted');
+  }, []);
 
   return (
-    <View style={styles.container}>
+    <>
       <StatusBar style="light" />
-      <Animated.View style={animStyle}>
-        <SushiPartyLogo size="lg" />
-      </Animated.View>
-    </View>
+      <PartySplash duration={3600} onFinish={finishSplash} />
+    </>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#1a0f0a',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

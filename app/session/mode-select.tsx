@@ -9,7 +9,12 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BackButton } from '../../src/components';
 import { useSession } from '../../src/hooks/useSession';
+
+const logPartyFlow = (...args: unknown[]) => {
+  console.log('[party-flow]', Date.now(), ...args);
+};
 
 export default function SessionModeScreen() {
   const router = useRouter();
@@ -21,9 +26,7 @@ export default function SessionModeScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navBack} onPress={() => router.back()}>
-          <Text style={styles.navBackText}>← Back</Text>
-        </TouchableOpacity>
+        <BackButton onPress={() => router.back()} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
@@ -68,7 +71,9 @@ export default function SessionModeScreen() {
         <TouchableOpacity
           style={[styles.choiceCard, styles.choiceCardSolo]}
           onPress={() => {
+            logPartyFlow('solo start pressed');
             void setMode('single').then(() => {
+              logPartyFlow('solo setMode complete, replace party-intro');
               router.replace('/session/party-intro');
             });
           }}
@@ -89,8 +94,6 @@ export default function SessionModeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#fff5ec' },
   navBar: { paddingHorizontal: 16, paddingVertical: 8 },
-  navBack: { alignSelf: 'flex-start', paddingVertical: 6, paddingHorizontal: 4 },
-  navBackText: { fontSize: 15, fontWeight: '700', color: '#c46738' },
   scroll: { padding: 20, gap: 18, paddingBottom: 30 },
   hero: {
     borderRadius: 28,
