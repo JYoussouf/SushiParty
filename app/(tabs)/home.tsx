@@ -30,10 +30,10 @@ export default function HomeScreen() {
   const buttons: HomeButton[] = hasActiveSession
     ? [
         {
-          label: groupCode ? 'Resume Lobby' : 'Resume Party',
+          label: groupCode ? 'Resume Lobby' : 'Resume Scoreboard',
           emoji: groupCode ? '🎉' : '🍣',
           accent: '#e53935',
-          onPress: () => router.push(groupCode ? '/session/lobby' : '/session/mode-select'),
+          onPress: () => router.push(groupCode ? '/session/lobby' : '/session/scoreboard'),
         },
       ]
     : [
@@ -75,15 +75,15 @@ export default function HomeScreen() {
             <Text style={styles.decorEmoji}>🍱</Text>
           </View>
           <View style={styles.buttons}>
-            {buttons.map((btn) => (
+            {buttons.map((btn, i) => (
               <TouchableOpacity
                 key={btn.label}
-                style={[styles.button, { borderColor: btn.accent }]}
+                style={i === 0 ? styles.buttonPrimary : styles.buttonSecondary}
                 onPress={btn.onPress}
                 activeOpacity={0.82}
               >
                 <Text style={styles.buttonEmoji}>{btn.emoji}</Text>
-                <Text style={[styles.buttonLabel, { color: btn.accent }]}>{btn.label}</Text>
+                <Text style={i === 0 ? styles.buttonLabelPrimary : styles.buttonLabelSecondary}>{btn.label}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 28,
+    paddingHorizontal: 24,
     justifyContent: 'center',
   },
   topBar: {
@@ -116,86 +116,113 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingRight: 14,
     borderRadius: 999,
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#ead7ca',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.08)',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 2,
     maxWidth: 180,
   },
   profileAvatar: {
-    fontSize: 22,
-    lineHeight: 26,
+    fontSize: 20,
+    lineHeight: 24,
   },
   profileName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#5a3e2b',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a3624',
     flexShrink: 1,
+    letterSpacing: -0.1,
   },
   settingsButton: {
-    width: 48,
-    height: 48,
+    width: 42,
+    height: 42,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 2,
-    borderColor: '#ead7ca',
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    backgroundColor: 'rgba(255,255,255,0.72)',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.08)',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.07,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
   settingsIcon: {
-    fontSize: 22,
-    lineHeight: 24,
+    fontSize: 20,
+    lineHeight: 22,
   },
   hero: {
     alignItems: 'center',
-    gap: 28,
+    gap: 24,
   },
   decorRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: 18,
+    gap: 16,
   },
   decorEmoji: {
-    fontSize: 48,
-    lineHeight: 56,
+    fontSize: 40,
+    lineHeight: 48,
   },
   buttons: {
     width: '100%',
-    gap: 12,
+    gap: 10,
   },
-  button: {
-    paddingVertical: 14,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 2,
+  buttonPrimary: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    backgroundColor: '#ee5d52',
+    shadowColor: '#ee5d52',
+    shadowOpacity: 0.45,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
+  },
+  buttonSecondary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.12)',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.06,
     shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
   buttonEmoji: {
-    fontSize: 26,
-    lineHeight: 32,
+    fontSize: 20,
+    lineHeight: 24,
   },
-  buttonLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.2,
+  buttonLabelPrimary: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fffaf2',
+    letterSpacing: -0.2,
+  },
+  buttonLabelSecondary: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#21160d',
+    letterSpacing: -0.2,
   },
 });

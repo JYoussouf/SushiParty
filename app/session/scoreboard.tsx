@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   View,
@@ -12,9 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SushiTile } from '../../src/components';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
-import { getCategoryTheme } from '../../src/lib/categoryTheme';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { useSession } from '../../src/hooks/useSession';
 import { useMenu } from '../../src/hooks/useMenu';
@@ -26,6 +24,19 @@ import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
 import { getSessionTemplates } from '../../src/lib/local/templates';
 import { isAnomaly } from '../../src/lib/stats/anomalyDetection';
 import type { SessionTemplate } from '../../src/types';
+
+function getCategoryChipColors(category: string): { bg: string; text: string } {
+  const map: Record<string, { bg: string; text: string }> = {
+    nigiri:  { bg: '#ffe5e0', text: '#b3372d' },
+    sashimi: { bg: '#fbe0e0', text: '#7a1a1a' },
+    maki:    { bg: '#ffeed6', text: '#8a4a14' },
+    roll:    { bg: '#dbeaf5', text: '#1d5582' },
+    side:    { bg: '#ecf3d4', text: '#4d6b1c' },
+    hot:     { bg: '#ffeed6', text: '#8a4a14' },
+    soup:    { bg: '#ffeed6', text: '#8a4a14' },
+  };
+  return map[category.toLowerCase()] ?? { bg: 'rgba(40,22,12,0.07)', text: '#4a3624' };
+}
 
 export default function ScoreboardScreen() {
   const router = useRouter();
@@ -54,7 +65,8 @@ export default function ScoreboardScreen() {
     stdDev: number;
   } | null>(null);
   const [scoreboardMode, setScoreboardMode] = useState<'simple' | 'detailed'>('simple');
-  const eatenScrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
   const activeParticipant = participants[activeParticipantIndex];
   const activeParticipantTotal = Object.values(activeParticipant?.counts ?? {}).reduce(
     (sum, count) => sum + count,
@@ -68,7 +80,7 @@ export default function ScoreboardScreen() {
 
   useEffect(() => {
     if (activeParticipantTotal > 0) {
-      eatenScrollRef.current?.scrollToEnd({ animated: true });
+      scrollRef.current?.scrollToEnd({ animated: true });
     }
   }, [activeParticipantTotal]);
 
@@ -76,8 +88,6 @@ export default function ScoreboardScreen() {
     void getSessionTemplates().then(setTemplates);
   }, []);
 
-
-  // Group items by category for section display
   const categorized = activeMenu.items.reduce<Record<string, typeof activeMenu.items>>(
     (acc, item) => {
       const cat = item.category;
@@ -87,6 +97,123 @@ export default function ScoreboardScreen() {
     },
     {},
   );
+
+  // Simple mode: vertical card list with inline CountStepper
+  const simpleList = useMemo(() => {
+    const visible = Object.values(categorized).flatMap((items) => {
+      const anyItem = items.find((item) => item.id.endsWith('-any'));
+      const collapsible = !!anyItem && items.length > 1;
+      return collapsible && anyItem ? [anyItem] : items;
+    });
+
+    return visible.map((item) => {
+      const isAny = item.id.endsWith('-any');
+      const catItems = categorized[item.category] ?? [];
+      const catTotal = catItems.reduce((s, it) => s + getCount(it.id), 0);
+      const displayCount = isAny ? catTotal : getCount(item.id);
+      const displayName = isAny ? getCategoryLabel(item.category) : item.name;
+      const decrementTarget =
+        isAny && getCount(item.id) === 0
+          ? catItems.find((catItem) => getCount(catItem.id) > 0)
+          : item;
+      const emoji = getItemEmoji(item.imageKey, item.category);
+      const chip = getCategoryChipColors(item.category);
+
+      return (
+        <View key={item.id} style={styles.itemCard}>
+          <View style={styles.itemEmojiBadge}>
+            <Text style={styles.itemEmojiText}>{emoji}</Text>
+          </View>
+          <View style={styles.itemInfo}>
+            <Text style={styles.itemName}>{displayName}</Text>
+            <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
+              <Text style={[styles.itemChipText, { color: chip.text }]}>
+                {getCategoryLabel(item.category)}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.stepper}>
+            <TouchableOpacity
+              style={[styles.stepperMinus, displayCount === 0 && styles.stepperMinusDisabled]}
+              onPress={() => { if (decrementTarget) void decrement(decrementTarget.id); }}
+              disabled={displayCount === 0 || !currentUserCanEditActive}
+            >
+              <Text style={[styles.stepperMinusText, displayCount === 0 && styles.stepperMinusTextDisabled]}>−</Text>
+            </TouchableOpacity>
+            <View style={[styles.stepperCount, displayCount > 0 && styles.stepperCountActive]}>
+              <Text style={[styles.stepperCountText, displayCount > 0 && styles.stepperCountTextActive]}>
+                {displayCount}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.stepperPlus}
+              onPress={() => void increment(item.id)}
+              disabled={!currentUserCanEditActive}
+            >
+              <Text style={styles.stepperPlusText}>+</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      );
+    });
+  }, [categorized, getCount, increment, decrement, currentUserCanEditActive]);
+
+  // Detailed mode: sectioned list with same card+stepper UX
+  const detailedList = useMemo(() => {
+    return Object.entries(categorized).map(([cat, catItems]) => {
+      const items = catItems.filter((item) => !item.id.endsWith('-any'));
+      const displayItems = items.length > 0 ? items : catItems;
+      const chip = getCategoryChipColors(cat);
+
+      return (
+        <View key={cat} style={styles.detailedSection}>
+          <Text style={styles.categoryHeader}>{getCategoryLabel(cat)}</Text>
+          <View style={styles.itemList}>
+            {displayItems.map((item) => {
+              const count = getCount(item.id);
+              const emoji = getItemEmoji(item.imageKey, item.category);
+              return (
+                <View key={item.id} style={styles.itemCard}>
+                  <View style={styles.itemEmojiBadge}>
+                    <Text style={styles.itemEmojiText}>{emoji}</Text>
+                  </View>
+                  <View style={styles.itemInfo}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
+                      <Text style={[styles.itemChipText, { color: chip.text }]}>
+                        {getCategoryLabel(item.category)}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.stepper}>
+                    <TouchableOpacity
+                      style={[styles.stepperMinus, count === 0 && styles.stepperMinusDisabled]}
+                      onPress={() => void decrement(item.id)}
+                      disabled={count === 0 || !currentUserCanEditActive}
+                    >
+                      <Text style={[styles.stepperMinusText, count === 0 && styles.stepperMinusTextDisabled]}>−</Text>
+                    </TouchableOpacity>
+                    <View style={[styles.stepperCount, count > 0 && styles.stepperCountActive]}>
+                      <Text style={[styles.stepperCountText, count > 0 && styles.stepperCountTextActive]}>
+                        {count}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.stepperPlus}
+                      onPress={() => void increment(item.id)}
+                      disabled={!currentUserCanEditActive}
+                    >
+                      <Text style={styles.stepperPlusText}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      );
+    });
+  }, [categorized, getCount, increment, decrement, currentUserCanEditActive]);
 
   const persistSession = async (flagged: boolean) => {
     if (!userProfile) {
@@ -181,89 +308,87 @@ export default function ScoreboardScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
+      {/* Header: back | center | menu */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Sushi Party!</Text>
+        <TouchableOpacity style={styles.headerBtn} onPress={() => router.back()} disabled={submitting}>
+          <Text style={styles.headerBtnIcon}>‹</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.headerCenter} onPress={() => router.push('/restaurant/picker')}>
+          <Text style={styles.headerRestaurant} numberOfLines={1}>
+            {restaurant?.name ?? 'Choose restaurant'}
+          </Text>
+          <Text style={styles.headerTitle}>Sushi Party</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.headerBtn} onPress={handleCancel} disabled={submitting}>
+          <Text style={styles.headerBtnIcon}>···</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Plate card: running tally + participant avatars */}
+      <View style={styles.tallySection}>
+        <View style={styles.tallyCard}>
+          <View>
+            <Text style={styles.tallyEyebrow}>Running tally</Text>
+            <View style={styles.tallyNumRow}>
+              <Text style={styles.tallyNum}>{sessionTotalPieces}</Text>
+              <Text style={styles.tallyUnit}>pieces</Text>
+            </View>
+          </View>
+          <View style={styles.avatarStack}>
+            {participants.slice(0, 3).map((p, i) => (
+              <View
+                key={p.userId}
+                style={[
+                  styles.avatarBubble,
+                  i > 0 && styles.avatarOverlap,
+                  i === 0 && styles.avatarFirst,
+                ]}
+              >
+                <Text style={styles.avatarBubbleEmoji}>{p.avatar ?? '🐱'}</Text>
+              </View>
+            ))}
+            {participants.length > 3 && (
+              <View style={[styles.avatarBubble, styles.avatarOverlap, styles.avatarExtraBubble]}>
+                <Text style={styles.avatarExtraText}>+{participants.length - 3}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+
+      {/* Segmented control */}
+      <View style={styles.modeBar}>
+        <View style={styles.modePill}>
           <TouchableOpacity
-            style={styles.restaurantBadge}
-            onPress={() => router.push('/restaurant/picker')}
+            style={[styles.modeBtn, scoreboardMode === 'simple' && styles.modeBtnActive]}
+            onPress={() => setScoreboardMode('simple')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: scoreboardMode === 'simple' }}
           >
-            <Text style={styles.restaurantBadgeText} numberOfLines={1}>
-              📍 {restaurant?.name ?? 'Choose restaurant'}
+            <Text style={[styles.modeBtnText, scoreboardMode === 'simple' && styles.modeBtnTextActive]}>
+              Simple
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeBtn, scoreboardMode === 'detailed' && styles.modeBtnActive]}
+            onPress={() => setScoreboardMode('detailed')}
+            accessibilityRole="button"
+            accessibilityState={{ selected: scoreboardMode === 'detailed' }}
+          >
+            <Text style={[styles.modeBtnText, scoreboardMode === 'detailed' && styles.modeBtnTextActive]}>
+              Detailed
             </Text>
           </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel} disabled={submitting}>
-          <Text style={styles.cancelBtnText}>✕</Text>
-        </TouchableOpacity>
       </View>
 
-      <View style={styles.modeBar}>
-        <TouchableOpacity
-          style={[styles.modeBtn, scoreboardMode === 'simple' && styles.modeBtnActive]}
-          onPress={() => setScoreboardMode('simple')}
-          accessibilityRole="button"
-          accessibilityState={{ selected: scoreboardMode === 'simple' }}
-        >
-          <Text style={[styles.modeBtnText, scoreboardMode === 'simple' && styles.modeBtnTextActive]}>Simple</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeBtn, scoreboardMode === 'detailed' && styles.modeBtnActive]}
-          onPress={() => setScoreboardMode('detailed')}
-          accessibilityRole="button"
-          accessibilityState={{ selected: scoreboardMode === 'detailed' }}
-        >
-          <Text style={[styles.modeBtnText, scoreboardMode === 'detailed' && styles.modeBtnTextActive]}>Detailed</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.totalBar}>
-        {activeParticipantTotal === 0 ? (
-          <Text style={styles.totalBarEmpty}>Tap a sushi to begin</Text>
-        ) : (
-          <ScrollView
-            ref={eatenScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.eatenStrip}
-          >
-            {activeMenu.items.flatMap((item) => {
-              const count = getCount(item.id);
-              if (count === 0) return [];
-              const emoji = getItemEmoji(item.imageKey, item.category);
-              return Array.from({ length: count }).map((_, i) => (
-                <TouchableOpacity
-                  key={`${item.id}-${i}`}
-                  style={styles.eatenChip}
-                  onPress={() => void decrement(item.id)}
-                  disabled={!currentUserCanEditActive}
-                >
-                  <Text style={styles.eatenEmoji}>{emoji}</Text>
-                </TouchableOpacity>
-              ));
-            })}
-          </ScrollView>
-        )}
-        {((mode === 'group' && groupCode) || canToggle) && (
-          <View style={styles.totalBarMeta}>
-            {mode === 'group' && groupCode && (
-              <Text style={styles.groupCodeText}>Code {groupCode}</Text>
-            )}
-            {canToggle && (
-              <TouchableOpacity
-                style={styles.menuToggle}
-                onPress={() => setUseGlobalMenu(!useGlobalMenu)}
-              >
-                <Text style={styles.menuToggleText}>
-                  {useGlobalMenu ? 'Restaurant' : 'Global'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
-      </View>
+      {/* Templates */}
       {templates.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.templateStrip}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.templateStrip}
+        >
           {templates.map((template) => (
             <TouchableOpacity
               key={template.id}
@@ -279,6 +404,7 @@ export default function ScoreboardScreen() {
         </ScrollView>
       )}
 
+      {/* Participant switcher (group mode) */}
       {(mode === 'group' || participants.length > 1) && (
         <ScrollView
           horizontal
@@ -290,7 +416,6 @@ export default function ScoreboardScreen() {
               (sum, count) => sum + count,
               0,
             );
-
             return (
               <TouchableOpacity
                 key={participant.userId}
@@ -322,6 +447,7 @@ export default function ScoreboardScreen() {
         </ScrollView>
       )}
 
+      {/* View-only banner */}
       {mode === 'group' && !currentUserCanEditActive && (
         <View style={styles.viewOnlyBanner}>
           <Text style={styles.viewOnlyText}>
@@ -330,113 +456,67 @@ export default function ScoreboardScreen() {
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-        {scoreboardMode === 'simple' ? (() => {
-          const visible = Object.values(categorized).flatMap((items) => {
-            const anyItem = items.find((item) => item.id.endsWith('-any'));
-            const collapsible = !!anyItem && items.length > 1;
-            return collapsible && anyItem ? [anyItem] : items;
-          });
-          const cols = 3;
-          const rows: typeof visible[] = [];
-          for (let i = 0; i < visible.length; i += cols) {
-            rows.push(visible.slice(i, i + cols));
-          }
-          return rows.map((row, rowIdx) => (
-            <View key={rowIdx} style={styles.gridRow}>
-              {row.map((item) => {
-                const theme = getCategoryTheme(item.category);
-                const isAny = item.id.endsWith('-any');
-                const catItems = categorized[item.category] ?? [];
-                const catTotal = catItems.reduce((s, it) => s + getCount(it.id), 0);
-                const displayCount = isAny ? catTotal : getCount(item.id);
-                const displayName = isAny ? getCategoryLabel(item.category) : item.name;
-                const decrementTarget =
-                  isAny && getCount(item.id) === 0
-                    ? catItems.find((catItem) => getCount(catItem.id) > 0)
-                    : item;
-                return (
-                  <SushiTile
-                    key={item.id}
-                    name={displayName}
-                    emoji={getItemEmoji(item.imageKey, item.category)}
-                    count={displayCount}
-                    tint={theme}
-                    onIncrement={() => void increment(item.id)}
-                    onDecrement={() => {
-                      if (decrementTarget) void decrement(decrementTarget.id);
-                    }}
-                    disabled={!currentUserCanEditActive}
-                  />
-                );
-              })}
-              {row.length < cols &&
-                Array.from({ length: cols - row.length }).map((_, idx) => (
-                  <View key={`spacer-${idx}`} style={styles.gridSpacer} />
-                ))}
-            </View>
-          ));
-        })() : Object.entries(categorized).map(([cat, catItems]) => {
-          const detailItems = catItems.filter((item) => !item.id.endsWith('-any'));
-          const items = detailItems.length > 0 ? detailItems : catItems;
-          const cols = 3;
-          const rows: typeof items[] = [];
-          for (let i = 0; i < items.length; i += cols) {
-            rows.push(items.slice(i, i + cols));
-          }
-          return (
-            <View key={cat}>
-              <Text style={styles.categoryHeader}>{getCategoryLabel(cat)}</Text>
-              {rows.map((row, rowIdx) => (
-                <View key={rowIdx} style={styles.gridRow}>
-                  {row.map((item) => {
-                    const theme = getCategoryTheme(item.category);
-                    return (
-                      <SushiTile
-                        key={item.id}
-                        name={item.name}
-                        emoji={getItemEmoji(item.imageKey, item.category)}
-                        count={getCount(item.id)}
-                        tint={theme}
-                        onIncrement={() => void increment(item.id)}
-                        onDecrement={() => void decrement(item.id)}
-                        disabled={!currentUserCanEditActive}
-                      />
-                    );
-                  })}
-                  {row.length < cols &&
-                    Array.from({ length: cols - row.length }).map((_, idx) => (
-                      <View key={`spacer-${idx}`} style={styles.gridSpacer} />
-                    ))}
-                </View>
-              ))}
-            </View>
-          );
-        })}
+      {/* Item list / grid */}
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+      >
+        {scoreboardMode === 'simple' ? (
+          <View style={styles.itemList}>{simpleList}</View>
+        ) : (
+          <View>{detailedList}</View>
+        )}
         <View style={styles.listPadding} />
       </ScrollView>
 
+      {/* Footer */}
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.resetBtn} onPress={() => void reset()} disabled={submitting}>
-          <Text style={styles.resetBtnText}>Reset</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.submitBtn,
-            (sessionTotalPieces === 0 || submitting) && styles.submitBtnDisabled,
-          ]}
-          disabled={sessionTotalPieces === 0 || submitting}
-          onPress={() => void handleSubmit()}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitBtnText}>Finished!</Text>
-          )}
-        </TouchableOpacity>
+        {canToggle && (
+          <TouchableOpacity
+            style={styles.menuToggle}
+            onPress={() => setUseGlobalMenu(!useGlobalMenu)}
+          >
+            <Text style={styles.menuToggleText}>
+              {useGlobalMenu ? 'Restaurant menu' : 'Global menu'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        <View style={styles.footerActions}>
+          <TouchableOpacity
+            style={styles.resetBtn}
+            onPress={() => void reset()}
+            disabled={submitting}
+          >
+            <Text style={styles.resetBtnText}>Reset</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.submitBtn,
+              (sessionTotalPieces === 0 || submitting) && styles.submitBtnDisabled,
+            ]}
+            disabled={sessionTotalPieces === 0 || submitting}
+            onPress={() => void handleSubmit()}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#fffaf2" />
+            ) : (
+              <>
+                <Text style={styles.submitBtnCheck}>✓</Text>
+                <Text style={styles.submitBtnText}>Submit & cheers</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <Modal visible={showAnomalyModal} transparent animationType="fade" onRequestClose={() => setShowAnomalyModal(false)}>
+      {/* Anomaly modal */}
+      <Modal
+        visible={showAnomalyModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowAnomalyModal(false)}
+      >
         <View style={styles.anomalyBackdrop}>
           <View style={styles.anomalyCard}>
             <Text style={styles.anomalyTitle}>That count looks unusual</Text>
@@ -465,7 +545,7 @@ export default function ScoreboardScreen() {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color="#fffaf2" />
                 ) : (
                   <Text style={styles.anomalyPrimaryText}>Yes, submit it</Text>
                 )}
@@ -481,320 +561,538 @@ export default function ScoreboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#fffaf2',
   },
+
+  // ── Header ──────────────────────────────────────────────
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(40,22,12,0.07)',
   },
-  headerLeft: {
-    gap: 4,
+  headerBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#e53935',
+  headerBtnIcon: {
+    fontSize: 20,
+    color: '#7a6452',
+    fontWeight: '500',
+    lineHeight: 22,
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 8,
+  },
+  headerRestaurant: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7a6452',
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
-  headerTitleAccent: {
-    fontSize: 26,
+  headerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#21160d',
+    marginTop: 2,
+    letterSpacing: -0.2,
   },
-  restaurantBadge: {
+
+  // ── Tally card (plate) ──────────────────────────────────
+  tallySection: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  tallyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#fdf3e3',
+    borderRadius: 28,
+    paddingHorizontal: 20,
+    paddingVertical: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.06)',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 3,
+  },
+  tallyEyebrow: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#7a6452',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tallyNumRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 6,
+    marginTop: 4,
+  },
+  tallyNum: {
+    fontSize: 44,
+    fontWeight: '700',
+    color: '#21160d',
+    letterSpacing: -1,
+    lineHeight: 48,
+    includeFontPadding: false,
+  },
+  tallyUnit: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#7a6452',
+  },
+  avatarStack: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  restaurantBadgeText: {
-    fontSize: 13,
-    color: '#888',
-  },
-  avatarBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#fafafa',
-    borderWidth: 2,
-    borderColor: '#e53935',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 22,
-  },
-  cancelBtn: {
+  avatarBubble: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f7e9d2',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#fdf3e3',
   },
-  cancelBtnText: {
-    fontSize: 16,
-    color: '#999',
-    fontWeight: '600',
-    lineHeight: 20,
+  avatarFirst: {
+    borderColor: '#ee5d52',
   },
-  totalBar: {
-    backgroundColor: '#fafafa',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e5e5',
-    gap: 4,
+  avatarOverlap: {
+    marginLeft: -10,
   },
-  totalBarEmpty: {
-    fontSize: 13,
-    color: '#999',
-    fontWeight: '600',
-    fontStyle: 'italic',
-    lineHeight: 32,
+  avatarBubbleEmoji: {
+    fontSize: 18,
+    lineHeight: 22,
   },
-  totalBarMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  avatarExtraBubble: {
+    backgroundColor: '#ffffff',
   },
-  eatenStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  eatenChip: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  eatenEmoji: {
-    fontSize: 26,
-    lineHeight: 32,
-  },
-  groupCodeText: {
-    fontSize: 12,
+  avatarExtraText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: '#b75c57',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
+    color: '#4a3624',
   },
+
+  // ── Segmented control ───────────────────────────────────
   modeBar: {
     flexDirection: 'row',
-    backgroundColor: '#f2f2f2',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
-    padding: 6,
-    gap: 4,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  modePill: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(40,22,12,0.06)',
+    borderRadius: 999,
+    padding: 4,
+    gap: 2,
   },
   modeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   modeBtnActive: {
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOpacity: 0.10,
+    backgroundColor: '#ffffff',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.08,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
   modeBtnText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
-    color: '#999',
+    color: '#7a6452',
+    letterSpacing: -0.1,
   },
   modeBtnTextActive: {
-    color: '#e53935',
+    color: '#21160d',
     fontWeight: '700',
   },
-  categoryHeader: {
-    fontSize: 12,
+
+  // ── Templates ───────────────────────────────────────────
+  templateStrip: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 10,
+  },
+  templateChip: {
+    minWidth: 156,
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.08)',
+    gap: 2,
+  },
+  templateChipTitle: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#bbb',
-    letterSpacing: 0.9,
+    color: '#21160d',
+  },
+  templateChipMeta: {
+    fontSize: 12,
+    color: '#7a6452',
+  },
+
+  // ── Participants ────────────────────────────────────────
+  participantStrip: {
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    gap: 8,
+  },
+  participantChip: {
+    minWidth: 108,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.10)',
+    gap: 2,
+    justifyContent: 'center',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  participantChipActive: {
+    backgroundColor: '#ffe5e0',
+    borderColor: '#ee5d52',
+  },
+  participantName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#4a3624',
+    lineHeight: 18,
+    includeFontPadding: false,
+  },
+  participantNameActive: {
+    color: '#b3372d',
+  },
+  participantTotal: {
+    fontSize: 12,
+    color: '#7a6452',
+    lineHeight: 16,
+    includeFontPadding: false,
+  },
+  participantTotalActive: {
+    color: '#ee5d52',
+  },
+
+  // ── View-only banner ────────────────────────────────────
+  viewOnlyBanner: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 14,
+    backgroundColor: '#ffeed6',
+    borderWidth: 1,
+    borderColor: 'rgba(243,176,107,0.4)',
+  },
+  viewOnlyText: {
+    fontSize: 13,
+    color: '#8a4a14',
+  },
+
+  // ── Item list (simple mode) ─────────────────────────────
+  list: {
+    paddingTop: 2,
+    paddingHorizontal: 16,
+  },
+  itemList: {
+    gap: 8,
+  },
+  itemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#ffffff',
+    borderRadius: 18,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.06)',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  itemEmojiBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: '#fdf3e3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.07)',
+  },
+  itemEmojiText: {
+    fontSize: 22,
+    lineHeight: 26,
+  },
+  itemInfo: {
+    flex: 1,
+    minWidth: 0,
+    gap: 5,
+  },
+  itemName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#21160d',
+    letterSpacing: -0.1,
+  },
+  itemChip: {
+    alignSelf: 'flex-start',
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  itemChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.1,
+  },
+
+  // ── CountStepper ────────────────────────────────────────
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepperMinus: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: '#fbf6ee',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperMinusDisabled: {
+    backgroundColor: 'rgba(40,22,12,0.05)',
+    borderColor: 'transparent',
+  },
+  stepperMinusText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#4a3624',
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+  stepperMinusTextDisabled: {
+    color: '#ad9886',
+  },
+  stepperCount: {
+    minWidth: 36,
+    height: 34,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    backgroundColor: 'rgba(40,22,12,0.07)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperCountActive: {
+    backgroundColor: '#ee5d52',
+    shadowColor: '#ee5d52',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  stepperCountText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#7a6452',
+  },
+  stepperCountTextActive: {
+    color: '#fffaf2',
+  },
+  stepperPlus: {
+    width: 34,
+    height: 34,
+    borderRadius: 999,
+    backgroundColor: '#ee5d52',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#ee5d52',
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  stepperPlusText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fffaf2',
+    lineHeight: 22,
+    includeFontPadding: false,
+  },
+
+  // ── Detailed list ───────────────────────────────────────
+  detailedSection: {
+    marginBottom: 4,
+  },
+  categoryHeader: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ad9886',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     paddingHorizontal: 8,
     paddingTop: 14,
     paddingBottom: 2,
   },
-  menuToggle: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    backgroundColor: '#ffeaea',
-  },
-  menuToggleText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#e53935',
-  },
-  quickStartHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-  quickStartTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: '#aaa',
-  },
-  templateStrip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    gap: 10,
-  },
-  templateChip: {
-    minWidth: 156,
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: '#fafafa',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    gap: 4,
-  },
-  templateChipTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#222',
-  },
-  templateChipMeta: {
-    fontSize: 12,
-    color: '#777',
-  },
-  list: {
-    paddingTop: 4,
-    paddingHorizontal: 2,
-  },
-  gridRow: {
-    flexDirection: 'row',
-  },
-  gridSpacer: {
-    flex: 1,
-  },
-  participantStrip: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  participantChip: {
-    minWidth: 108,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 18,
-    backgroundColor: '#fafafa',
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
-    gap: 2,
-  },
-  participantChipActive: {
-    backgroundColor: '#fff3f2',
-    borderColor: '#f2b9b3',
-  },
-  participantName: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#333',
-  },
-  participantNameActive: {
-    color: '#e53935',
-  },
-  participantTotal: {
-    fontSize: 12,
-    color: '#777',
-  },
-  participantTotalActive: {
-    color: '#b75c57',
-  },
-  viewOnlyBanner: {
-    marginHorizontal: 16,
-    marginBottom: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: '#fff6e7',
-    borderWidth: 1,
-    borderColor: '#f0d7a0',
-  },
-  viewOnlyText: {
-    fontSize: 13,
-    color: '#8b6a1d',
-  },
+
+
   listPadding: {
-    height: 120,
+    height: 130,
   },
+
+  // ── Footer ──────────────────────────────────────────────
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    gap: 12,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: 10,
     paddingBottom: 28,
-    backgroundColor: '#fff',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e0e0e0',
+    backgroundColor: 'rgba(255,250,242,0.96)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(40,22,12,0.07)',
+    gap: 8,
+  },
+  menuToggle: {
+    alignSelf: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 999,
+    backgroundColor: '#ffe5e0',
+  },
+  menuToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#b3372d',
+  },
+  footerActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
   resetBtn: {
     flex: 1,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f5f5f5',
+    height: 54,
+    borderRadius: 999,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
   },
   resetBtnText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 15,
+    color: '#4a3624',
     fontWeight: '600',
   },
   submitBtn: {
     flex: 2,
     height: 54,
-    borderRadius: 27,
-    backgroundColor: '#e53935',
+    borderRadius: 999,
+    backgroundColor: '#2a1a10',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    shadowColor: '#28160c',
+    shadowOpacity: 0.40,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
   submitBtnDisabled: {
-    backgroundColor: '#ffcdd2',
+    backgroundColor: 'rgba(40,22,12,0.20)',
     shadowOpacity: 0,
+    elevation: 0,
+  },
+  submitBtnCheck: {
+    fontSize: 16,
+    color: '#fffaf2',
+    fontWeight: '700',
   },
   submitBtnText: {
-    fontSize: 17,
-    color: '#fff',
-    fontWeight: '800',
-    letterSpacing: 0.3,
+    fontSize: 16,
+    color: '#fffaf2',
+    fontWeight: '700',
+    letterSpacing: -0.2,
   },
+
+  // ── Anomaly modal ───────────────────────────────────────
   anomalyBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.36)',
+    backgroundColor: 'rgba(40,22,12,0.45)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   anomalyCard: {
     width: '100%',
-    borderRadius: 24,
-    padding: 20,
+    borderRadius: 28,
+    padding: 22,
     gap: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#fffaf2',
+    shadowColor: '#28160c',
+    shadowOpacity: 0.18,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 18 },
   },
   anomalyTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#222',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#21160d',
+    letterSpacing: -0.3,
   },
   anomalyText: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#666',
+    color: '#7a6452',
   },
   anomalyActions: {
     flexDirection: 'row',
@@ -806,23 +1104,30 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(40,22,12,0.12)',
   },
   anomalySecondaryText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#555',
+    fontWeight: '600',
+    color: '#4a3624',
   },
   anomalyPrimary: {
     flex: 1,
     borderRadius: 999,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#e53935',
+    backgroundColor: '#ee5d52',
+    shadowColor: '#ee5d52',
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
   anomalyPrimaryText: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
+    color: '#fffaf2',
   },
 });
