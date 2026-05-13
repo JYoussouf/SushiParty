@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Text, Pressable, StyleSheet, View } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -68,6 +69,7 @@ export function SushiTile({
       withSpring(0.95, { duration: 100 }),
       withSpring(1, { duration: 140 }),
     );
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const id = Date.now() + Math.random();
     const x = (Math.random() - 0.5) * 30;
     setFloats((prev) => [...prev, { id, x }]);

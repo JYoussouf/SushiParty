@@ -10,6 +10,12 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
@@ -71,6 +77,13 @@ export default function ScoreboardScreen() {
   } | null>(null);
   const [scoreboardMode, setScoreboardMode] = useState<'simple' | 'detailed'>('simple');
   const scrollRef = useRef<ScrollView>(null);
+  const tallyScale = useSharedValue(1);
+  const tallyStyle = useAnimatedStyle(() => ({ transform: [{ scale: tallyScale.value }] }));
+  const tabIndicatorX = useSharedValue(0);
+  const [tabWidth, setTabWidth] = useState(0);
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: tabIndicatorX.value }],
+  }));
 
   const sessionTotalPieces = participants.reduce(
     (sum, participant) =>
@@ -82,6 +95,15 @@ export default function ScoreboardScreen() {
     logPartyFlow('scoreboard mounted');
     return () => logPartyFlow('scoreboard unmounted');
   }, []);
+
+  useEffect(() => {
+    if (sessionTotalPieces > 0) {
+      tallyScale.value = withSequence(
+        withSpring(1.18, { damping: 6, stiffness: 400 }),
+        withSpring(1, { damping: 14, stiffness: 200 }),
+      );
+    }
+  }, [sessionTotalPieces]);
 
   useEffect(() => {
     logPartyFlow('scoreboard state snapshot', {
@@ -349,7 +371,7 @@ export default function ScoreboardScreen() {
           <View>
             <Text style={styles.tallyEyebrow}>Running tally</Text>
             <View style={styles.tallyNumRow}>
-              <Text style={styles.tallyNum}>{sessionTotalPieces}</Text>
+              <Animated.Text style={[styles.tallyNum, tallyStyle]}>{sessionTotalPieces}</Animated.Text>
               <Text style={styles.tallyUnit}>pieces</Text>
             </View>
           </View>
@@ -377,10 +399,23 @@ export default function ScoreboardScreen() {
 
       {/* Segmented control */}
       <View style={styles.modeBar}>
-        <View style={styles.modePill}>
+        <View
+          style={styles.modePill}
+          onLayout={(e) => {
+            const w = (e.nativeEvent.layout.width - 8) / 2;
+            setTabWidth(w);
+            tabIndicatorX.value = scoreboardMode === 'detailed' ? w + 2 : 0;
+          }}
+        >
+          {tabWidth > 0 && (
+            <Animated.View style={[styles.modeBtnActive, styles.modeIndicator, { width: tabWidth }, indicatorStyle]} />
+          )}
           <TouchableOpacity
-            style={[styles.modeBtn, scoreboardMode === 'simple' && styles.modeBtnActive]}
-            onPress={() => setScoreboardMode('simple')}
+            style={[styles.modeBtn, { flex: 1 }]}
+            onPress={() => {
+              setScoreboardMode('simple');
+              tabIndicatorX.value = withSpring(0, { damping: 20, stiffness: 260 });
+            }}
             accessibilityRole="button"
             accessibilityState={{ selected: scoreboardMode === 'simple' }}
           >
@@ -389,8 +424,11 @@ export default function ScoreboardScreen() {
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.modeBtn, scoreboardMode === 'detailed' && styles.modeBtnActive]}
-            onPress={() => setScoreboardMode('detailed')}
+            style={[styles.modeBtn, { flex: 1 }]}
+            onPress={() => {
+              setScoreboardMode('detailed');
+              tabIndicatorX.value = withSpring(tabWidth + 2, { damping: 20, stiffness: 260 });
+            }}
             accessibilityRole="button"
             accessibilityState={{ selected: scoreboardMode === 'detailed' }}
           >
@@ -728,6 +766,14 @@ const styles = StyleSheet.create({
     padding: 4,
     gap: 2,
   },
+  modeIndicator: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    bottom: 4,
+    borderRadius: 999,
+    zIndex: 0,
+  },
   modeBtn: {
     paddingVertical: 8,
     paddingHorizontal: 20,
@@ -735,6 +781,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
+    zIndex: 1,
   },
   modeBtnActive: {
     backgroundColor: '#ffffff',

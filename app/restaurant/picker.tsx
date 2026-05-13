@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
   View,
   Text,
@@ -44,6 +45,7 @@ export default function RestaurantPickerScreen() {
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load nearby when location becomes available; auto-select if one is within 100m
@@ -134,7 +136,7 @@ export default function RestaurantPickerScreen() {
 
       <View style={styles.searchBar}>
         <TextInput
-          style={styles.searchInput}
+          style={[styles.searchInput, searchFocused && styles.searchInputFocused]}
           value={searchQuery}
           onChangeText={handleSearchChange}
           placeholder="Search by name or city…"
@@ -142,6 +144,8 @@ export default function RestaurantPickerScreen() {
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
+          onFocus={() => setSearchFocused(true)}
+          onBlur={() => setSearchFocused(false)}
         />
         {searchQuery.length > 0 ? (
           <TouchableOpacity style={styles.searchAction} onPress={clearSearch}>
@@ -196,7 +200,7 @@ export default function RestaurantPickerScreen() {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onPress={() => handleSelect(item)}>
+          <TouchableOpacity style={styles.row} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSelect(item); }}>
             <View style={styles.rowBody}>
               <Text style={styles.rowName}>{item.name}</Text>
               <Text style={styles.rowAddress} numberOfLines={1}>
@@ -301,6 +305,7 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
         <KeyboardAvoidingView
           style={modalStyles.kb}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
         >
           <View style={modalStyles.header}>
             <TouchableOpacity onPress={onClose} disabled={submitting}>
@@ -374,6 +379,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     fontSize: 15,
     color: '#222',
+    borderWidth: 1.5,
+    borderColor: 'transparent',
+  },
+  searchInputFocused: {
+    borderColor: '#d7522e',
+    backgroundColor: '#fff',
   },
   searchAction: {
     width: 32,

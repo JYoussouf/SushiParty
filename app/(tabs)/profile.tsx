@@ -1,4 +1,5 @@
 import React, { useCallback, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
   ActivityIndicator,
   Alert,
@@ -307,6 +308,7 @@ function AchievementBadge({ achievement: a, locked }: { achievement: Achievement
   const progress = useSharedValue(0);
 
   const show = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
     setOpen(true);
     progress.value = withSpring(1, { damping: 28, stiffness: 160, mass: 1.1 });
   };

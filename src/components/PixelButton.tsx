@@ -1,5 +1,6 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { palette, pixelFamily } from '../theme/pixel';
 
 interface PixelButtonProps {
@@ -27,6 +28,11 @@ export function PixelButton({
   const fontSize = size === 'lg' ? 16 : size === 'sm' ? 9 : 11;
   const shadowOffset = size === 'lg' ? 5 : size === 'sm' ? 2 : 4;
 
+  const handlePress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress();
+  };
+
   return (
     <View style={[styles.wrap, style]}>
       <View
@@ -40,7 +46,7 @@ export function PixelButton({
         pointerEvents="none"
       />
       <Pressable
-        onPress={onPress}
+        onPress={handlePress}
         disabled={disabled}
         style={({ pressed }) => [
           styles.btn,

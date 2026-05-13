@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import * as Linking from 'expo-linking';
 import {
   Alert,
@@ -211,6 +212,7 @@ export default function LobbyScreen() {
   }, []);
 
   const sendEmote = (emoji: string) => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
     const originX = 8 + Math.random() * 84;
     const originY = 58 + Math.random() * 32;

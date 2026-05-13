@@ -43,6 +43,10 @@ export async function markOnboardingComplete(): Promise<void> {
   await AsyncStorage.setItem(ONBOARDING_KEY, '1');
 }
 
+export async function clearOnboardingFlag(): Promise<void> {
+  await AsyncStorage.removeItem(ONBOARDING_KEY);
+}
+
 export async function updateDeviceProfile(
   updates: Partial<Pick<User, 'displayName' | 'username' | 'email' | 'friendIds' | 'avatar'>>,
 ): Promise<User> {

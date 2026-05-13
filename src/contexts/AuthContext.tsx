@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { clearLocalSessions } from '../lib/local/sessions';
 import {
+  clearOnboardingFlag,
   getOrCreateDeviceProfile,
   isOnboardingComplete,
   markOnboardingComplete,
@@ -15,7 +16,8 @@ import {
   syncDeviceIdentity,
   type AuthSession,
 } from '../lib/cloudflare/auth';
-import { signInWithApple, signInWithGoogle, signInWithFacebook } from '../lib/oauth';
+import { createUserDoc } from '../lib/cloudflare/users';
+import { signInWithApple, exchangeGoogleCode, signInWithFacebook } from '../lib/oauth';
 import type { User } from '../types';
 
 interface LocalIdentity {
@@ -28,12 +30,12 @@ interface AuthContextValue {
   accountBacked: boolean;
   loading: boolean;
   onboardingDone: boolean;
-  completeOnboarding: (displayName: string, avatar: string) => Promise<void>;
+  completeOnboarding: (displayName: string, avatar: string, username: string) => Promise<void>;
   updateLocalProfile: (updates: Partial<Pick<User, 'displayName' | 'avatar'>>) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string, username: string) => Promise<void>;
   signInWithAppleOAuth: () => Promise<void>;
-  signInWithGoogleOAuth: (clientId: string) => Promise<void>;
+  signInWithGoogleCode: (code: string, redirectUri: string) => Promise<void>;
   signInWithFacebookOAuth: (appId: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -70,10 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const session = await syncDeviceIdentity(profile);
         await applyAuthSession(session);
-        if (session.accountBacked && !onboardingComplete) {
-          await markOnboardingComplete();
-          onboardingComplete = true;
-        }
       } catch {
         setUserProfile(profile);
         setAccountBacked(false);
@@ -90,8 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserProfile(updated);
   };
 
-  const completeOnboarding = async (displayName: string, avatar: string) => {
-    const updated = await updateDeviceProfile({ displayName, avatar });
+  const completeOnboarding = async (displayName: string, avatar: string, username: string) => {
+    const updated = await updateDeviceProfile({ displayName, avatar, username });
+    if (accountBacked) {
+      await createUserDoc(updated.uid, updated.email, displayName, username);
+    }
     await markOnboardingComplete();
     setUserProfile(updated);
     setOnboardingDone(true);
@@ -122,6 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await clearLocalSessions();
     await signOutRemote();
+    await clearOnboardingFlag();
+    setOnboardingDone(false);
     const freshProfile = await resetDeviceProfile();
     try {
       const session = await syncDeviceIdentity(freshProfile);
@@ -151,16 +154,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: response.user,
       accountBacked: response.accountBacked,
     };
-    await applyAuthSession(oauthSession, true);
+    // Don't force-mark onboarding done — new OAuth users need to set their profile.
+    // The isOnboardingComplete flag (written by completeOnboarding) handles returning users.
+    await applyAuthSession(oauthSession, false);
   };
 
-  const signInWithGoogleOAuth = async (clientId: string) => {
-    const response = await signInWithGoogle(clientId);
+  const signInWithGoogleCode = async (code: string, redirectUri: string) => {
+    const response = await exchangeGoogleCode(code, redirectUri);
     const oauthSession: AuthSession = {
       user: response.user,
       accountBacked: response.accountBacked,
     };
-    await applyAuthSession(oauthSession, true);
+    await applyAuthSession(oauthSession, false);
   };
 
   const signInWithFacebookOAuth = async (appId: string) => {
@@ -169,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user: response.user,
       accountBacked: response.accountBacked,
     };
-    await applyAuthSession(oauthSession, true);
+    await applyAuthSession(oauthSession, false);
   };
 
   return (
@@ -185,7 +190,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signInWithAppleOAuth,
-        signInWithGoogleOAuth,
+        signInWithGoogleCode,
         signInWithFacebookOAuth,
         signOut,
         refreshProfile,

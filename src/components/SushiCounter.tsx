@@ -1,5 +1,6 @@
 import React, { useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,8 +31,14 @@ export function SushiCounter({
 
   const handleIncrement = useCallback(() => {
     scale.value = withSequence(withSpring(1.15, { duration: 80 }), withSpring(1, { duration: 120 }));
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     onIncrement();
   }, [onIncrement, scale]);
+
+  const handleDecrement = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onDecrement();
+  }, [onDecrement]);
 
   return (
     <View style={styles.row}>
@@ -39,7 +46,7 @@ export function SushiCounter({
         {name}
       </Text>
       <View style={styles.controls}>
-        <TouchableOpacity style={styles.btn} onPress={onDecrement} disabled={count === 0 || disabled}>
+        <TouchableOpacity style={styles.btn} onPress={handleDecrement} disabled={count === 0 || disabled}>
           <Text style={[styles.btnText, (count === 0 || disabled) && styles.disabledText]}>−</Text>
         </TouchableOpacity>
         <Animated.View style={[styles.countBadge, animatedStyle]}>

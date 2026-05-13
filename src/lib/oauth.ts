@@ -1,6 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import * as WebBrowser from 'expo-web-browser';
-import { apiRequest, setApiToken } from './cloudflare/client';
+import { apiRequest } from './cloudflare/client';
+import { setApiToken } from './cloudflare/authToken';
 import type { User } from '../types';
 
 export interface OAuthResponse {
@@ -8,9 +9,6 @@ export interface OAuthResponse {
   user: User;
   accountBacked: boolean;
 }
-
-// Set up the redirect URL
-WebBrowser.maybeCompleteAuthSession();
 
 /**
  * Sign in with Apple
@@ -47,7 +45,12 @@ export async function signInWithApple(): Promise<OAuthResponse> {
     await setApiToken(response.token);
     return response;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('User cancelled')) {
+    if (
+      error instanceof Error &&
+      ('code' in error
+        ? (error as { code?: string }).code === 'ERR_REQUEST_CANCELED'
+        : error.message.toLowerCase().includes('cancel'))
+    ) {
       throw new Error('Sign in cancelled');
     }
     throw error;
@@ -55,53 +58,16 @@ export async function signInWithApple(): Promise<OAuthResponse> {
 }
 
 /**
- * Sign in with Google using OAuth flow
- * Opens the browser for OAuth authentication
+ * Exchange a Google OAuth authorization code for a Sushi Party session.
+ * The browser step is handled by Google.useAuthRequest in login.tsx.
  */
-export async function signInWithGoogle(googleClientId: string): Promise<OAuthResponse> {
-  try {
-    // Build the authorization URL
-    const redirectUrl = 'com.sushiparty://oauth/google';
-    const state = Math.random().toString(36).substring(7);
-    const scope = encodeURIComponent('openid profile email');
-    
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${encodeURIComponent(googleClientId)}&` +
-      `redirect_uri=${encodeURIComponent(redirectUrl)}&` +
-      `response_type=code&` +
-      `scope=${scope}&` +
-      `state=${state}`;
-
-    // Open browser for authentication
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
-
-    if (result.type === 'success') {
-      // Extract authorization code from URL
-      const url = new URL(result.url);
-      const code = url.searchParams.get('code');
-
-      if (!code) {
-        throw new Error('No authorization code received from Google');
-      }
-
-      // Exchange code for ID token (in production, do this on backend)
-      // For now, we'll send the code to our backend which will exchange it
-      const response = await apiRequest<OAuthResponse>('/auth/google', {
-        method: 'POST',
-        body: JSON.stringify({ code }),
-      });
-
-      await setApiToken(response.token);
-      return response;
-    }
-
-    throw new Error('Google sign in was cancelled');
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('cancelled')) {
-      throw new Error('Sign in cancelled');
-    }
-    throw error;
-  }
+export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<OAuthResponse> {
+  const response = await apiRequest<OAuthResponse>('/auth/google', {
+    method: 'POST',
+    body: JSON.stringify({ code, redirectUri }),
+  });
+  await setApiToken(response.token);
+  return response;
 }
 
 /**
@@ -110,33 +76,26 @@ export async function signInWithGoogle(googleClientId: string): Promise<OAuthRes
  */
 export async function signInWithFacebook(facebookAppId: string): Promise<OAuthResponse> {
   try {
-    // Build the authorization URL
-    const redirectUrl = 'com.sushiparty://oauth/facebook';
+    const redirectUri = 'sushiparty://oauth/facebook';
     const scope = encodeURIComponent('public_profile,email');
-    
-    const authUrl = `https://www.facebook.com/v18.0/dialog/oauth?` +
+
+    const authUrl =
+      `https://www.facebook.com/v18.0/dialog/oauth?` +
       `client_id=${encodeURIComponent(facebookAppId)}&` +
-      `redirect_uri=${encodeURIComponent(redirectUrl)}&` +
+      `redirect_uri=${encodeURIComponent(redirectUri)}&` +
       `response_type=code&` +
       `scope=${scope}`;
 
-    // Open browser for authentication
-    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUrl);
+    const result = await WebBrowser.openAuthSessionAsync(authUrl, redirectUri);
 
     if (result.type === 'success') {
-      // Extract authorization code from URL
       const url = new URL(result.url);
       const code = url.searchParams.get('code');
+      if (!code) throw new Error('No authorization code received from Facebook');
 
-      if (!code) {
-        throw new Error('No authorization code received from Facebook');
-      }
-
-      // Exchange code for access token (in production, do this on backend)
-      // For now, we'll send the code to our backend which will exchange it
       const response = await apiRequest<OAuthResponse>('/auth/facebook', {
         method: 'POST',
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, redirectUri }),
       });
 
       await setApiToken(response.token);
@@ -145,7 +104,7 @@ export async function signInWithFacebook(facebookAppId: string): Promise<OAuthRe
 
     throw new Error('Facebook sign in was cancelled');
   } catch (error) {
-    if (error instanceof Error && error.message.includes('cancelled')) {
+    if (error instanceof Error && error.message.toLowerCase().includes('cancel')) {
       throw new Error('Sign in cancelled');
     }
     throw error;

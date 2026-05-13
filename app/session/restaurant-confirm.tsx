@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import * as Haptics from 'expo-haptics';
 import {
   ActivityIndicator,
   Alert,
@@ -181,7 +182,7 @@ export default function SessionRestaurantConfirmScreen() {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onPress={() => void handleSelect(item.id)} disabled={saving}>
+          <TouchableOpacity style={styles.row} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); void handleSelect(item.id); }} disabled={saving}>
             <View style={styles.rowBody}>
               <Text style={styles.rowName}>{item.name}</Text>
               <Text style={styles.rowAddress} numberOfLines={1}>

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -218,6 +219,17 @@ export default function HomeScreen() {
     return () => { alive = false; };
   }, [userProfile?.uid, activeMenu]);
 
+  const cardOpacity = useSharedValue(0);
+  const cardY = useSharedValue(16);
+  const cardStyle = useAnimatedStyle(() => ({
+    opacity: cardOpacity.value,
+    transform: [{ translateY: cardY.value }],
+  }));
+  useEffect(() => {
+    cardOpacity.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.cubic) });
+    cardY.value = withTiming(0, { duration: 320, easing: Easing.out(Easing.cubic) });
+  }, []);
+
   const buttons: HomeButton[] = hasActiveSession
     ? [
         {
@@ -265,7 +277,7 @@ export default function HomeScreen() {
       </View>
 
       {/* Rotating "plate" card */}
-      <View style={styles.plateWrap}>
+      <Animated.View style={[styles.plateWrap, cardStyle]}>
         <View style={styles.plate}>
           <View style={styles.plateLeft}>
             <View style={styles.ribbon}>
@@ -307,10 +319,10 @@ export default function HomeScreen() {
             <Text style={styles.plateEmoji}>{card.emoji}</Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
 
       {/* CTAs */}
-      <View style={styles.buttons}>
+      <Animated.View style={[styles.buttons, cardStyle]}>
         {buttons.map((btn, i) => (
           <TouchableOpacity
             key={btn.label}
@@ -324,7 +336,7 @@ export default function HomeScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </Animated.View>
     </SafeAreaView>
   );
 }

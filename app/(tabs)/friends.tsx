@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -13,6 +15,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -39,6 +43,17 @@ export default function FriendsScreen() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [query, setQuery] = useState('');
   const [challenges, setChallenges] = useState<FriendChallengeProgress[]>([]);
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(12);
+  const entranceStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  useEffect(() => {
+    opacity.value = withTiming(1, { duration: 280, easing: Easing.out(Easing.cubic) });
+    translateY.value = withTiming(0, { duration: 280, easing: Easing.out(Easing.cubic) });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -93,6 +108,7 @@ export default function FriendsScreen() {
   const handleAddFriend = async (friendId: string) => {
     try {
       await addFriend(friendId);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Could not add that friend.';
       Alert.alert('Add friend failed', message);
@@ -127,6 +143,7 @@ export default function FriendsScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} />}
       >
+        <Animated.View style={entranceStyle}>
         {header}
 
         <View style={styles.section}>
@@ -211,11 +228,17 @@ export default function FriendsScreen() {
             ))
           )}
         </View>
+        </Animated.View>
       </ScrollView>
 
       <Modal visible={showAddModal} animationType="slide" onRequestClose={closeModal}>
         <SafeAreaView style={styles.modalContainer}>
           <StatusBar style="dark" />
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+          >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add Friend</Text>
             <TouchableOpacity onPress={closeModal}>
