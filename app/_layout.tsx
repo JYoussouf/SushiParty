@@ -119,15 +119,15 @@ function RootLayoutNav() {
       <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
       <Stack.Screen
         name="restaurant/picker"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
+        options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/mode-select"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
+        options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/lobby"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
+        options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/scoreboard"
@@ -139,7 +139,7 @@ function RootLayoutNav() {
       />
       <Stack.Screen
         name="session/group-join"
-        options={{ headerShown: false, presentation: 'fullScreenModal', animation: 'slide_from_bottom', gestureEnabled: false }}
+        options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen
         name="session/restaurant-confirm"

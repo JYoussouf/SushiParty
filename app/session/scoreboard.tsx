@@ -352,7 +352,7 @@ export default function ScoreboardScreen() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
 
-      {/* Header: back | center | menu */}
+      {/* Header: back | center */}
       <View style={styles.header}>
         <BackButton onPress={handleCancel} disabled={submitting} />
         <TouchableOpacity style={styles.headerCenter} onPress={() => router.push('/restaurant/picker')}>
@@ -361,9 +361,7 @@ export default function ScoreboardScreen() {
           </Text>
           <Text style={styles.headerTitle}>Sushi Party</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerBtn} onPress={handleCancel} disabled={submitting}>
-          <Text style={styles.headerBtnIcon}>···</Text>
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
       {/* Plate card: running tally + participant avatars */}
@@ -456,47 +454,56 @@ export default function ScoreboardScreen() {
         </ScrollView>
       )}
 
-      {/* Participant switcher (group mode) */}
+      {/* Player bar (group mode) */}
       {(mode === 'group' || participants.length > 1) && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.participantStrip}
-        >
-          {participants.map((participant, index) => {
-            const participantTotal = Object.values(participant.counts).reduce(
-              (sum, count) => sum + count,
-              0,
-            );
-            return (
-              <TouchableOpacity
-                key={participant.userId}
-                style={[
-                  styles.participantChip,
-                  index === activeParticipantIndex && styles.participantChipActive,
-                ]}
-                onPress={() => setActiveParticipantIndex(index)}
-              >
-                <Text
+        <View style={styles.participantBar}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.participantTrack}
+          >
+            {participants.map((participant, index) => {
+              const participantTotal = Object.values(participant.counts).reduce(
+                (sum, count) => sum + count,
+                0,
+              );
+              return (
+                <TouchableOpacity
+                  key={participant.userId}
                   style={[
-                    styles.participantName,
-                    index === activeParticipantIndex && styles.participantNameActive,
+                    styles.participantItem,
+                    index === activeParticipantIndex && styles.participantItemActive,
                   ]}
+                  onPress={() => setActiveParticipantIndex(index)}
                 >
-                  {participant.displayName}
-                </Text>
-                <Text
-                  style={[
-                    styles.participantTotal,
-                    index === activeParticipantIndex && styles.participantTotalActive,
-                  ]}
-                >
-                  {participantTotal} pcs
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    style={[
+                      styles.participantName,
+                      index === activeParticipantIndex && styles.participantNameActive,
+                    ]}
+                  >
+                    {participant.displayName}
+                  </Text>
+                  <View
+                    style={[
+                      styles.participantScore,
+                      index === activeParticipantIndex && styles.participantScoreActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.participantTotal,
+                        index === activeParticipantIndex && styles.participantTotalActive,
+                      ]}
+                    >
+                      {participantTotal}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
       )}
 
       {/* View-only banner */}
@@ -625,26 +632,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(40,22,12,0.07)',
   },
-  headerBtn: {
+  headerSpacer: {
     width: 40,
     height: 40,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.10)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
-  },
-  headerBtnIcon: {
-    fontSize: 20,
-    color: '#7a6452',
-    fontWeight: '500',
-    lineHeight: 22,
   },
   headerCenter: {
     flex: 1,
@@ -816,37 +806,52 @@ const styles = StyleSheet.create({
   },
 
   // ── Participants ────────────────────────────────────────
-  participantStrip: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    gap: 8,
+  participantBar: {
+    paddingVertical: 10,
+    backgroundColor: '#fffaf2',
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(40,22,12,0.06)',
   },
-  participantChip: {
-    minWidth: 108,
+  participantTrack: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 999,
+    gap: 8,
+    alignItems: 'center',
+  },
+  participantItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 40,
+    paddingLeft: 14,
+    paddingRight: 5,
+    paddingVertical: 5,
+    borderRadius: 20,
     backgroundColor: '#ffffff',
     borderWidth: 1,
     borderColor: 'rgba(40,22,12,0.10)',
-    gap: 2,
-    justifyContent: 'center',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
   },
-  participantChipActive: {
+  participantItemActive: {
     backgroundColor: '#ffe5e0',
     borderColor: '#ee5d52',
+  },
+  participantScore: {
+    minWidth: 30,
+    minHeight: 30,
+    marginLeft: 10,
+    paddingHorizontal: 9,
+    borderRadius: 15,
+    backgroundColor: '#f7efe3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  participantScoreActive: {
+    backgroundColor: 'rgba(255,250,242,0.95)',
   },
   participantName: {
     fontSize: 14,
     fontWeight: '700',
     color: '#4a3624',
-    lineHeight: 18,
-    includeFontPadding: false,
+    lineHeight: 20,
   },
   participantNameActive: {
     color: '#b3372d',
@@ -855,7 +860,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#7a6452',
     lineHeight: 16,
-    includeFontPadding: false,
+    fontWeight: '700',
   },
   participantTotalActive: {
     color: '#ee5d52',
