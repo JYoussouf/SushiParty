@@ -229,19 +229,17 @@ export default function LoginScreen() {
 
       {/* Bottom sheet */}
       {credentialsOpen && (
-        <KeyboardAvoidingView
-          style={StyleSheet.absoluteFill}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
-          pointerEvents="box-none"
-        >
-          <Pressable style={styles.backdrop} onPress={closeCredentials} />
+        <>
+          <Pressable style={[StyleSheet.absoluteFill, styles.backdrop]} onPress={closeCredentials} />
+          <KeyboardAvoidingView
+            style={styles.sheetWrapper}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
           <View style={styles.sheet}>
-            <View style={styles.sheetHandle} />
             <ScrollView
               contentContainerStyle={styles.sheetContent}
               keyboardShouldPersistTaps="handled"
-              automaticallyAdjustKeyboardInsets
               showsVerticalScrollIndicator={false}
             >
               <View style={styles.sheetHeader}>
@@ -262,6 +260,8 @@ export default function LoginScreen() {
                     placeholder="Display name"
                     placeholderTextColor="#bbb"
                     autoCapitalize="words"
+                    autoCorrect={false}
+                    spellCheck={false}
                     textContentType="name"
                     maxLength={32}
                   />
@@ -296,6 +296,8 @@ export default function LoginScreen() {
                 placeholder="Password"
                 placeholderTextColor="#bbb"
                 secureTextEntry
+                autoCorrect={false}
+                spellCheck={false}
                 textContentType={credentialMode === 'create' ? 'newPassword' : 'password'}
                 returnKeyType={credentialMode === 'create' ? 'next' : 'done'}
                 onSubmitEditing={credentialMode === 'sign-in' ? () => void handleCredentialSubmit() : undefined}
@@ -342,7 +344,8 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+          </KeyboardAvoidingView>
+        </>
       )}
     </SafeAreaView>
   );
@@ -522,29 +525,22 @@ const styles = StyleSheet.create({
 
   // ── Bottom sheet ──────────────────────────────────────────
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.28)',
   },
-  sheet: {
+  sheetWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: '88%',
+    maxHeight: '92%',
+  },
+  sheet: {
+    maxHeight: '100%',
     backgroundColor: '#fff',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#e8ddd8',
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#ddd',
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 4,
   },
   sheetContent: {
     padding: 24,

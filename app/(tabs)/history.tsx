@@ -180,6 +180,8 @@ export default function HistoryScreen() {
               onChangeText={setQuery}
               placeholder="Search restaurant, note, or attendee"
               placeholderTextColor="#aaa"
+              autoCorrect={false}
+              spellCheck={false}
             />
 
             <View style={styles.filterRow}>

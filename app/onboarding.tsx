@@ -133,6 +133,7 @@ export default function OnboardingScreen() {
               placeholderTextColor="#c4a898"
               autoCapitalize="words"
               autoCorrect={false}
+              spellCheck={false}
               returnKeyType="next"
               onFocus={() => setNameFocused(true)}
               onBlur={() => setNameFocused(false)}

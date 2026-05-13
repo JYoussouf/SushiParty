@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
   Share,
@@ -157,6 +159,8 @@ export default function SettingsScreen() {
             value={backupText}
             editable={false}
             multiline
+            autoCorrect={false}
+            spellCheck={false}
             textAlignVertical="top"
           />
         </SafeAreaView>
@@ -165,6 +169,11 @@ export default function SettingsScreen() {
       <Modal visible={showRestoreModal} animationType="slide" onRequestClose={() => setShowRestoreModal(false)}>
         <SafeAreaView style={styles.modalContainer}>
           <StatusBar style="dark" />
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 20 : 0}
+          >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Restore Backup</Text>
             <TouchableOpacity onPress={() => setShowRestoreModal(false)} disabled={restoring}>
@@ -180,6 +189,8 @@ export default function SettingsScreen() {
             onChangeText={setRestoreText}
             placeholder="Paste backup JSON here"
             placeholderTextColor="#aa9a92"
+            autoCorrect={false}
+            spellCheck={false}
             multiline
             textAlignVertical="top"
           />
@@ -190,6 +201,7 @@ export default function SettingsScreen() {
           >
             {restoring ? <ActivityIndicator color="#fff" /> : <Text style={styles.restoreButtonText}>Restore Backup</Text>}
           </TouchableOpacity>
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>

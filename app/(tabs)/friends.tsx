@@ -296,6 +296,7 @@ export default function FriendsScreen() {
               }
             />
           )}
+          </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
     </SafeAreaView>

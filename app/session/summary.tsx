@@ -618,6 +618,8 @@ export default function SessionSummaryScreen() {
               onChangeText={setDraftNote}
               placeholder="Was it everything you ever hoped for?"
               placeholderTextColor="#9f8f86"
+              autoCorrect={false}
+              spellCheck={false}
               multiline
               textAlignVertical="top"
             />

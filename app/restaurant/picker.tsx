@@ -330,6 +330,8 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
               placeholder="e.g. Sushi Palace"
               placeholderTextColor="#bbb"
               autoCapitalize="words"
+              autoCorrect={false}
+              spellCheck={false}
             />
 
             <Text style={modalStyles.label}>Address (optional)</Text>
@@ -340,6 +342,8 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
               placeholder="123 Main St"
               placeholderTextColor="#bbb"
               autoCapitalize="words"
+              autoCorrect={false}
+              spellCheck={false}
             />
 
             <Text style={modalStyles.note}>
