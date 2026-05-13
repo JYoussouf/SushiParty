@@ -17,7 +17,6 @@ import { useLocation } from '../../src/hooks/useLocation';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
 import {
   getNearbyRestaurants,
-  getRestaurant,
   searchRestaurantsByName,
 } from '../../src/lib/cloudflare/restaurants';
 import { formatDistance } from '../../src/lib/geo';
@@ -91,7 +90,7 @@ export default function SessionRestaurantConfirmScreen() {
     goToSummary('1');
   };
 
-  const handleSelect = async (restaurantId: string) => {
+  const handleSelect = async (restaurant: RestaurantWithDistance) => {
     if (!sessionId) {
       Alert.alert('Party unavailable', 'No party id was provided.');
       return;
@@ -99,12 +98,6 @@ export default function SessionRestaurantConfirmScreen() {
 
     setSaving(true);
     try {
-      const restaurant = await getRestaurant(restaurantId);
-      if (!restaurant) {
-        Alert.alert('Restaurant unavailable', 'Could not load that restaurant.');
-        return;
-      }
-
       const updated = await updateSession(sessionId, {
         restaurantId: restaurant.id,
         restaurantName: restaurant.name,
@@ -182,7 +175,7 @@ export default function SessionRestaurantConfirmScreen() {
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); void handleSelect(item.id); }} disabled={saving}>
+          <TouchableOpacity style={styles.row} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); void handleSelect(item); }} disabled={saving}>
             <View style={styles.rowBody}>
               <Text style={styles.rowName}>{item.name}</Text>
               <Text style={styles.rowAddress} numberOfLines={1}>

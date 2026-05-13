@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
+  Pressable,
   View,
   Text,
   ScrollView,
@@ -16,6 +17,7 @@ import Animated, {
   withSpring,
   withSequence,
 } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
@@ -79,11 +81,6 @@ export default function ScoreboardScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const tallyScale = useSharedValue(1);
   const tallyStyle = useAnimatedStyle(() => ({ transform: [{ scale: tallyScale.value }] }));
-  const tabIndicatorX = useSharedValue(0);
-  const [tabWidth, setTabWidth] = useState(0);
-  const indicatorStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: tabIndicatorX.value }],
-  }));
 
   const sessionTotalPieces = participants.reduce(
     (sum, participant) =>
@@ -155,15 +152,17 @@ export default function ScoreboardScreen() {
 
       return (
         <View key={item.id} style={styles.itemCard}>
-          <View style={styles.itemEmojiBadge}>
-            <Text style={styles.itemEmojiText}>{emoji}</Text>
-          </View>
-          <View style={styles.itemInfo}>
-            <Text style={styles.itemName}>{displayName}</Text>
-            <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
-              <Text style={[styles.itemChipText, { color: chip.text }]}>
-                {getCategoryLabel(item.category)}
-              </Text>
+          <View style={styles.itemCardLeft}>
+            <View style={styles.itemEmojiBadge}>
+              <Text style={styles.itemEmojiText}>{emoji}</Text>
+            </View>
+            <View style={styles.itemInfo}>
+              <Text style={styles.itemName}>{displayName}</Text>
+              <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
+                <Text style={[styles.itemChipText, { color: chip.text }]}>
+                  {getCategoryLabel(item.category)}
+                </Text>
+              </View>
             </View>
           </View>
           <View style={styles.stepper}>
@@ -208,15 +207,17 @@ export default function ScoreboardScreen() {
               const emoji = getItemEmoji(item.imageKey, item.category);
               return (
                 <View key={item.id} style={styles.itemCard}>
-                  <View style={styles.itemEmojiBadge}>
-                    <Text style={styles.itemEmojiText}>{emoji}</Text>
-                  </View>
-                  <View style={styles.itemInfo}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
-                      <Text style={[styles.itemChipText, { color: chip.text }]}>
-                        {getCategoryLabel(item.category)}
-                      </Text>
+                  <View style={styles.itemCardLeft}>
+                    <View style={styles.itemEmojiBadge}>
+                      <Text style={styles.itemEmojiText}>{emoji}</Text>
+                    </View>
+                    <View style={styles.itemInfo}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
+                        <Text style={[styles.itemChipText, { color: chip.text }]}>
+                          {getCategoryLabel(item.category)}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                   <View style={styles.stepper}>
@@ -399,22 +400,14 @@ export default function ScoreboardScreen() {
 
       {/* Segmented control */}
       <View style={styles.modeBar}>
-        <View
-          style={styles.modePill}
-          onLayout={(e) => {
-            const w = (e.nativeEvent.layout.width - 8) / 2;
-            setTabWidth(w);
-            tabIndicatorX.value = scoreboardMode === 'detailed' ? w + 2 : 0;
-          }}
-        >
-          {tabWidth > 0 && (
-            <Animated.View style={[styles.modeBtnActive, styles.modeIndicator, { width: tabWidth }, indicatorStyle]} />
-          )}
-          <TouchableOpacity
-            style={[styles.modeBtn, { flex: 1 }]}
+        <View style={styles.modePill}>
+          <Pressable
+            style={[styles.modeBtn, scoreboardMode === 'simple' && styles.modeBtnActive]}
             onPress={() => {
-              setScoreboardMode('simple');
-              tabIndicatorX.value = withSpring(0, { damping: 20, stiffness: 260 });
+              if (scoreboardMode !== 'simple') {
+                setScoreboardMode('simple');
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: scoreboardMode === 'simple' }}
@@ -422,12 +415,14 @@ export default function ScoreboardScreen() {
             <Text style={[styles.modeBtnText, scoreboardMode === 'simple' && styles.modeBtnTextActive]}>
               Simple
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modeBtn, { flex: 1 }]}
+          </Pressable>
+          <Pressable
+            style={[styles.modeBtn, scoreboardMode === 'detailed' && styles.modeBtnActive]}
             onPress={() => {
-              setScoreboardMode('detailed');
-              tabIndicatorX.value = withSpring(tabWidth + 2, { damping: 20, stiffness: 260 });
+              if (scoreboardMode !== 'detailed') {
+                setScoreboardMode('detailed');
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              }
             }}
             accessibilityRole="button"
             accessibilityState={{ selected: scoreboardMode === 'detailed' }}
@@ -435,7 +430,7 @@ export default function ScoreboardScreen() {
             <Text style={[styles.modeBtnText, scoreboardMode === 'detailed' && styles.modeBtnTextActive]}>
               Detailed
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
       </View>
 
@@ -766,14 +761,6 @@ const styles = StyleSheet.create({
     padding: 4,
     gap: 2,
   },
-  modeIndicator: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    bottom: 4,
-    borderRadius: 999,
-    zIndex: 0,
-  },
   modeBtn: {
     paddingVertical: 8,
     paddingHorizontal: 20,
@@ -900,12 +887,12 @@ const styles = StyleSheet.create({
   },
   itemCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    alignItems: 'stretch',
     backgroundColor: '#ffffff',
     borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingLeft: 14,
+    paddingRight: 0,
+    paddingVertical: 0,
     borderWidth: 1,
     borderColor: 'rgba(40,22,12,0.06)',
     shadowColor: '#28160c',
@@ -913,6 +900,16 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
+    overflow: 'hidden',
+    minHeight: 68,
+  },
+  itemCardLeft: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    minWidth: 0,
   },
   itemEmojiBadge: {
     width: 44,
@@ -954,76 +951,60 @@ const styles = StyleSheet.create({
   // ── CountStepper ────────────────────────────────────────
   stepper: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
+    alignItems: 'stretch',
+    marginLeft: 'auto',
   },
   stepperMinus: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    backgroundColor: '#fbf6ee',
-    borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.10)',
+    width: 48,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: '#2f1e14',
   },
   stepperMinusDisabled: {
-    backgroundColor: 'rgba(40,22,12,0.05)',
-    borderColor: 'transparent',
+    backgroundColor: '#4a3424',
   },
   stepperMinusText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#4a3624',
-    lineHeight: 22,
+    fontSize: 22,
+    fontWeight: '500',
+    color: '#fffaf2',
+    lineHeight: 24,
     includeFontPadding: false,
   },
   stepperMinusTextDisabled: {
-    color: '#ad9886',
+    color: '#7a5e50',
   },
   stepperCount: {
-    minWidth: 36,
-    height: 34,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    backgroundColor: 'rgba(40,22,12,0.07)',
+    minWidth: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
+    backgroundColor: '#ffffff',
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: 'rgba(40,22,12,0.10)',
   },
   stepperCountActive: {
-    backgroundColor: '#ee5d52',
-    shadowColor: '#ee5d52',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    backgroundColor: '#ffffff',
   },
   stepperCountText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#7a6452',
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#d0cbc6',
   },
   stepperCountTextActive: {
-    color: '#fffaf2',
+    color: '#2f1e14',
   },
   stepperPlus: {
-    width: 34,
-    height: 34,
-    borderRadius: 999,
-    backgroundColor: '#ee5d52',
+    width: 52,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#ee5d52',
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 3,
+    backgroundColor: '#ee5d52',
   },
   stepperPlusText: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '400',
     color: '#fffaf2',
-    lineHeight: 22,
+    lineHeight: 26,
     includeFontPadding: false,
   },
 

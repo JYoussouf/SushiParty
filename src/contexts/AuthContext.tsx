@@ -16,7 +16,9 @@ import {
   syncDeviceIdentity,
   type AuthSession,
 } from '../lib/cloudflare/auth';
-import { createUserDoc } from '../lib/cloudflare/users';
+import { createUserDoc, getUserDoc } from '../lib/cloudflare/users';
+import { getApiToken, clearApiToken } from '../lib/cloudflare/authToken';
+import { hasApiBaseUrl } from '../lib/cloudflare/client';
 import { signInWithApple, exchangeGoogleCode, signInWithFacebook } from '../lib/oauth';
 import type { User } from '../types';
 
@@ -64,18 +66,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void (async () => {
-      const [profile, obDone] = await Promise.all([
+      const [profile, obDone, storedToken] = await Promise.all([
         getOrCreateDeviceProfile(),
         isOnboardingComplete(),
+        getApiToken(),
       ]);
       let onboardingComplete = obDone;
       try {
-        const session = await syncDeviceIdentity(profile);
-        await applyAuthSession(session);
+        if (storedToken && hasApiBaseUrl()) {
+          // Restore the existing OAuth/email session from the stored JWT.
+          // /users/me uses the Authorization header — no device sync needed.
+          const user = await getUserDoc(profile.uid);
+          if (user) {
+            const stored = await replaceDeviceProfile(user);
+            setUserProfile(stored);
+            setAccountBacked(true);
+            setRemoteUser(stored.email ? { email: stored.email } : null);
+          }
+        } else {
+          // No stored token — create/sync a guest device identity.
+          const session = await syncDeviceIdentity(profile);
+          await applyAuthSession(session);
+        }
       } catch {
-        setUserProfile(profile);
-        setAccountBacked(false);
-        setRemoteUser(null);
+        // Token expired or network error — clear it and fall back to device identity.
+        await clearApiToken();
+        try {
+          const session = await syncDeviceIdentity(profile);
+          await applyAuthSession(session);
+        } catch {
+          setUserProfile(profile);
+          setAccountBacked(false);
+          setRemoteUser(null);
+        }
       } finally {
         setOnboardingDone(onboardingComplete);
         setLoading(false);

@@ -1365,13 +1365,13 @@ async function googleNearby(
   center: { latitude: number; longitude: number },
   radiusMeters: number,
 ): Promise<(Restaurant & { distanceKm?: number })[]> {
-  const resp = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
+  const resp = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: googleHeaders(apiKey),
     body: JSON.stringify({
-      includedTypes: ['restaurant'],
+      textQuery: 'sushi',
       maxResultCount: 20,
-      locationRestriction: {
+      locationBias: {
         circle: { center: { latitude: center.latitude, longitude: center.longitude }, radius: radiusMeters },
       },
     }),
