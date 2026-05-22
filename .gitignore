@@ -31,6 +31,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# local assistant metadata
+.claude/
+
 # local env files — mode-specific files (.env.development, .env.production) are committed
 .env
 .env*.local
