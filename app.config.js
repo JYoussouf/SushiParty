@@ -5,7 +5,7 @@ const base = require('./app.json');
 
 // The iOS OAuth client ID from Google Cloud Console (Application type: iOS).
 // To create: https://console.cloud.google.com → Credentials → Create → OAuth client → iOS
-// Bundle ID to enter: com.sushiparty.app
+// Bundle ID to enter: com.joseppy.sushiparty
 // After creating, set EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID in .env.local to the new client ID.
 // The reversed scheme is derived automatically below.
 const iosClientId = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
@@ -18,12 +18,11 @@ module.exports = {
   ...base.expo,
   ios: {
     ...base.expo.ios,
-    ...(reversedClientId
-      ? {
-          infoPlist: {
-            CFBundleURLTypes: [{ CFBundleURLSchemes: [reversedClientId] }],
-          },
-        }
-      : {}),
+    infoPlist: {
+      ...base.expo.ios.infoPlist,
+      ...(reversedClientId
+        ? { CFBundleURLTypes: [{ CFBundleURLSchemes: [reversedClientId] }] }
+        : {}),
+    },
   },
 };

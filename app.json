@@ -2,6 +2,7 @@
   "expo": {
     "name": "Sushi Party",
     "slug": "sushi-party",
+    "owner": "joseppy",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,7 +16,10 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.sushiparty.app"
+      "bundleIdentifier": "com.joseppy.sushiparty",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +28,7 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "com.sushiparty.app"
+      "package": "com.joseppy.sushiparty"
     },
     "web": {
       "bundler": "metro",
@@ -34,6 +38,9 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-apple-authentication",
+      "expo-font",
+      "expo-web-browser",
       [
         "expo-location",
         {
@@ -50,6 +57,11 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4dd74eba-2b10-4a65-8003-ea12b7bad396"
+      }
     }
   }
 }

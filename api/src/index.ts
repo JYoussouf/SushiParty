@@ -1483,6 +1483,12 @@ async function route(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   const parts = url.pathname.split('/').filter(Boolean);
 
+  if (request.method === 'GET' && url.pathname === '/privacy') {
+    return new Response(PRIVACY_POLICY_HTML, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }
+
   if (request.method === 'POST' && url.pathname === '/auth/device') {
     return handleAuthDevice(request, env);
   }
@@ -1521,6 +1527,109 @@ async function route(request: Request, env: Env): Promise<Response> {
       throw new HttpError(404, 'Route not found.');
   }
 }
+
+const PRIVACY_POLICY_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sushi Party Privacy Policy</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; }
+  h3 { font-size: 1rem; margin-top: 1.2rem; }
+  code { background: #f2f2f2; padding: 1px 4px; border-radius: 4px; }
+  a { color: #c0392b; }
+</style>
+</head>
+<body>
+<h1>Sushi Party Privacy Policy</h1>
+<p><em>Last updated: June 20, 2026</em></p>
+<p>This Privacy Policy explains how Sushi Party ("the app") collects, uses, and stores information when you use it.</p>
+
+<h2>1. Who We Are</h2>
+<p>Sushi Party is provided by JoseppyCo ("we", "us", or "our"). For questions about this Privacy Policy, contact us at <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>.</p>
+
+<h2>2. Information We Collect</h2>
+<p>Sushi Party uses a cloud backend (a Cloudflare Worker with a Cloudflare D1 database and Durable Objects) to support accounts, sign-in, history, friends, and group sessions. We collect and store the following on our servers and/or your device:</p>
+<h3>Account and profile information</h3>
+<ul>
+<li>Display name, username, email address, and avatar/profile image (if set)</li>
+<li>Password credentials, stored only as a salted PBKDF2 hash — we never store your plaintext password</li>
+<li>If you sign in with Google or Apple: a provider account identifier and the associated email</li>
+</ul>
+<h3>App content you create</h3>
+<ul>
+<li>Eating sessions, including sushi counts and item-level logs</li>
+<li>Restaurant selections and session context</li>
+<li>Session notes</li>
+<li>Friend connections and tagged session participants</li>
+</ul>
+<h3>Location information</h3>
+<ul>
+<li>The approximate or precise location of an eating session (latitude/longitude), used to attach restaurant context and find nearby restaurants. Accessed only with your permission.</li>
+</ul>
+<h3>Device and app information</h3>
+<ul>
+<li>A locally generated device/profile identifier</li>
+<li>An authentication token, stored securely on your device, to keep you signed in</li>
+</ul>
+
+<h2>3. How We Use Information</h2>
+<ul>
+<li>Create, authenticate, and manage your account</li>
+<li>Save and display your session history across your devices</li>
+<li>Show friends, activity, and tagged session participants</li>
+<li>Help you find, create, and select restaurants</li>
+<li>Support real-time group session features</li>
+<li>Generate in-app analytics such as favorite items or restaurant insights</li>
+<li>Maintain, secure, improve, and troubleshoot the app</li>
+</ul>
+
+<h2>4. Sign-In Providers</h2>
+<p>You can sign in with email and password, with Google, or with Apple. When you use Google or Apple sign-in, we receive a provider account identifier and your email to create or match your account. We do not receive your provider password.</p>
+
+<h2>5. Location Permissions</h2>
+<p>Sushi Party may request location access to show nearby restaurants, pre-fill restaurant context, and associate a session with location data. Restaurant search may send a location query to Google Places. You can deny or revoke location permission anytime in your device settings.</p>
+
+<h2>6. Third Parties and Service Providers</h2>
+<ul>
+<li><strong>Cloudflare</strong> — hosting for our backend, database (D1), and real-time group sessions (Durable Objects)</li>
+<li><strong>Google</strong> — Google Sign-In and Google Places restaurant search</li>
+<li><strong>Apple</strong> — Sign in with Apple</li>
+</ul>
+<p>We do not include advertising SDKs, we do not use third-party analytics SDKs, and we do not sell personal information.</p>
+
+<h2>7. Data Retention</h2>
+<p>We retain your account and session data while your account is active. Data stored locally on your device is removed if you uninstall the app or clear its storage.</p>
+
+<h2>8. Data Deletion</h2>
+<p>You can request deletion of your account and associated server-side data by emailing <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>. We will delete your account record, credentials, sessions, friendships, and related data, except where we must retain limited information to comply with legal obligations.</p>
+
+<h2>9. Data Security</h2>
+<p>We take reasonable steps to protect information, including hashing passwords and transmitting data over HTTPS. However, no method of storage or transmission is completely secure.</p>
+
+<h2>10. Children's Privacy</h2>
+<p>Sushi Party is not directed to children under 13, and we do not knowingly collect their personal information. If you believe a child has provided personal information, contact <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>.</p>
+
+<h2>11. Your Choices</h2>
+<ul>
+<li>Edit your profile details in the app</li>
+<li>Decline or revoke location permission</li>
+<li>Request export or deletion of your data by contacting us</li>
+</ul>
+
+<h2>12. International Users</h2>
+<p>Your information may be processed and stored on servers operated by our service providers in various regions. By using the app, you consent to this processing consistent with this policy.</p>
+
+<h2>13. Changes to This Privacy Policy</h2>
+<p>We may update this Privacy Policy from time to time. When we do, we will update the "Last updated" date above and reflect material changes in the app's store listings.</p>
+
+<h2>14. Contact Us</h2>
+<p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a></p>
+</body>
+</html>`;
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {

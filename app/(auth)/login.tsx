@@ -21,7 +21,7 @@ import { SushiPartyLogo } from '../../src/components';
 
 type CredentialMode = 'sign-in' | 'create';
 
-// iOS OAuth client ID from Google Cloud Console (Application type: iOS, Bundle ID: com.sushiparty.app)
+// iOS OAuth client ID from Google Cloud Console (Application type: iOS, Bundle ID: com.joseppy.sushiparty)
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
 const googleConfigured = !!GOOGLE_IOS_CLIENT_ID;
 

@@ -1,0 +1,51 @@
+{
+  "cli": {
+    "version": ">= 11.12.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "production"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "env": {
+        "APP_ENV": "production"
+      },
+      "android": {
+        "buildType": "app-bundle"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "ascAppId": "6782783583",
+        "appleTeamId": "T7W52GCBM2",
+        "ascApiKeyPath": "./AuthKey_4ZTN9SG94S.p8",
+        "ascApiKeyId": "4ZTN9SG94S",
+        "ascApiKeyIssuerId": "ffee8fc0-1848-4687-8936-69e24e9a07d9"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./play-service-account.json",
+        "track": "internal"
+      }
+    }
+  }
+}
