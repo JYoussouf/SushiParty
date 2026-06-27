@@ -1489,6 +1489,12 @@ async function route(request: Request, env: Env): Promise<Response> {
     });
   }
 
+  if (request.method === 'GET' && url.pathname === '/delete-account') {
+    return new Response(DELETE_ACCOUNT_HTML, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }
+
   if (request.method === 'POST' && url.pathname === '/auth/device') {
     return handleAuthDevice(request, env);
   }
@@ -1628,6 +1634,50 @@ const PRIVACY_POLICY_HTML = `<!DOCTYPE html>
 
 <h2>14. Contact Us</h2>
 <p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a></p>
+</body>
+</html>`;
+
+const DELETE_ACCOUNT_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Delete Your Sushi Party Account</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; }
+  ol { padding-left: 1.2rem; }
+  code { background: #f2f2f2; padding: 1px 4px; border-radius: 4px; }
+  a { color: #c0392b; }
+</style>
+</head>
+<body>
+<h1>Delete Your Sushi Party Account</h1>
+<p>This page explains how to request deletion of your <strong>Sushi Party</strong> account (provided by JoseppyCo) and the data associated with it.</p>
+
+<h2>How to request deletion</h2>
+<ol>
+<li>From the email address associated with your Sushi Party account, send an email to <a href="mailto:contact@joseppy.ca?subject=Delete%20my%20Sushi%20Party%20account">contact@joseppy.ca</a>.</li>
+<li>Use the subject line <code>Delete my Sushi Party account</code>.</li>
+<li>Include the email address or username on your account so we can locate it.</li>
+</ol>
+<p>We will verify the request and delete your account, usually within 30 days.</p>
+
+<h2>What is deleted</h2>
+<p>When your account is deleted, we permanently remove:</p>
+<ul>
+<li>Your profile (display name, username, email, avatar)</li>
+<li>Your password credentials and any linked Google/Apple sign-in records</li>
+<li>Your eating sessions, sushi counts, and session notes</li>
+<li>Your friend connections and session participation records</li>
+</ul>
+
+<h2>What may be kept</h2>
+<p>We may retain a limited amount of information where required to comply with legal obligations or to prevent fraud and abuse. Aggregated, non-identifying restaurant statistics that cannot be linked back to you may also be retained.</p>
+
+<h2>Contact</h2>
+<p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>. See also our <a href="/privacy">Privacy Policy</a>.</p>
 </body>
 </html>`;
 
