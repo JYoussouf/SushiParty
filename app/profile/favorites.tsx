@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -8,9 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { BackButton } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 import { getUserTopCategories } from '../../src/lib/analytics';
@@ -18,6 +21,8 @@ import type { RankedCategory } from '../../src/lib/analytics';
 
 export default function FavoritesScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const [categories, setCategories] = useState<RankedCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,14 +56,16 @@ export default function FavoritesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <BackButton onPress={() => router.back()} />
       </View>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#e53935" />
+          <ActivityIndicator color={t.color.accent} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
@@ -106,30 +113,32 @@ export default function FavoritesScreen() {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 10 },
-  title: { fontSize: 28, fontWeight: '800', color: '#222' },
-  subtitle: { fontSize: 15, color: '#777', marginBottom: 4 },
+  title: { fontSize: 28, fontFamily: t.font.display, color: t.color.textPrimary },
+  subtitle: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary, marginBottom: 4 },
   emptyCard: {
-    borderRadius: 18,
+    borderRadius: t.radius.md,
     padding: 18,
-    backgroundColor: '#fafafa',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
   },
-  emptyText: { fontSize: 14, color: '#777' },
+  emptyText: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
   card: {
-    borderRadius: 18,
-    backgroundColor: '#fafafa',
+    borderRadius: t.radius.md,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
     overflow: 'hidden',
   },
   row: {
@@ -138,14 +147,14 @@ const styles = StyleSheet.create({
     gap: 14,
     padding: 16,
   },
-  rank: { width: 26, fontSize: 18, fontWeight: '800', color: '#e53935' },
+  rank: { width: 26, fontSize: 18, fontFamily: t.font.bodyBold, color: t.color.accent },
   rowBody: { flex: 1, gap: 2 },
-  name: { fontSize: 16, fontWeight: '700', color: '#222' },
-  meta: { fontSize: 13, color: '#777' },
-  chevron: { fontSize: 11, color: '#aaa' },
+  name: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
+  meta: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
+  chevron: { fontSize: 11, color: t.color.textTertiary },
   subList: {
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#e8e8e8',
+    borderTopColor: t.color.border,
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 8,
@@ -155,6 +164,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  subName: { fontSize: 14, color: '#444' },
-  subCount: { fontSize: 14, fontWeight: '700', color: '#222' },
+  subName: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
+  subCount: { fontSize: 14, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
 });

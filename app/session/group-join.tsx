@@ -12,12 +12,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Camera, CameraView, type BarcodeScanningResult } from 'expo-camera';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../../src/components';
 import { useSession } from '../../src/hooks/useSession';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 
 type CameraPermState = 'undetermined' | 'granted' | 'denied' | 'denied-permanent';
 
@@ -36,6 +39,8 @@ export default function GroupJoinScreen() {
   const params = useLocalSearchParams<{ code?: string }>();
   const { joinGroup } = useSession();
   const insets = useSafeAreaInsets();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const [joinCode, setJoinCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
@@ -123,8 +128,10 @@ export default function GroupJoinScreen() {
   const canJoin = joinCode.length === CODE_LENGTH;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
       {/* Top bar */}
       <View style={styles.topBar}>
@@ -203,15 +210,23 @@ export default function GroupJoinScreen() {
       {/* Footer actions */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
         <TouchableOpacity
-          style={[styles.primaryBtn, (!canJoin || loading) && styles.primaryBtnDisabled]}
+          style={[styles.primaryBtnShadow, (!canJoin || loading) && styles.primaryBtnShadowDisabled]}
           onPress={() => void handleJoinGroup()}
           disabled={loading || !canJoin}
+          activeOpacity={0.85}
         >
-          {loading ? (
-            <ActivityIndicator color="#fffaf2" />
-          ) : (
-            <Text style={styles.primaryBtnText}>Join the party</Text>
-          )}
+          <LinearGradient
+            colors={(!canJoin || loading) ? [t.color.surfaceAlt, t.color.surfaceAlt] : t.color.accentGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.primaryBtn}
+          >
+            {loading ? (
+              <ActivityIndicator color={t.color.onAccent} />
+            ) : (
+              <Text style={[styles.primaryBtnText, !canJoin && styles.primaryBtnTextDisabled]}>Join the party</Text>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.ghostBtn}
@@ -249,14 +264,18 @@ export default function GroupJoinScreen() {
           </SafeAreaView>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fdf3e3',
+    backgroundColor: t.color.bg,
+  },
+  safe: {
+    flex: 1,
   },
 
   // ── Top bar ─────────────────────────────────────────────
@@ -273,32 +292,33 @@ const styles = StyleSheet.create({
   },
   ribbon: {
     alignSelf: 'flex-start',
-    backgroundColor: '#ffeed6',
+    backgroundColor: t.color.accentSoft,
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
   },
   ribbonText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#8a4a14',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
   heroTitle: {
     fontSize: 36,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
     lineHeight: 40,
     letterSpacing: -1,
     marginTop: 12,
   },
   heroTitleAccent: {
-    color: '#ee5d52',
+    color: t.color.accent,
   },
   heroSubtitle: {
     fontSize: 14,
-    color: '#7a6452',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     marginTop: 6,
     lineHeight: 20,
   },
@@ -317,34 +337,26 @@ const styles = StyleSheet.create({
   codeBox: {
     flex: 1,
     aspectRatio: 0.84,
-    borderRadius: 18,
-    backgroundColor: '#ffffff',
+    borderRadius: t.radius.md,
+    backgroundColor: t.color.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.07)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   codeBoxFilled: {
-    borderColor: 'rgba(40,22,12,0.12)',
+    borderColor: t.color.border,
   },
   codeBoxActive: {
-    borderColor: '#ee5d52',
+    borderColor: t.color.accent,
     borderWidth: 2,
-    shadowColor: '#ee5d52',
-    shadowOpacity: 0.30,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 0 },
-    elevation: 4,
+    ...t.shadow.glow(t.color.accent),
   },
   codeBoxText: {
     fontSize: 32,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.displayItalic,
+    color: t.color.textPrimary,
     letterSpacing: -0.5,
     fontStyle: 'italic',
   },
@@ -360,22 +372,23 @@ const styles = StyleSheet.create({
   permissionBanner: {
     marginHorizontal: 24,
     marginTop: 20,
-    borderRadius: 16,
+    borderRadius: t.radius.md,
     padding: 14,
-    backgroundColor: '#ffe5e0',
+    backgroundColor: t.color.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(238,93,82,0.25)',
+    borderColor: t.color.border,
     gap: 6,
   },
   permissionText: {
     fontSize: 13,
-    color: '#7a6452',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     lineHeight: 18,
   },
   permissionAction: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#b3372d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
 
   // ── Footer ──────────────────────────────────────────────
@@ -386,39 +399,39 @@ const styles = StyleSheet.create({
     bottom: 0,
     gap: 10,
   },
-  primaryBtn: {
-    height: 56,
-    borderRadius: 999,
-    backgroundColor: '#ee5d52',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#ee5d52',
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+  primaryBtnShadow: {
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
   },
-  primaryBtnDisabled: {
-    backgroundColor: '#f7c9c6',
+  primaryBtnShadowDisabled: {
     shadowOpacity: 0,
     elevation: 0,
   },
+  primaryBtn: {
+    height: 56,
+    borderRadius: t.radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   primaryBtnText: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#fffaf2',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
     letterSpacing: -0.2,
+  },
+  primaryBtnTextDisabled: {
+    color: t.color.textTertiary,
   },
   ghostBtn: {
     height: 44,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ghostBtnText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#4a3624',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
   },
 
   // ── Camera modal ────────────────────────────────────────

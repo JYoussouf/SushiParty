@@ -11,11 +11,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useFriends } from '../../src/hooks/useFriends';
 import { getNewlyEarnedAchievements, getAchievements } from '../../src/lib/achievements';
+import { showInterstitialIfDue } from '../../src/lib/ads';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { getMenu } from '../../src/lib/cloudflare/menus';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
@@ -88,6 +92,8 @@ function PlateCard({
   pieces: string[];
   hiddenCount: number;
 }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   return (
     <View style={styles.plateCard}>
       <View style={styles.plateHeader}>
@@ -123,6 +129,8 @@ function PlateCard({
 
 export default function SessionSummaryScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const params = useLocalSearchParams<{ id?: string; origin?: string; allowUnknown?: string }>();
   const [session, setSession] = useState<SushiSession | null>(null);
@@ -260,11 +268,14 @@ export default function SessionSummaryScreen() {
     router.push({ pathname: '/(tabs)/profile', params: { achievements: '1' } });
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     if (origin === 'history') {
       router.back();
       return;
     }
+    // Occasional interstitial at the natural break — after the user has enjoyed
+    // their results and is heading home (no-op unless ads are enabled / due).
+    await showInterstitialIfDue();
     router.replace({ pathname: '/session/party-intro', params: { next: 'home' } });
   };
 
@@ -323,22 +334,34 @@ export default function SessionSummaryScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingContainer}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#ff6f3c" />
-      </SafeAreaView>
+      <View style={styles.loadingContainer}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+        <StatusBar style={t.isDark ? 'light' : 'dark'} />
+        <ActivityIndicator size="large" color={t.color.accent} />
+      </View>
     );
   }
 
   if (!session || !menu || !submittedAt) {
-    return <SafeAreaView style={styles.loadingContainer} />;
+    return (
+      <View style={styles.loadingContainer}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      </View>
+    );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroCard}>
+        <LinearGradient
+          colors={t.color.accentGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.heroCard}
+        >
           <Text style={styles.eyebrow}>Feast recap</Text>
           <Text style={styles.heroTitle}>{getFunHeadline(totalPieces)}</Text>
           <Text style={styles.heroText}>
@@ -354,7 +377,7 @@ export default function SessionSummaryScreen() {
               <Text style={styles.statPillHotText}>{totalPieces} pieces down</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         <PlateCard
           title="Party platter"
@@ -550,14 +573,21 @@ export default function SessionSummaryScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-          <Text style={styles.doneButtonText}>Let's Go Home!</Text>
+        <TouchableOpacity style={styles.doneButton} onPress={() => void handleDone()} activeOpacity={0.85}>
+          <LinearGradient
+            colors={t.color.accentGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.doneButtonInner}
+          >
+            <Text style={styles.doneButtonText}>Let's Go Home!</Text>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
 
       <Modal visible={showTagModal} animationType="slide" onRequestClose={() => setShowTagModal(false)}>
         <SafeAreaView style={styles.modalContainer}>
-          <StatusBar style="dark" />
+          <StatusBar style={t.isDark ? 'light' : 'dark'} />
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Tag Friends</Text>
             <TouchableOpacity onPress={() => setShowTagModal(false)} disabled={savingTags}>
@@ -597,14 +627,14 @@ export default function SessionSummaryScreen() {
             onPress={() => void handleSaveTags()}
             disabled={savingTags}
           >
-            {savingTags ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Tags</Text>}
+            {savingTags ? <ActivityIndicator color={t.color.onAccent} /> : <Text style={styles.saveButtonText}>Save Tags</Text>}
           </TouchableOpacity>
         </SafeAreaView>
       </Modal>
 
       <Modal visible={showNoteModal} animationType="slide" onRequestClose={() => setShowNoteModal(false)}>
         <SafeAreaView style={styles.noteModalContainer}>
-          <StatusBar style="dark" />
+          <StatusBar style={t.isDark ? 'light' : 'dark'} />
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Note</Text>
             <TouchableOpacity onPress={() => setShowNoteModal(false)} disabled={savingNote}>
@@ -617,7 +647,7 @@ export default function SessionSummaryScreen() {
               value={draftNote}
               onChangeText={setDraftNote}
               placeholder="Was it everything you ever hoped for?"
-              placeholderTextColor="#9f8f86"
+              placeholderTextColor={t.color.textTertiary}
               autoCorrect={false}
               spellCheck={false}
               multiline
@@ -628,79 +658,78 @@ export default function SessionSummaryScreen() {
               onPress={() => void handleSaveNote()}
               disabled={savingNote}
             >
-              {savingNote ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>Save Note</Text>}
+              {savingNote ? <ActivityIndicator color={t.color.onAccent} /> : <Text style={styles.saveButtonText}>Save Note</Text>}
             </TouchableOpacity>
           </View>
         </SafeAreaView>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff1e6' },
-  loadingContainer: { flex: 1, backgroundColor: '#fff1e6', justifyContent: 'center', alignItems: 'center' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
+  loadingContainer: { flex: 1, backgroundColor: t.color.bg, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20, paddingBottom: 28, gap: 18 },
   heroCard: {
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 22,
     gap: 10,
-    backgroundColor: '#ff7a59',
     borderWidth: 1,
-    borderColor: '#ff946f',
+    borderColor: t.color.border,
+    ...t.shadow.glow(t.color.accent),
   },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: '#fff3e8' },
-  heroTitle: { fontSize: 32, lineHeight: 36, fontWeight: '900', color: '#fffdf8' },
-  heroText: { fontSize: 15, lineHeight: 22, color: '#fff3e8' },
+  eyebrow: { fontSize: 12, fontFamily: t.font.bodyBold, letterSpacing: 1, textTransform: 'uppercase', color: t.color.onAccent },
+  heroTitle: { fontSize: 32, lineHeight: 36, fontFamily: t.font.display, color: t.color.onAccent },
+  heroText: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.onAccent },
   heroStatsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 },
   statPill: {
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 9,
     backgroundColor: 'rgba(255,255,255,0.18)',
   },
-  statPillHot: { backgroundColor: '#fff4cf' },
-  statPillLabel: { fontSize: 13, fontWeight: '800', color: '#fffdf8' },
-  statPillHotText: { fontSize: 13, fontWeight: '800', color: '#8c4d00' },
+  statPillHot: { backgroundColor: t.color.surface },
+  statPillLabel: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.onAccent },
+  statPillHotText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
   section: { gap: 10 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  sectionTitle: { fontSize: 21, fontWeight: '900', color: '#2c211c' },
+  sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
   actionChip: {
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: '#ffe1d2',
+    backgroundColor: t.color.accentSoft,
   },
-  actionChipText: { fontSize: 13, fontWeight: '800', color: '#d7522e' },
+  actionChipText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
   plateCard: {
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 18,
     gap: 14,
-    backgroundColor: '#fffaf4',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f2d6c8',
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   plateHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  plateTitle: { fontSize: 22, fontWeight: '900', color: '#2c211c' },
-  plateSubtitle: { marginTop: 4, fontSize: 14, lineHeight: 20, color: '#7d6558' },
+  plateTitle: { fontSize: 22, fontFamily: t.font.display, color: t.color.textPrimary },
+  plateSubtitle: { marginTop: 4, fontSize: 14, lineHeight: 20, fontFamily: t.font.body, color: t.color.textSecondary },
   plateSurface: {
     borderRadius: 999,
-    backgroundColor: '#f9f4ef',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 10,
-    borderColor: '#ffffff',
+    borderColor: t.color.surface,
     padding: 14,
     minHeight: 210,
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 1,
+    ...t.shadow.card,
   },
   plateInner: {
     borderRadius: 999,
     borderWidth: 2,
-    borderColor: '#f1ddd0',
+    borderColor: t.color.border,
     padding: 18,
     minHeight: 170,
     justifyContent: 'center',
@@ -712,18 +741,18 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: t.color.surface,
   },
-  moreBubble: { backgroundColor: '#ffe3cb' },
+  moreBubble: { backgroundColor: t.color.accentSoft },
   pieceEmoji: { fontSize: 18 },
-  moreText: { fontSize: 13, fontWeight: '800', color: '#b35b19' },
-  emptyPlateText: { textAlign: 'center', fontSize: 15, lineHeight: 21, color: '#8f7869' },
+  moreText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
+  emptyPlateText: { textAlign: 'center', fontSize: 15, lineHeight: 21, fontFamily: t.font.body, color: t.color.textSecondary },
   playerPlateGrid: { gap: 14 },
   listCard: {
-    borderRadius: 24,
-    backgroundColor: '#fffaf4',
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f2d6c8',
+    borderColor: t.color.border,
     overflow: 'hidden',
   },
   rowCard: {
@@ -733,19 +762,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 15,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ecd8cb',
+    borderBottomColor: t.color.border,
   },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  rowTitle: { fontSize: 16, fontWeight: '700', color: '#2c211c' },
-  rowValue: { fontSize: 15, fontWeight: '900', color: '#d7522e' },
-  rowChevron: { fontSize: 11, color: '#b09080' },
+  rowTitle: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
+  rowValue: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.accent },
+  rowChevron: { fontSize: 11, color: t.color.textTertiary },
   participantBreakdown: {
     paddingHorizontal: 18,
     paddingBottom: 14,
     paddingTop: 4,
     gap: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ecd8cb',
+    borderBottomColor: t.color.border,
   },
   breakdownCatGroup: { gap: 2 },
   breakdownCatRow: {
@@ -754,10 +783,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
   },
-  breakdownCatLabel: { fontSize: 13, fontWeight: '700', color: '#9a7a6e' },
+  breakdownCatLabel: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.textSecondary },
   breakdownCatRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  breakdownCatCount: { fontSize: 13, fontWeight: '700', color: '#5e4a3f' },
-  breakdownCatChevron: { fontSize: 10, color: '#bbb' },
+  breakdownCatCount: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
+  breakdownCatChevron: { fontSize: 10, color: t.color.textTertiary },
   superlativesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -766,139 +795,144 @@ const styles = StyleSheet.create({
   superlativeCard: {
     flexBasis: '47%',
     flexGrow: 1,
-    borderRadius: 18,
+    borderRadius: t.radius.md,
     padding: 14,
-    backgroundColor: '#fffaf4',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f2d6c8',
+    borderColor: t.color.border,
     gap: 4,
   },
   superlativeEmoji: { fontSize: 28, lineHeight: 34 },
-  superlativeLabel: { fontSize: 12, fontWeight: '700', color: '#b07050', textTransform: 'uppercase', letterSpacing: 0.6 },
-  superlativeWinner: { fontSize: 15, fontWeight: '800', color: '#2c211c' },
+  superlativeLabel: { fontSize: 12, fontFamily: t.font.bodySemibold, color: t.color.accent, textTransform: 'uppercase', letterSpacing: 0.6 },
+  superlativeWinner: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   noteCard: {
-    borderRadius: 24,
+    borderRadius: t.radius.lg,
     padding: 18,
-    backgroundColor: '#fffaf4',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f2d6c8',
+    borderColor: t.color.border,
   },
-  noteBody: { fontSize: 15, lineHeight: 22, color: '#5e4a3f' },
+  noteBody: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
   sectionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  sectionTitleLink: { fontSize: 13, fontWeight: '800', color: '#d7522e' },
+  sectionTitleLink: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
   achievementList: { gap: 10 },
   achievementCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 20,
+    borderRadius: t.radius.md,
     padding: 14,
-    backgroundColor: '#fff4cf',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#f2d68a',
+    borderColor: t.color.border,
   },
   achievementEmoji: { fontSize: 20 },
-  achievementTitle: { flex: 1, fontSize: 15, fontWeight: '800', color: '#725000' },
+  achievementTitle: { flex: 1, fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.amber },
   achievementCardLocked: {
-    backgroundColor: '#f0ebe5',
-    borderColor: '#d9cdc2',
+    backgroundColor: t.color.surface,
+    borderColor: t.color.border,
   },
   achievementEmojiLocked: { opacity: 0.5 },
   achievementCardContent: { flex: 1 },
-  achievementTitleLocked: { color: '#9a8977' },
-  achievementDescription: { fontSize: 12, lineHeight: 16, color: '#8a6f55', marginTop: 2 },
-  achievementDescriptionLocked: { color: '#a89878' },
+  achievementTitleLocked: { color: t.color.textTertiary },
+  achievementDescription: { fontSize: 12, lineHeight: 16, fontFamily: t.font.body, color: t.color.textSecondary, marginTop: 2 },
+  achievementDescriptionLocked: { color: t.color.textTertiary },
   breakdownCard: {
     gap: 10,
-    borderRadius: 22,
+    borderRadius: t.radius.lg,
     padding: 16,
-    backgroundColor: '#fffaf4',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f2d6c8',
+    borderColor: t.color.border,
   },
   breakdownHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  breakdownTitle: { fontSize: 17, fontWeight: '800', color: '#2c211c' },
-  breakdownTotal: { fontSize: 15, fontWeight: '900', color: '#d7522e' },
+  breakdownTitle: { fontSize: 17, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  breakdownTotal: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.accent },
   itemRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
   itemLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 },
   itemEmoji: { fontSize: 18 },
-  itemName: { flex: 1, fontSize: 14, color: '#5e4a3f' },
-  itemCount: { fontSize: 14, fontWeight: '800', color: '#2c211c' },
+  itemName: { flex: 1, fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
+  itemCount: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   doneButton: {
     marginTop: 4,
-    borderRadius: 999,
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
+  doneButtonInner: {
+    borderRadius: t.radius.button,
     paddingVertical: 16,
     alignItems: 'center',
-    backgroundColor: '#2c211c',
   },
-  doneButtonText: { fontSize: 16, fontWeight: '800', color: '#fff7f1' },
-  modalContainer: { flex: 1, backgroundColor: '#fff8f2', padding: 20 },
-  noteModalContainer: { flex: 1, backgroundColor: '#fff8f2', paddingHorizontal: 20, paddingTop: 16 },
+  doneButtonText: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.onAccent },
+  modalContainer: { flex: 1, backgroundColor: t.color.bg, padding: 20 },
+  noteModalContainer: { flex: 1, backgroundColor: t.color.bg, paddingHorizontal: 20, paddingTop: 16 },
   noteModalContent: { paddingHorizontal: 6, paddingBottom: 20 },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, paddingHorizontal: 20 },
-  modalTitle: { fontSize: 24, fontWeight: '900', color: '#2c211c' },
-  modalClose: { fontSize: 16, fontWeight: '800', color: '#d7522e' },
-  modalText: { fontSize: 14, lineHeight: 21, color: '#6e5a4f' },
+  modalTitle: { fontSize: 24, fontFamily: t.font.display, color: t.color.textPrimary },
+  modalClose: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.accent },
+  modalText: { fontSize: 14, lineHeight: 21, fontFamily: t.font.body, color: t.color.textSecondary },
   modalList: { flex: 1, paddingTop: 18, gap: 12 },
-  modalEmpty: { fontSize: 15, color: '#7d6558' },
+  modalEmpty: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary },
   friendOption: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#fff',
+    borderRadius: t.radius.md,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#eed8cb',
+    borderColor: t.color.border,
   },
-  friendOptionSelected: { backgroundColor: '#fff0e8', borderColor: '#f6c8b5' },
-  friendOptionName: { fontSize: 16, fontWeight: '800', color: '#2c211c' },
-  friendOptionUsername: { marginTop: 2, fontSize: 13, color: '#8a7467' },
-  friendOptionCheck: { fontSize: 13, fontWeight: '800', color: '#9b8b81' },
-  friendOptionCheckSelected: { color: '#d7522e' },
+  friendOptionSelected: { backgroundColor: t.color.accentSoft, borderColor: t.color.accent },
+  friendOptionName: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  friendOptionUsername: { marginTop: 2, fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
+  friendOptionCheck: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary },
+  friendOptionCheckSelected: { color: t.color.accent },
   saveButton: {
-    borderRadius: 999,
+    borderRadius: t.radius.button,
     paddingVertical: 15,
     alignItems: 'center',
-    backgroundColor: '#d7522e',
+    backgroundColor: t.color.accent,
     marginBottom: 8,
   },
-  saveButtonDisabled: { backgroundColor: '#f5b6a1' },
-  saveButtonText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  saveButtonDisabled: { backgroundColor: t.color.surfaceAlt },
+  saveButtonText: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   noteInput: {
     height: 80,
-    borderRadius: 18,
+    borderRadius: t.radius.md,
     borderWidth: 1,
-    borderColor: '#eed8cb',
-    backgroundColor: '#fff',
+    borderColor: t.color.border,
+    backgroundColor: t.color.surface,
     padding: 16,
     fontSize: 15,
-    color: '#2c211c',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
     marginBottom: 16,
   },
   noteDisplay: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#5e4a3f',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     padding: 18,
   },
   addNoteButton: {
-    borderRadius: 999,
+    borderRadius: t.radius.button,
     paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
-    backgroundColor: '#ffe1d2',
+    backgroundColor: t.color.accentSoft,
     borderWidth: 1,
-    borderColor: '#f2d6c8',
+    borderColor: t.color.border,
   },
   addNoteButtonText: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#d7522e',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -17,14 +17,19 @@ import Animated, {
   withSpring,
   withSequence,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { CAT_AVATARS } from '../src/lib/catAvatars';
+import { useTheme } from '../src/contexts/ThemeContext';
+import type { Theme } from '../src/theme/themes';
 import { useAuth } from '../src/contexts/AuthContext';
 import { isUsernameTaken } from '../src/lib/cloudflare/users';
 
-function AvatarButton({ avatar, selected, onSelect }: { avatar: string; selected: boolean; onSelect: (a: string) => void }) {
+type Styles = ReturnType<typeof makeStyles>;
+
+function AvatarButton({ avatar, selected, onSelect, styles }: { avatar: string; selected: boolean; onSelect: (a: string) => void; styles: Styles }) {
   const scale = useSharedValue(1);
   const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
@@ -54,6 +59,8 @@ type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { completeOnboarding, userProfile } = useAuth();
   const [selectedAvatar, setSelectedAvatar] = useState<string>(userProfile?.avatar ?? '🐱');
   const genericNames = ['Google User', 'Apple User', 'Facebook User'];
@@ -104,8 +111,10 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         style={styles.kb}
         behavior={Platform.OS === 'ios' ? undefined : 'height'}
@@ -130,7 +139,7 @@ export default function OnboardingScreen() {
               value={name}
               onChangeText={setName}
               placeholder="Just a nickname is fine"
-              placeholderTextColor="#c4a898"
+              placeholderTextColor={t.color.textTertiary}
               autoCapitalize="words"
               autoCorrect={false}
               spellCheck={false}
@@ -151,6 +160,7 @@ export default function OnboardingScreen() {
                 <AvatarButton
                   key={avatar}
                   avatar={avatar}
+                  styles={styles}
                   selected={avatar === selectedAvatar}
                   onSelect={(a) => {
                     setSelectedAvatar(a);
@@ -174,7 +184,7 @@ export default function OnboardingScreen() {
                 value={username}
                 onChangeText={(v) => setUsername(v.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                 placeholder="letters, numbers, underscores"
-                placeholderTextColor="#c4a898"
+                placeholderTextColor={t.color.textTertiary}
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="done"
@@ -184,7 +194,7 @@ export default function OnboardingScreen() {
                 maxLength={20}
               />
               {usernameStatus === 'checking' && (
-                <ActivityIndicator size="small" color="#b08070" style={styles.usernameIndicator} />
+                <ActivityIndicator size="small" color={t.color.textSecondary} style={styles.usernameIndicator} />
               )}
             </View>
             <Text style={[
@@ -200,23 +210,32 @@ export default function OnboardingScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.continueBtn, !canContinue && styles.continueBtnDisabled]}
+            style={[styles.continueShadow, !canContinue && styles.continueBtnDisabled]}
             onPress={() => void handleContinue()}
             disabled={!canContinue || saving}
             activeOpacity={0.85}
           >
-            <Text style={styles.continueBtnText}>
-              {saving ? 'Saving…' : `Let's eat! ${selectedAvatar}`}
-            </Text>
+            <LinearGradient
+              colors={t.color.accentGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.continueBtn}
+            >
+              <Text style={styles.continueBtnText}>
+                {saving ? 'Saving…' : `Let's eat! ${selectedAvatar}`}
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff5ec' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   kb: { flex: 1 },
   scroll: { padding: 28, gap: 32, paddingBottom: 40 },
   hero: { alignItems: 'center', gap: 14, paddingTop: 12 },
@@ -225,29 +244,26 @@ const styles = StyleSheet.create({
     width: 110,
     height: 110,
     borderRadius: 55,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.surface,
     borderWidth: 3,
-    borderColor: '#df5a31',
+    borderColor: t.color.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#df5a31',
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    ...t.shadow.glow(t.color.accent),
   },
   avatarPreviewEmoji: { fontSize: 62, lineHeight: 72 },
   title: {
     fontSize: 36,
-    fontWeight: '900',
-    color: '#2d1a0e',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
     textAlign: 'center',
     lineHeight: 42,
   },
   subtitle: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#7a5540',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     textAlign: 'center',
   },
   section: { gap: 12 },
@@ -256,24 +272,20 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: 24,
     paddingVertical: 34,
-    borderRadius: 32,
-    backgroundColor: '#fff8e9',
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f4e4ca',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.12,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 5,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   label: {
     fontSize: 13,
-    fontWeight: '800',
+    fontFamily: t.font.bodyBold,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
-    color: '#b06040',
+    color: t.color.accent,
   },
-  avatarHint: { fontSize: 13, color: '#b08070', lineHeight: 18, marginTop: -4 },
+  avatarHint: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 18, marginTop: -4 },
   avatarGrid: {
     width: '100%',
     flexDirection: 'row',
@@ -287,59 +299,53 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 2,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
   },
   avatarBtnSelected: {
-    borderColor: '#df5a31',
-    backgroundColor: '#fff0e6',
-    shadowColor: '#df5a31',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    borderColor: t.color.accent,
+    backgroundColor: t.color.accentSoft,
+    ...t.shadow.glow(t.color.accent),
   },
   avatarEmoji: { fontSize: 30 },
   input: {
     height: 54,
-    borderRadius: 16,
+    borderRadius: t.radius.md,
     borderWidth: 2,
-    borderColor: '#efd8ca',
-    backgroundColor: '#fff',
+    borderColor: t.color.border,
+    backgroundColor: t.color.surface,
     paddingHorizontal: 18,
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2d1a0e',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textPrimary,
   },
   inputFocused: {
-    borderColor: '#df5a31',
+    borderColor: t.color.accent,
   },
-  hint: { fontSize: 12, color: '#b08070', lineHeight: 17 },
-  hintSuccess: { color: '#4caf50' },
-  hintError: { color: '#df5a31' },
-  inputError: { borderColor: '#df5a31' },
+  hint: { fontSize: 12, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 17 },
+  hintSuccess: { color: t.color.success },
+  hintError: { color: t.color.danger },
+  inputError: { borderColor: t.color.danger },
   usernameIndicator: { position: 'absolute', right: 16, top: 17 },
+  continueShadow: {
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
   continueBtn: {
-    borderRadius: 999,
+    borderRadius: t.radius.button,
     paddingVertical: 18,
     alignItems: 'center',
-    backgroundColor: '#df5a31',
-    shadowColor: '#df5a31',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
   },
   continueBtnDisabled: {
-    backgroundColor: '#e8bfb0',
+    opacity: 0.5,
     shadowOpacity: 0,
     elevation: 0,
   },
   continueBtnText: {
     fontSize: 18,
-    fontWeight: '900',
-    color: '#fff',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
     letterSpacing: 0.3,
   },
 });

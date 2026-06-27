@@ -6,11 +6,14 @@ import {
   StyleSheet,
   SafeAreaView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SushiPartyLogo } from '../../src/components';
+import { useTheme, useThemeControls } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSession } from '../../src/hooks/useSession';
 import { useMenu } from '../../src/hooks/useMenu';
@@ -198,6 +201,9 @@ function computeStatCards(sessions: SushiSession[], uid: string | undefined, men
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const t = useTheme();
+  const { name: themeName, toggleTheme } = useThemeControls();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
   const { activeMenu } = useMenu();
@@ -252,8 +258,10 @@ export default function HomeScreen() {
       ];
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
       {/* Top bar */}
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
@@ -265,9 +273,14 @@ export default function HomeScreen() {
             <Text style={styles.profileName} numberOfLines={1}>{userProfile.displayName}</Text>
           ) : null}
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsButton} onPress={() => router.push('/settings')}>
-          <Text style={styles.settingsIcon}>⚙️</Text>
-        </TouchableOpacity>
+        <View style={styles.topActions}>
+          <TouchableOpacity style={styles.iconButton} onPress={toggleTheme} accessibilityLabel="Toggle theme">
+            <Text style={styles.iconButtonText}>{themeName === 'tokyo' ? '🌙' : '☀️'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/settings')}>
+            <Text style={styles.iconButtonText}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Hero */}
@@ -323,28 +336,39 @@ export default function HomeScreen() {
 
       {/* CTAs */}
       <Animated.View style={[styles.buttons, cardStyle]}>
-        {buttons.map((btn, i) => (
-          <TouchableOpacity
-            key={btn.label}
-            style={i === 0 ? styles.buttonPrimary : styles.buttonSecondary}
-            onPress={btn.onPress}
-            activeOpacity={0.82}
-          >
-            <Text style={styles.buttonEmoji}>{btn.emoji}</Text>
-            <Text style={i === 0 ? styles.buttonLabelPrimary : styles.buttonLabelSecondary}>
-              {btn.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
+        {buttons.map((btn, i) =>
+          i === 0 ? (
+            <TouchableOpacity key={btn.label} onPress={btn.onPress} activeOpacity={0.85} style={styles.primaryShadow}>
+              <LinearGradient
+                colors={t.color.accentGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.buttonPrimary}
+              >
+                <Text style={styles.buttonEmoji}>{btn.emoji}</Text>
+                <Text style={styles.buttonLabelPrimary}>{btn.label}</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity key={btn.label} style={styles.buttonSecondary} onPress={btn.onPress} activeOpacity={0.82}>
+              <Text style={styles.buttonEmoji}>{btn.emoji}</Text>
+              <Text style={styles.buttonLabelSecondary}>{btn.label}</Text>
+            </TouchableOpacity>
+          ),
+        )}
       </Animated.View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fffaf2',
+    backgroundColor: t.color.bg,
+  },
+  safe: {
+    flex: 1,
   },
 
   // ── Top bar ─────────────────────────────────────────────
@@ -357,6 +381,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     zIndex: 2,
   },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
   profileButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -365,14 +394,10 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
     paddingRight: 14,
     borderRadius: 999,
-    backgroundColor: '#fffdf8',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.07)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
+    borderColor: t.color.border,
+    ...t.shadow.card,
     maxWidth: 220,
   },
   profileAvatarBadge: {
@@ -381,14 +406,9 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff4d7',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 2,
-    borderColor: '#fff',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.13,
-    shadowRadius: 5,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 3,
+    borderColor: t.isDark ? t.color.accent : '#fff',
   },
   profileAvatar: {
     fontSize: 18,
@@ -396,28 +416,23 @@ const styles = StyleSheet.create({
   },
   profileName: {
     fontSize: 14,
-    fontWeight: '800',
-    color: '#21160d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
     flexShrink: 1,
   },
-  settingsButton: {
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fffdf8',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.07)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.14,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 5,
+    borderColor: t.color.border,
   },
-  settingsIcon: {
-    fontSize: 21,
-    lineHeight: 25,
+  iconButtonText: {
+    fontSize: 20,
+    lineHeight: 24,
   },
 
   // ── Hero ────────────────────────────────────────────────
@@ -429,7 +444,8 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     fontSize: 15,
-    color: '#7a6452',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     textAlign: 'center',
     lineHeight: 21,
   },
@@ -443,17 +459,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fdf3e3',
-    borderRadius: 28,
+    backgroundColor: t.color.surface,
+    borderRadius: t.radius.lg,
     paddingHorizontal: 22,
     paddingVertical: 20,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.06)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.10,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 3,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   plateLeft: {
     flex: 1,
@@ -466,46 +478,47 @@ const styles = StyleSheet.create({
   },
   ribbon: {
     alignSelf: 'flex-start',
-    backgroundColor: '#ffe5e0',
+    backgroundColor: t.isDark ? 'rgba(255,111,145,0.16)' : '#ffe5e0',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: 999,
   },
   ribbonText: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#b3372d',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.accent,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   plateTitle: {
     fontSize: 24,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
     letterSpacing: -0.5,
     marginTop: 10,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   plateQuote: {
     fontSize: 22,
-    fontWeight: '600',
-    color: '#21160d',
+    fontFamily: t.font.displayItalic,
+    color: t.color.textPrimary,
     fontStyle: 'italic',
     letterSpacing: -0.3,
     marginTop: 10,
-    lineHeight: 28,
+    lineHeight: 30,
   },
   plateHeadline: {
     fontSize: 19,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
     letterSpacing: -0.3,
     marginTop: 10,
-    lineHeight: 24,
+    lineHeight: 26,
   },
   plateSub: {
     fontSize: 13,
-    color: '#7a6452',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     marginTop: 6,
     lineHeight: 18,
   },
@@ -520,6 +533,10 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     gap: 10,
   },
+  primaryShadow: {
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
   buttonPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -527,13 +544,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 18,
     paddingHorizontal: 24,
-    borderRadius: 999,
-    backgroundColor: '#ee5d52',
-    shadowColor: '#ee5d52',
-    shadowOpacity: 0.45,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
+    borderRadius: t.radius.button,
   },
   buttonSecondary: {
     flexDirection: 'row',
@@ -542,15 +553,10 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.12)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderColor: t.color.border,
   },
   buttonEmoji: {
     fontSize: 20,
@@ -558,14 +564,14 @@ const styles = StyleSheet.create({
   },
   buttonLabelPrimary: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#fffaf2',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
     letterSpacing: -0.2,
   },
   buttonLabelSecondary: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#21160d',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textPrimary,
     letterSpacing: -0.2,
   },
 });

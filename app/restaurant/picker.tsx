@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as Haptics from 'expo-haptics';
 import {
   View,
@@ -15,9 +15,12 @@ import {
   Platform,
   Linking,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useLocation } from '../../src/hooks/useLocation';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
 import {
@@ -35,6 +38,8 @@ const searchCache = new Map<string, RestaurantWithDistance[]>();
 
 export default function RestaurantPickerScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { location, permission, loading: locLoading, refresh } = useLocation();
   const { setRestaurant } = useRestaurant();
 
@@ -127,8 +132,10 @@ export default function RestaurantPickerScreen() {
 
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
       <View style={styles.topBar}>
         <BackButton onPress={() => router.back()} />
@@ -140,7 +147,7 @@ export default function RestaurantPickerScreen() {
           value={searchQuery}
           onChangeText={handleSearchChange}
           placeholder="Search by name or city…"
-          placeholderTextColor="#bbb"
+          placeholderTextColor={t.color.textTertiary}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
@@ -152,7 +159,7 @@ export default function RestaurantPickerScreen() {
             <Text style={styles.searchClear}>✕</Text>
           </TouchableOpacity>
         ) : searchLoading ? (
-          <ActivityIndicator style={styles.searchAction} size="small" color="#e53935" />
+          <ActivityIndicator style={styles.searchAction} size="small" color={t.color.accent} />
         ) : null}
       </View>
 
@@ -188,7 +195,7 @@ export default function RestaurantPickerScreen() {
           ) : (
             <View style={styles.sectionRow}>
               <Text style={styles.sectionLabel}>Nearby</Text>
-              {(locLoading || nearbyLoading) && <ActivityIndicator size="small" color="#e53935" />}
+              {(locLoading || nearbyLoading) && <ActivityIndicator size="small" color={t.color.accent} />}
             </View>
           )}
         </View>
@@ -215,7 +222,7 @@ export default function RestaurantPickerScreen() {
         ListEmptyComponent={
           listLoading ? (
             <View style={styles.emptyState}>
-              <ActivityIndicator color="#e53935" />
+              <ActivityIndicator color={t.color.accent} />
             </View>
           ) : (
             <View style={styles.emptyState}>
@@ -232,8 +239,15 @@ export default function RestaurantPickerScreen() {
       />
 
       {location && (
-        <TouchableOpacity style={styles.addBtn} onPress={() => setAddModalVisible(true)}>
-          <Text style={styles.addBtnText}>+ Add a new restaurant here</Text>
+        <TouchableOpacity style={styles.addBtnShadow} onPress={() => setAddModalVisible(true)} activeOpacity={0.85}>
+          <LinearGradient
+            colors={t.color.accentGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.addBtn}
+          >
+            <Text style={styles.addBtnText}>+ Add a new restaurant here</Text>
+          </LinearGradient>
         </TouchableOpacity>
       )}
 
@@ -242,8 +256,10 @@ export default function RestaurantPickerScreen() {
         location={location}
         onClose={() => setAddModalVisible(false)}
         onCreated={handleCreated}
+        t={t}
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -254,9 +270,11 @@ interface AddRestaurantModalProps {
   location: { latitude: number; longitude: number } | null;
   onClose: () => void;
   onCreated: (r: Restaurant) => void;
+  t: Theme;
 }
 
-function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestaurantModalProps) {
+function AddRestaurantModal({ visible, location, onClose, onCreated, t }: AddRestaurantModalProps) {
+  const modalStyles = useMemo(() => makeModalStyles(t), [t]);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -314,7 +332,7 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
             <Text style={modalStyles.title}>New Restaurant</Text>
             <TouchableOpacity onPress={handleCreate} disabled={submitting}>
               {submitting ? (
-                <ActivityIndicator color="#e53935" />
+                <ActivityIndicator color={t.color.accent} />
               ) : (
                 <Text style={modalStyles.save}>Save</Text>
               )}
@@ -328,7 +346,7 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
               value={name}
               onChangeText={setName}
               placeholder="e.g. Sushi Palace"
-              placeholderTextColor="#bbb"
+              placeholderTextColor={t.color.textTertiary}
               autoCapitalize="words"
               autoCorrect={false}
               spellCheck={false}
@@ -340,7 +358,7 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
               value={address}
               onChangeText={setAddress}
               placeholder="123 Main St"
-              placeholderTextColor="#bbb"
+              placeholderTextColor={t.color.textTertiary}
               autoCapitalize="words"
               autoCorrect={false}
               spellCheck={false}
@@ -358,8 +376,9 @@ function AddRestaurantModal({ visible, location, onClose, onCreated }: AddRestau
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   topBar: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -370,7 +389,7 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: t.color.border,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -378,17 +397,18 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 44,
-    borderRadius: 22,
-    backgroundColor: '#f5f5f5',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.surfaceAlt,
     paddingHorizontal: 18,
     fontSize: 15,
-    color: '#222',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
   searchInputFocused: {
-    borderColor: '#d7522e',
-    backgroundColor: '#fff',
+    borderColor: t.color.accent,
+    backgroundColor: t.color.surface,
   },
   searchAction: {
     width: 32,
@@ -397,27 +417,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchClear: { fontSize: 14, color: '#aaa', fontWeight: '600' },
+  searchClear: { fontSize: 14, color: t.color.textTertiary, fontFamily: t.font.bodySemibold },
   errorBanner: {
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#fff3f2',
+    backgroundColor: t.color.surfaceAlt,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#ffd0cc',
+    borderBottomColor: t.color.border,
   },
-  errorText: { fontSize: 13, color: '#c0392b' },
+  errorText: { fontSize: 13, fontFamily: t.font.body, color: t.color.danger },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   sectionLabel: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#aaa',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textTertiary,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
-  helperText: { marginTop: 8, fontSize: 14, color: '#666', lineHeight: 20 },
+  helperText: { marginTop: 8, fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 20 },
   linkBtn: { marginTop: 12, alignSelf: 'flex-start' },
-  linkBtnText: { color: '#e53935', fontSize: 15, fontWeight: '600' },
+  linkBtnText: { color: t.color.accent, fontSize: 15, fontFamily: t.font.bodySemibold },
   listContent: { paddingBottom: 120 },
   row: {
     flexDirection: 'row',
@@ -427,28 +447,31 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowBody: { flex: 1 },
-  rowName: { fontSize: 16, fontWeight: '600', color: '#222' },
-  rowAddress: { fontSize: 13, color: '#888', marginTop: 2 },
-  rowDistance: { fontSize: 13, color: '#aaa', fontWeight: '600' },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: '#eee', marginLeft: 16 },
+  rowName: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
+  rowAddress: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary, marginTop: 2 },
+  rowDistance: { fontSize: 13, color: t.color.textTertiary, fontFamily: t.font.bodySemibold },
+  separator: { height: StyleSheet.hairlineWidth, backgroundColor: t.color.border, marginLeft: 16 },
   emptyState: { padding: 40, alignItems: 'center' },
-  emptyText: { color: '#aaa', fontSize: 14, textAlign: 'center' },
-  addBtn: {
+  emptyText: { color: t.color.textTertiary, fontSize: 14, fontFamily: t.font.body, textAlign: 'center' },
+  addBtnShadow: {
     position: 'absolute',
     bottom: 20,
     left: 16,
     right: 16,
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
+  addBtn: {
     height: 50,
-    borderRadius: 25,
-    backgroundColor: '#e53935',
+    borderRadius: t.radius.button,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  addBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  addBtnText: { color: t.color.onAccent, fontSize: 16, fontFamily: t.font.bodyBold },
 });
 
-const modalStyles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeModalStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
   kb: { flex: 1 },
   header: {
     flexDirection: 'row',
@@ -457,22 +480,23 @@ const modalStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: t.color.border,
   },
-  title: { fontSize: 16, fontWeight: '700', color: '#222' },
-  cancel: { fontSize: 15, color: '#888' },
-  save: { fontSize: 15, fontWeight: '700', color: '#e53935' },
+  title: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  cancel: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary },
+  save: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.accent },
   body: { padding: 20, gap: 6 },
-  label: { fontSize: 13, fontWeight: '600', color: '#444', marginTop: 14 },
+  label: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.textSecondary, marginTop: 14 },
   input: {
     height: 50,
     borderWidth: 1.5,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
+    borderColor: t.color.border,
+    borderRadius: t.radius.md,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#222',
-    backgroundColor: '#fafafa',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
+    backgroundColor: t.color.surface,
   },
-  note: { marginTop: 20, fontSize: 12, color: '#aaa', lineHeight: 18 },
+  note: { marginTop: 20, fontSize: 12, fontFamily: t.font.body, color: t.color.textTertiary, lineHeight: 18 },
 });

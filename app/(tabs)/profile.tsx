@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import {
   ActivityIndicator,
@@ -28,7 +28,8 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
-import Svg, { Circle } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Defs, LinearGradient as SvgLinearGradient, Stop } from 'react-native-svg';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -36,6 +37,8 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { BackButton } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { CAT_AVATARS } from '../../src/lib/catAvatars';
 import { getAchievements } from '../../src/lib/achievements';
@@ -58,6 +61,8 @@ const EMPTY_STATS: UserProfileStats = {
 
 export default function ProfileScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const params = useLocalSearchParams<{ achievements?: string }>();
   const { userProfile, updateLocalProfile } = useAuth();
   const [stats, setStats] = useState<UserProfileStats>(EMPTY_STATS);
@@ -139,8 +144,10 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <BackButton onPress={() => router.back()} />
       </View>
@@ -173,7 +180,7 @@ export default function ProfileScreen() {
                 value={draftName}
                 onChangeText={setDraftName}
                 placeholder="Your name"
-                placeholderTextColor="#bbb"
+                placeholderTextColor={t.color.textTertiary}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={32}
@@ -183,7 +190,7 @@ export default function ProfileScreen() {
                   <Text style={styles.cancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveBtn} onPress={() => void handleSaveProfile()} disabled={saving}>
-                  {saving ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.saveBtnText}>Save</Text>}
+                  {saving ? <ActivityIndicator color={t.color.onAccent} size="small" /> : <Text style={styles.saveBtnText}>Save</Text>}
                 </TouchableOpacity>
               </View>
             </View>
@@ -216,7 +223,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Your Stats</Text>
           {loading ? (
             <View style={styles.loadingCard}>
-              <ActivityIndicator color="#e53935" />
+              <ActivityIndicator color={t.color.accent} />
             </View>
           ) : stats.totalSessions === 0 ? (
             <EmptyCard text="Submit a few parties and this tab will start tracking your pace, favourite restaurant, and most-ordered sushi." />
@@ -257,13 +264,16 @@ export default function ProfileScreen() {
 
 
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: number }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const size = 132;
   const stroke = 10;
   const radius = (size - stroke) / 2;
@@ -273,11 +283,17 @@ function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: numb
   return (
     <View style={styles.avatarRing}>
       <Svg width={size} height={size} style={styles.avatarRingSvg}>
+        <Defs>
+          <SvgLinearGradient id="avatarRingGradient" x1="0" y1="0" x2="1" y2="1">
+            <Stop offset="0" stopColor={t.color.accentGradient[0]} />
+            <Stop offset="1" stopColor={t.color.accentGradient[1]} />
+          </SvgLinearGradient>
+        </Defs>
         <Circle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#fff7e8"
+          stroke={t.color.surfaceAlt}
           strokeWidth={stroke}
           fill="none"
         />
@@ -285,7 +301,7 @@ function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: numb
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#f45750"
+          stroke="url(#avatarRingGradient)"
           strokeWidth={stroke}
           strokeLinecap="round"
           fill="none"
@@ -304,6 +320,8 @@ function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: numb
 }
 
 function AchievementBadge({ achievement: a, locked }: { achievement: Achievement; locked?: boolean }) {
+  const t = useTheme();
+  const achStyles = useMemo(() => makeAchStyles(t), [t]);
   const [open, setOpen] = useState(false);
   const progress = useSharedValue(0);
 
@@ -350,13 +368,13 @@ function AchievementBadge({ achievement: a, locked }: { achievement: Achievement
       <Modal visible={open} transparent animationType="none" onRequestClose={hide}>
         <Pressable style={StyleSheet.absoluteFill} onPress={hide}>
           <Animated.View style={[StyleSheet.absoluteFill, backdropStyle]} pointerEvents="none">
-            <BlurView style={StyleSheet.absoluteFill} intensity={24} tint="light" />
+            <BlurView style={StyleSheet.absoluteFill} intensity={24} tint={t.isDark ? 'dark' : 'light'} />
           </Animated.View>
         </Pressable>
 
         <View style={achStyles.modalCenter} pointerEvents="box-none">
           <Animated.View style={[achStyles.glassCard, cardStyle]}>
-            <BlurView style={achStyles.glassBlur} intensity={80} tint="light" />
+            <BlurView style={achStyles.glassBlur} intensity={80} tint={t.isDark ? 'dark' : 'light'} />
             <View style={achStyles.glassContent}>
               <Text style={achStyles.glassEmoji}>{isHiddenLocked ? '🔒' : a.emoji}</Text>
               <Text style={achStyles.glassTitle}>{modalTitle}</Text>
@@ -424,6 +442,9 @@ function AchievementsSection({
   achievements: Achievement[];
   autoOpen?: boolean;
 }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
+  const achStyles = useMemo(() => makeAchStyles(t), [t]);
   const [allOpen, setAllOpen] = useState(false);
 
   const earned = achievements.filter((a) => a.earned).sort((a, b) => (b.earnedAt ?? '').localeCompare(a.earnedAt ?? ''));
@@ -484,6 +505,8 @@ function AchievementsSection({
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
+  const t = useTheme();
+  const statStyles = useMemo(() => makeStatStyles(t), [t]);
   return (
     <View style={statStyles.card}>
       <Text style={statStyles.value}>{value}</Text>
@@ -493,6 +516,8 @@ function StatCard({ label, value }: { label: string; value: string }) {
 }
 
 function InsightCard({ title, value, note }: { title: string; value: string; note: string }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   return (
     <View style={styles.insightCard}>
       <Text style={styles.insightTitle}>{title}</Text>
@@ -503,6 +528,8 @@ function InsightCard({ title, value, note }: { title: string; value: string; not
 }
 
 function EmptyCard({ text }: { text: string }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   return (
     <View style={styles.emptyCard}>
       <Text style={styles.emptyText}>{text}</Text>
@@ -510,23 +537,25 @@ function EmptyCard({ text }: { text: string }) {
   );
 }
 
-const statStyles = StyleSheet.create({
+const makeStatStyles = (t: Theme) => StyleSheet.create({
   card: {
     flexBasis: '48%',
-    backgroundColor: '#fafafa',
-    borderRadius: 16,
+    backgroundColor: t.color.surface,
+    borderRadius: t.radius.md,
     padding: 16,
     alignItems: 'center',
     gap: 4,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
-  value: { fontSize: 28, fontWeight: '800', color: '#e53935' },
-  label: { fontSize: 13, color: '#888', fontWeight: '600' },
+  value: { fontSize: 28, fontFamily: t.font.display, color: t.color.accent },
+  label: { fontSize: 13, color: t.color.textSecondary, fontFamily: t.font.bodySemibold },
 });
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   scroll: { padding: 24, gap: 24 },
   profileTitleRow: {
@@ -534,42 +563,34 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  profileTitle: { fontSize: 38, lineHeight: 44, fontWeight: '900', color: '#21160d' },
-  profileEdit: { fontSize: 18, fontWeight: '800', color: '#5e4a3f' },
+  profileTitle: { fontSize: 38, lineHeight: 44, fontFamily: t.font.display, color: t.color.textPrimary },
+  profileEdit: { fontSize: 18, fontFamily: t.font.bodyBold, color: t.color.accent },
   profileEditDisabled: { opacity: 0.4 },
   avatarCard: {
     alignItems: 'center',
     gap: 14,
     paddingHorizontal: 24,
     paddingVertical: 34,
-    borderRadius: 32,
-    backgroundColor: '#fff8e9',
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f4e4ca',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.12,
-    shadowRadius: 22,
-    shadowOffset: { width: 0, height: 10 },
-    elevation: 5,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   avatarMeta: { alignItems: 'center', gap: 8 },
   inlineEdit: { width: '100%', gap: 12, paddingHorizontal: 4, alignItems: 'center' },
   catGrid: { width: '100%', flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center' },
   editActions: { width: '100%', flexDirection: 'row', gap: 12 },
-  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, borderWidth: 1.5, borderColor: '#e0e0e0', alignItems: 'center' },
-  cancelBtnText: { fontSize: 15, fontWeight: '700', color: '#888' },
-  saveBtn: { flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: '#e53935', alignItems: 'center' },
-  saveBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  cancelBtn: { flex: 1, paddingVertical: 12, borderRadius: t.radius.md, borderWidth: 1.5, borderColor: t.color.border, alignItems: 'center' },
+  cancelBtnText: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.textSecondary },
+  saveBtn: { flex: 1, paddingVertical: 12, borderRadius: t.radius.md, backgroundColor: t.color.accent, alignItems: 'center' },
+  saveBtnText: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   avatarRing: {
     width: 132,
     height: 132,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 7 },
-    elevation: 5,
+    ...t.shadow.glow(t.color.accent),
   },
   avatarRingSvg: { position: 'absolute' },
   avatarCore: {
@@ -578,82 +599,83 @@ const styles = StyleSheet.create({
     borderRadius: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff9ec',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 6,
-    borderColor: '#fff',
+    borderColor: t.color.surface,
   },
   avatarEmoji: { fontSize: 54, lineHeight: 64 },
-  displayName: { fontSize: 28, lineHeight: 34, fontWeight: '900', color: '#21160d', textAlign: 'center' },
+  displayName: { fontSize: 28, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary, textAlign: 'center' },
   levelPill: {
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 5,
-    backgroundColor: '#ead9ff',
+    backgroundColor: t.color.surfaceAlt,
   },
-  levelPillText: { fontSize: 14, fontWeight: '900', color: '#68408e' },
+  levelPillText: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.purple },
   levelProgressText: {
     marginTop: 6,
     fontSize: 15,
-    fontWeight: '800',
-    color: '#8d7768',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
     textAlign: 'center',
   },
   section: { gap: 12 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: '#aaa', letterSpacing: 0.8, textTransform: 'uppercase' },
+  sectionTitle: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  loadingCard: { paddingVertical: 28, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#f0f0f0' },
-  emptyCard: { borderRadius: 16, padding: 18, backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#f0f0f0' },
-  emptyText: { fontSize: 14, lineHeight: 21, color: '#777' },
-  insightCard: { borderRadius: 16, padding: 18, gap: 6, backgroundColor: '#fff7f5', borderWidth: 1, borderColor: '#f4d7d4' },
-  insightTitle: { fontSize: 12, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase', color: '#c26a62' },
-  insightValue: { fontSize: 20, fontWeight: '800', color: '#222' },
-  insightNote: { fontSize: 13, color: '#777' },
-  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#f0f0f0', gap: 12 },
-  listRowText: { fontSize: 16, color: '#222', flex: 1 },
-  listRowChevron: { fontSize: 14, color: '#999' },
+  loadingCard: { paddingVertical: 28, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
+  emptyCard: { borderRadius: t.radius.md, padding: 18, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
+  emptyText: { fontSize: 14, lineHeight: 21, fontFamily: t.font.body, color: t.color.textSecondary },
+  insightCard: { borderRadius: t.radius.md, padding: 18, gap: 6, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
+  insightTitle: { fontSize: 12, fontFamily: t.font.bodyBold, letterSpacing: 0.8, textTransform: 'uppercase', color: t.color.accent },
+  insightValue: { fontSize: 20, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  insightNote: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
+  listRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.color.border, gap: 12 },
+  listRowText: { fontSize: 16, fontFamily: t.font.body, color: t.color.textPrimary, flex: 1 },
+  listRowChevron: { fontSize: 14, fontFamily: t.font.bodySemibold, color: t.color.accent },
   catBtn: {
     width: 56,
     height: 56,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 2,
-    borderColor: '#eee',
+    borderColor: t.color.border,
   },
-  catBtnSelected: { borderColor: '#e53935', backgroundColor: '#fff0f0' },
+  catBtnSelected: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
   catEmoji: { fontSize: 28 },
   nameInput: {
     width: '100%',
     height: 52,
-    borderRadius: 14,
+    borderRadius: t.radius.md,
     borderWidth: 1.5,
-    borderColor: '#e0e0e0',
+    borderColor: t.color.border,
     paddingHorizontal: 16,
     fontSize: 17,
-    color: '#222',
-    backgroundColor: '#fafafa',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
+    backgroundColor: t.color.surfaceAlt,
   },
 });
 
 const BADGE_SIZE = (SCREEN_WIDTH - 48 - 24) / 4; // 4 cols, 24px side padding, 3×8px gaps
 
-const achStyles = StyleSheet.create({
+const makeAchStyles = (t: Theme) => StyleSheet.create({
   headerButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
   },
-  headerArrow: { fontSize: 20, color: '#e53935', fontWeight: '800' },
+  headerArrow: { fontSize: 20, color: t.color.accent, fontFamily: t.font.bodyBold },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   badge: {
     width: BADGE_SIZE,
     height: BADGE_SIZE,
-    borderRadius: 16,
-    backgroundColor: '#fff6e7',
+    borderRadius: t.radius.md,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0d7a0',
+    borderColor: t.color.border,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 8,
@@ -661,7 +683,7 @@ const achStyles = StyleSheet.create({
   },
   badgeLocked: { opacity: 0.38 },
   badgeEmoji: { fontSize: 24 },
-  badgeTitle: { fontSize: 10, fontWeight: '700', color: '#8b6a1d', textAlign: 'center', lineHeight: 13 },
+  badgeTitle: { fontSize: 10, fontFamily: t.font.bodyBold, color: t.color.amber, textAlign: 'center', lineHeight: 13 },
   // liquid glass modal
   modalCenter: {
     flex: 1,
@@ -671,10 +693,10 @@ const achStyles = StyleSheet.create({
   },
   glassCard: {
     width: SCREEN_WIDTH - 64,
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.55)',
+    borderColor: t.color.border,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.22,
@@ -687,32 +709,32 @@ const achStyles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 28,
     paddingVertical: 36,
-    backgroundColor: 'rgba(255,255,255,0.35)',
+    backgroundColor: t.isDark ? 'rgba(26,19,48,0.55)' : 'rgba(255,255,255,0.35)',
   },
   glassEmoji: { fontSize: 56, lineHeight: 68 },
-  glassTitle: { fontSize: 22, fontWeight: '800', color: '#222', textAlign: 'center' },
-  glassDesc: { fontSize: 15, color: '#555', textAlign: 'center', lineHeight: 22 },
+  glassTitle: { fontSize: 22, fontFamily: t.font.display, color: t.color.textPrimary, textAlign: 'center' },
+  glassDesc: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary, textAlign: 'center', lineHeight: 22 },
   glassPill: {
     marginTop: 8,
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(229,57,53,0.12)',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.accentSoft,
     borderWidth: 1,
-    borderColor: 'rgba(229,57,53,0.2)',
+    borderColor: t.color.accent,
   },
-  glassPillText: { fontSize: 12, fontWeight: '700', color: '#e53935' },
+  glassPillText: { fontSize: 12, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   glassPillLocked: {
     marginTop: 8,
     paddingHorizontal: 14,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.06)',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.1)',
+    borderColor: t.color.border,
   },
-  glassPillLockedText: { fontSize: 12, fontWeight: '700', color: '#999' },
-  sheetContainer: { flex: 1, backgroundColor: '#fff' },
+  glassPillLockedText: { fontSize: 12, fontFamily: t.font.bodyBold, color: t.color.textTertiary },
+  sheetContainer: { flex: 1, backgroundColor: t.color.bg },
   sheetHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -720,9 +742,9 @@ const achStyles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: t.color.border,
   },
-  sheetTitle: { fontSize: 16, fontWeight: '800', color: '#222' },
-  sheetClose: { fontSize: 16, fontWeight: '600', color: '#e53935' },
+  sheetTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  sheetClose: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.accent },
   sheetScroll: { padding: 24 },
 });

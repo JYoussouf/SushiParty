@@ -18,9 +18,12 @@ import Animated, {
   withSequence,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { useSession } from '../../src/hooks/useSession';
@@ -28,6 +31,7 @@ import { useMenu } from '../../src/hooks/useMenu';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
 import { submitSession } from '../../src/lib/cloudflare/sessions';
+import { prepareInterstitial } from '../../src/lib/ads';
 import { getRestaurantStats } from '../../src/lib/local/restaurantStats';
 import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
 import { getSessionTemplates } from '../../src/lib/local/templates';
@@ -38,21 +42,10 @@ const logPartyFlow = (...args: unknown[]) => {
   console.log('[party-flow]', Date.now(), ...args);
 };
 
-function getCategoryChipColors(category: string): { bg: string; text: string } {
-  const map: Record<string, { bg: string; text: string }> = {
-    nigiri:  { bg: '#ffe5e0', text: '#b3372d' },
-    sashimi: { bg: '#fbe0e0', text: '#7a1a1a' },
-    maki:    { bg: '#ffeed6', text: '#8a4a14' },
-    roll:    { bg: '#dbeaf5', text: '#1d5582' },
-    side:    { bg: '#ecf3d4', text: '#4d6b1c' },
-    hot:     { bg: '#ffeed6', text: '#8a4a14' },
-    soup:    { bg: '#ffeed6', text: '#8a4a14' },
-  };
-  return map[category.toLowerCase()] ?? { bg: 'rgba(40,22,12,0.07)', text: '#4a3624' };
-}
-
 export default function ScoreboardScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const { restaurant, clearRestaurant, setRestaurant } = useRestaurant();
   const {
@@ -90,6 +83,9 @@ export default function ScoreboardScreen() {
 
   useEffect(() => {
     logPartyFlow('scoreboard mounted');
+    // Warm up the post-party ad while the party is happening, so it shows
+    // instantly at the summary (no-op unless ads are enabled).
+    prepareInterstitial();
     return () => logPartyFlow('scoreboard unmounted');
   }, []);
 
@@ -148,7 +144,7 @@ export default function ScoreboardScreen() {
           ? catItems.find((catItem) => getCount(catItem.id) > 0)
           : item;
       const emoji = getItemEmoji(item.imageKey, item.category);
-      const chip = getCategoryChipColors(item.category);
+      const cat = t.category(item.category);
 
       return (
         <View key={item.id} style={styles.itemCard}>
@@ -158,8 +154,8 @@ export default function ScoreboardScreen() {
             </View>
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{displayName}</Text>
-              <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
-                <Text style={[styles.itemChipText, { color: chip.text }]}>
+              <View style={[styles.itemChip, { backgroundColor: t.color.surfaceAlt }]}>
+                <Text style={[styles.itemChipText, { color: cat.accent }]}>
                   {getCategoryLabel(item.category)}
                 </Text>
               </View>
@@ -179,24 +175,30 @@ export default function ScoreboardScreen() {
               </Text>
             </View>
             <TouchableOpacity
-              style={styles.stepperPlus}
               onPress={() => void increment(item.id)}
               disabled={!currentUserCanEditActive}
             >
-              <Text style={styles.stepperPlusText}>+</Text>
+              <LinearGradient
+                colors={cat.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.stepperPlus}
+              >
+                <Text style={styles.stepperPlusText}>+</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
       );
     });
-  }, [categorized, getCount, increment, decrement, currentUserCanEditActive]);
+  }, [categorized, getCount, increment, decrement, currentUserCanEditActive, styles, t]);
 
   // Detailed mode: sectioned list with same card+stepper UX
   const detailedList = useMemo(() => {
     return Object.entries(categorized).map(([cat, catItems]) => {
       const items = catItems.filter((item) => !item.id.endsWith('-any'));
       const displayItems = items.length > 0 ? items : catItems;
-      const chip = getCategoryChipColors(cat);
+      const catVisual = t.category(cat);
 
       return (
         <View key={cat} style={styles.detailedSection}>
@@ -213,8 +215,8 @@ export default function ScoreboardScreen() {
                     </View>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName}>{item.name}</Text>
-                      <View style={[styles.itemChip, { backgroundColor: chip.bg }]}>
-                        <Text style={[styles.itemChipText, { color: chip.text }]}>
+                      <View style={[styles.itemChip, { backgroundColor: t.color.surfaceAlt }]}>
+                        <Text style={[styles.itemChipText, { color: catVisual.accent }]}>
                           {getCategoryLabel(item.category)}
                         </Text>
                       </View>
@@ -234,11 +236,17 @@ export default function ScoreboardScreen() {
                       </Text>
                     </View>
                     <TouchableOpacity
-                      style={styles.stepperPlus}
                       onPress={() => void increment(item.id)}
                       disabled={!currentUserCanEditActive}
                     >
-                      <Text style={styles.stepperPlusText}>+</Text>
+                      <LinearGradient
+                        colors={catVisual.gradient}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.stepperPlus}
+                      >
+                        <Text style={styles.stepperPlusText}>+</Text>
+                      </LinearGradient>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -248,7 +256,7 @@ export default function ScoreboardScreen() {
         </View>
       );
     });
-  }, [categorized, getCount, increment, decrement, currentUserCanEditActive]);
+  }, [categorized, getCount, increment, decrement, currentUserCanEditActive, styles, t]);
 
   const persistSession = async (flagged: boolean) => {
     if (!userProfile) {
@@ -275,6 +283,7 @@ export default function ScoreboardScreen() {
       clearRestaurant();
       setShowAnomalyModal(false);
       setPendingSubmit(null);
+
       if (!restaurant?.id) {
         router.replace({
           pathname: '/session/restaurant-confirm',
@@ -349,8 +358,10 @@ export default function ScoreboardScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
       {/* Header: back | center */}
       <View style={styles.header}>
@@ -556,14 +567,20 @@ export default function ScoreboardScreen() {
             ]}
             disabled={sessionTotalPieces === 0 || submitting}
             onPress={() => void handleSubmit()}
+            activeOpacity={0.85}
           >
-            {submitting ? (
-              <ActivityIndicator color="#fffaf2" />
-            ) : (
-              <>
-                <Text style={styles.submitBtnText}>Party's Over!</Text>
-              </>
-            )}
+            <LinearGradient
+              colors={(sessionTotalPieces === 0 || submitting) ? [t.color.surfaceAlt, t.color.surfaceAlt] : t.color.accentGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.submitBtnInner}
+            >
+              {submitting ? (
+                <ActivityIndicator color={t.color.onAccent} />
+              ) : (
+                <Text style={[styles.submitBtnText, sessionTotalPieces === 0 && styles.submitBtnTextDisabled]}>Party's Over!</Text>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -603,7 +620,7 @@ export default function ScoreboardScreen() {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fffaf2" />
+                  <ActivityIndicator color={t.color.onAccent} />
                 ) : (
                   <Text style={styles.anomalyPrimaryText}>Yes, submit it</Text>
                 )}
@@ -612,14 +629,18 @@ export default function ScoreboardScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fffaf2',
+    backgroundColor: t.color.bg,
+  },
+  safe: {
+    flex: 1,
   },
 
   // ── Header ──────────────────────────────────────────────
@@ -630,7 +651,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(40,22,12,0.07)',
+    borderBottomColor: t.color.border,
   },
   headerSpacer: {
     width: 40,
@@ -643,15 +664,15 @@ const styles = StyleSheet.create({
   },
   headerRestaurant: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#7a6452',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   headerTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
     marginTop: 2,
     letterSpacing: -0.2,
   },
@@ -666,22 +687,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fdf3e3',
-    borderRadius: 28,
+    backgroundColor: t.color.surface,
+    borderRadius: t.radius.lg,
     paddingHorizontal: 20,
     paddingVertical: 18,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.06)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.10,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 3,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   tallyEyebrow: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#7a6452',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -693,16 +710,16 @@ const styles = StyleSheet.create({
   },
   tallyNum: {
     fontSize: 44,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.display,
+    color: t.color.accent,
     letterSpacing: -1,
     lineHeight: 48,
     includeFontPadding: false,
   },
   tallyUnit: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#7a6452',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
   },
   avatarStack: {
     flexDirection: 'row',
@@ -712,14 +729,14 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f7e9d2',
+    backgroundColor: t.color.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#fdf3e3',
+    borderColor: t.color.surface,
   },
   avatarFirst: {
-    borderColor: '#ee5d52',
+    borderColor: t.color.accent,
   },
   avatarOverlap: {
     marginLeft: -10,
@@ -729,12 +746,12 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   avatarExtraBubble: {
-    backgroundColor: '#ffffff',
+    backgroundColor: t.color.surfaceAlt,
   },
   avatarExtraText: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#4a3624',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textSecondary,
   },
 
   // ── Segmented control ───────────────────────────────────
@@ -746,37 +763,32 @@ const styles = StyleSheet.create({
   },
   modePill: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(40,22,12,0.06)',
-    borderRadius: 999,
+    backgroundColor: t.color.surfaceAlt,
+    borderRadius: t.radius.pill,
     padding: 4,
     gap: 2,
   },
   modeBtn: {
     paddingVertical: 8,
     paddingHorizontal: 20,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
     zIndex: 1,
   },
   modeBtnActive: {
-    backgroundColor: '#ffffff',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 2,
+    backgroundColor: t.color.accent,
   },
   modeBtnText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: '#7a6452',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
     letterSpacing: -0.1,
   },
   modeBtnTextActive: {
-    color: '#21160d',
-    fontWeight: '700',
+    color: t.color.onAccent,
+    fontFamily: t.font.bodyBold,
   },
 
   // ── Templates ───────────────────────────────────────────
@@ -787,31 +799,31 @@ const styles = StyleSheet.create({
   },
   templateChip: {
     minWidth: 156,
-    borderRadius: 20,
+    borderRadius: t.radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: '#ffffff',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.08)',
+    borderColor: t.color.border,
     gap: 2,
   },
   templateChipTitle: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   templateChipMeta: {
     fontSize: 12,
-    color: '#7a6452',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
 
   // ── Participants ────────────────────────────────────────
   participantBar: {
     paddingVertical: 10,
-    backgroundColor: '#fffaf2',
     borderTopWidth: 1,
     borderBottomWidth: 1,
-    borderColor: 'rgba(40,22,12,0.06)',
+    borderColor: t.color.border,
   },
   participantTrack: {
     paddingHorizontal: 16,
@@ -825,14 +837,14 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
     paddingRight: 5,
     paddingVertical: 5,
-    borderRadius: 20,
-    backgroundColor: '#ffffff',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.10)',
+    borderColor: t.color.border,
   },
   participantItemActive: {
-    backgroundColor: '#ffe5e0',
-    borderColor: '#ee5d52',
+    backgroundColor: t.color.accentSoft,
+    borderColor: t.color.accent,
   },
   participantScore: {
     minWidth: 30,
@@ -840,30 +852,30 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     paddingHorizontal: 9,
     borderRadius: 15,
-    backgroundColor: '#f7efe3',
+    backgroundColor: t.color.surfaceAlt,
     justifyContent: 'center',
     alignItems: 'center',
   },
   participantScoreActive: {
-    backgroundColor: 'rgba(255,250,242,0.95)',
+    backgroundColor: t.color.surface,
   },
   participantName: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#4a3624',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textSecondary,
     lineHeight: 20,
   },
   participantNameActive: {
-    color: '#b3372d',
+    color: t.color.accent,
   },
   participantTotal: {
     fontSize: 12,
-    color: '#7a6452',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textSecondary,
     lineHeight: 16,
-    fontWeight: '700',
   },
   participantTotalActive: {
-    color: '#ee5d52',
+    color: t.color.accent,
   },
 
   // ── View-only banner ────────────────────────────────────
@@ -872,14 +884,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    borderRadius: 14,
-    backgroundColor: '#ffeed6',
+    borderRadius: t.radius.md,
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
-    borderColor: 'rgba(243,176,107,0.4)',
+    borderColor: t.color.border,
   },
   viewOnlyText: {
     fontSize: 13,
-    color: '#8a4a14',
+    fontFamily: t.font.body,
+    color: t.color.amber,
   },
 
   // ── Item list (simple mode) ─────────────────────────────
@@ -893,18 +906,14 @@ const styles = StyleSheet.create({
   itemCard: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    backgroundColor: '#ffffff',
-    borderRadius: 18,
+    backgroundColor: t.color.surface,
+    borderRadius: t.radius.md,
     paddingLeft: 14,
     paddingRight: 0,
     paddingVertical: 0,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.06)',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderColor: t.color.border,
+    ...t.shadow.card,
     overflow: 'hidden',
     minHeight: 68,
   },
@@ -920,11 +929,11 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: '#fdf3e3',
+    backgroundColor: t.color.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.07)',
+    borderColor: t.color.border,
   },
   itemEmojiText: {
     fontSize: 22,
@@ -937,19 +946,19 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#21160d',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textPrimary,
     letterSpacing: -0.1,
   },
   itemChip: {
     alignSelf: 'flex-start',
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   itemChipText: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: t.font.bodyBold,
     letterSpacing: 0.1,
   },
 
@@ -963,52 +972,53 @@ const styles = StyleSheet.create({
     width: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2f1e14',
+    backgroundColor: t.color.surfaceAlt,
   },
   stepperMinusDisabled: {
-    backgroundColor: '#4a3424',
+    backgroundColor: t.color.surfaceAlt,
+    opacity: 0.5,
   },
   stepperMinusText: {
     fontSize: 22,
-    fontWeight: '500',
-    color: '#fffaf2',
+    fontFamily: t.font.bodyMedium,
+    color: t.color.textPrimary,
     lineHeight: 24,
     includeFontPadding: false,
   },
   stepperMinusTextDisabled: {
-    color: '#7a5e50',
+    color: t.color.textTertiary,
   },
   stepperCount: {
     minWidth: 44,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 6,
-    backgroundColor: '#ffffff',
+    backgroundColor: t.color.surface,
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderColor: 'rgba(40,22,12,0.10)',
+    borderColor: t.color.border,
   },
   stepperCountActive: {
-    backgroundColor: '#ffffff',
+    backgroundColor: t.color.surface,
   },
   stepperCountText: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#d0cbc6',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textTertiary,
   },
   stepperCountTextActive: {
-    color: '#2f1e14',
+    color: t.color.textPrimary,
   },
   stepperPlus: {
     width: 52,
+    alignSelf: 'stretch',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ee5d52',
   },
   stepperPlusText: {
     fontSize: 24,
-    fontWeight: '400',
-    color: '#fffaf2',
+    fontFamily: t.font.bodyMedium,
+    color: t.color.onAccent,
     lineHeight: 26,
     includeFontPadding: false,
   },
@@ -1019,8 +1029,8 @@ const styles = StyleSheet.create({
   },
   categoryHeader: {
     fontSize: 11,
-    fontWeight: '700',
-    color: '#ad9886',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textTertiary,
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     paddingHorizontal: 8,
@@ -1042,22 +1052,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 10,
     paddingBottom: 28,
-    backgroundColor: 'rgba(255,250,242,0.96)',
+    backgroundColor: t.color.surface,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(40,22,12,0.07)',
+    borderTopColor: t.color.border,
     gap: 8,
   },
   menuToggle: {
     alignSelf: 'center',
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: '#ffe5e0',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.accentSoft,
   },
   menuToggleText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#b3372d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
   footerActions: {
     flexDirection: 'row',
@@ -1066,84 +1076,76 @@ const styles = StyleSheet.create({
   resetBtn: {
     flex: 1,
     height: 54,
-    borderRadius: 999,
-    backgroundColor: '#ffffff',
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.12)',
+    borderColor: t.color.border,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    ...t.shadow.card,
   },
   resetBtnText: {
     fontSize: 15,
-    color: '#4a3624',
-    fontWeight: '600',
+    color: t.color.textSecondary,
+    fontFamily: t.font.bodySemibold,
   },
   submitBtn: {
     flex: 2,
     height: 54,
-    borderRadius: 999,
-    backgroundColor: '#2a1a10',
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
+  submitBtnInner: {
+    flex: 1,
+    borderRadius: t.radius.button,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    shadowColor: '#28160c',
-    shadowOpacity: 0.40,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 6,
   },
   submitBtnDisabled: {
-    backgroundColor: 'rgba(40,22,12,0.20)',
     shadowOpacity: 0,
     elevation: 0,
   },
-  submitBtnCheck: {
-    fontSize: 16,
-    color: '#fffaf2',
-    fontWeight: '700',
-  },
   submitBtnText: {
     fontSize: 16,
-    color: '#fffaf2',
-    fontWeight: '700',
+    color: t.color.onAccent,
+    fontFamily: t.font.bodyBold,
     letterSpacing: -0.2,
+  },
+  submitBtnTextDisabled: {
+    color: t.color.textTertiary,
   },
 
   // ── Anomaly modal ───────────────────────────────────────
   anomalyBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(40,22,12,0.45)',
+    backgroundColor: 'rgba(0,0,0,0.55)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   anomalyCard: {
     width: '100%',
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 22,
     gap: 10,
-    backgroundColor: '#fffaf2',
-    shadowColor: '#28160c',
-    shadowOpacity: 0.18,
-    shadowRadius: 40,
-    shadowOffset: { width: 0, height: 18 },
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   anomalyTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#21160d',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
     letterSpacing: -0.3,
   },
   anomalyText: {
     fontSize: 14,
     lineHeight: 21,
-    color: '#7a6452',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   anomalyActions: {
     flexDirection: 'row',
@@ -1152,33 +1154,29 @@ const styles = StyleSheet.create({
   },
   anomalySecondary: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: t.radius.button,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: 'rgba(40,22,12,0.12)',
+    borderColor: t.color.border,
   },
   anomalySecondaryText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#4a3624',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
   },
   anomalyPrimary: {
     flex: 1,
-    borderRadius: 999,
+    borderRadius: t.radius.button,
     paddingVertical: 14,
     alignItems: 'center',
-    backgroundColor: '#ee5d52',
-    shadowColor: '#ee5d52',
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
+    backgroundColor: t.color.accent,
+    ...t.shadow.glow(t.color.accent),
   },
   anomalyPrimaryText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fffaf2',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
 });

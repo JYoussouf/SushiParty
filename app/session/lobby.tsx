@@ -25,9 +25,12 @@ import Animated, {
   withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { CAT_AVATARS } from '../../src/lib/catAvatars';
 import { useSession } from '../../src/hooks/useSession';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 
 const EMOTES = ['👋', '🎉', '🍣', '🔥', '😂'] as const;
 
@@ -49,6 +52,8 @@ function AnimatedEmote({
   progress: SharedValue<number>;
   onPress: () => void;
 }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const style = useAnimatedStyle(() => {
     const start = (index + 1) * 0.1;
     const p = Math.max(0, Math.min(1, (progress.value - start) / (1 - start)));
@@ -70,6 +75,8 @@ function AnimatedEmote({
 const SPRING_CFG = { damping: 32, stiffness: 260, mass: 1 };
 
 function ReactionToggle({ onEmote }: { onEmote: (emoji: string) => void }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const progress = useSharedValue(0);
   const openRef = useRef(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -119,6 +126,8 @@ function FloatingEmote({
   travel: number;
   onDone: (id: string) => void;
 }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const progress = useSharedValue(0);
 
   React.useEffect(() => {
@@ -166,6 +175,8 @@ export default function LobbyScreen() {
     setMode,
   } = useSession();
   const isHost = !!userProfile && userProfile.uid === groupOwnerUid;
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
 
   const [emoteBursts, setEmoteBursts] = useState<
     Array<{ id: string; emoji: string; originX: number; originY: number; drift: number }>
@@ -221,8 +232,10 @@ export default function LobbyScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.navBar}>
         <BackButton onPress={confirmLeave} />
       </View>
@@ -286,14 +299,22 @@ export default function LobbyScreen() {
 
         <TouchableOpacity
           style={styles.startButton}
+          activeOpacity={0.85}
           onPress={() => {
             logPartyFlow('lobby start pressed, replace party-intro', { groupCode, groupSessionId });
             router.replace('/session/party-intro');
           }}
         >
-          <Text style={styles.startButtonText}>
-            {isHost ? 'Start the Party 🍣' : 'Join the Scoreboard 🍣'}
-          </Text>
+          <LinearGradient
+            colors={t.color.accentGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.startButtonInner}
+          >
+            <Text style={styles.startButtonText}>
+              {isHost ? 'Start the Party 🍣' : 'Join the Scoreboard 🍣'}
+            </Text>
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
       <View pointerEvents="none" style={styles.reactionOverlay}>
@@ -310,36 +331,38 @@ export default function LobbyScreen() {
           />
         ))}
       </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff5ec' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   navBar: { paddingHorizontal: 16, paddingVertical: 8 },
   scroll: { padding: 20, gap: 18, paddingBottom: 30 },
   hero: {
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 22,
     gap: 8,
-    backgroundColor: '#ffe4d1',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#f5c6aa',
+    borderColor: t.color.border,
   },
   eyebrow: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: t.font.bodyBold,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: '#c46738',
+    color: t.color.accent,
   },
-  title: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: '#2d2019' },
+  title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
   codeCard: {
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 18,
-    backgroundColor: '#fffdf9',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -347,54 +370,50 @@ const styles = StyleSheet.create({
   },
   codeLabel: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: t.font.bodyBold,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: '#aa6a49',
+    color: t.color.textSecondary,
   },
-  codeValue: { marginTop: 6, fontSize: 28, fontWeight: '900', letterSpacing: 3, color: '#df5a31' },
+  codeValue: { marginTop: 6, fontSize: 28, fontFamily: t.font.display, letterSpacing: 3, color: t.color.accent },
   qrFrame: {
-    borderRadius: 20,
+    borderRadius: t.radius.md,
     padding: 10,
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#ead5ca',
+    borderColor: t.color.border,
   },
-  qrHint: { marginTop: -6, fontSize: 13, color: '#7f695d' },
+  qrHint: { marginTop: -6, fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
   section: { gap: 10 },
-  sectionTitle: { fontSize: 21, fontWeight: '900', color: '#2d2019' },
+  sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
   participantList: { gap: 10 },
   participantCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 20,
+    borderRadius: t.radius.md,
     padding: 14,
-    backgroundColor: '#fffdf9',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
   },
-  participantCardMe: { borderColor: '#f0a57f', backgroundColor: '#fff6ef' },
+  participantCardMe: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
   participantAvatar: { fontSize: 30 },
   participantBody: { flex: 1, gap: 2 },
   participantNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  participantName: { flexShrink: 1, fontSize: 16, fontWeight: '800', color: '#2d2019' },
+  participantName: { flexShrink: 1, fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   reactionPill: {
     height: 34,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 3,
     gap: 1,
-    backgroundColor: 'rgba(255, 253, 249, 0.88)',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
-    borderColor: 'rgba(239, 216, 202, 0.95)',
-    shadowColor: '#c46738',
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   waveButton: {
     width: 28,
@@ -416,14 +435,14 @@ const styles = StyleSheet.create({
   avatarButton: {
     width: 48,
     height: 48,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
   },
-  avatarButtonSelected: { borderColor: '#df5a31', backgroundColor: '#fff0e6' },
+  avatarButtonSelected: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
   avatarButtonText: { fontSize: 24 },
   reactionOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -436,10 +455,13 @@ const styles = StyleSheet.create({
   floatingEmoteText: { fontSize: 36 },
   startButton: {
     marginTop: 8,
-    borderRadius: 999,
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
+  startButtonInner: {
+    borderRadius: t.radius.button,
     paddingVertical: 17,
     alignItems: 'center',
-    backgroundColor: '#2d2019',
   },
-  startButtonText: { fontSize: 16, fontWeight: '900', color: '#fff7f1' },
+  startButtonText: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.onAccent },
 });

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -12,6 +12,8 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { SushiPartyLogo } from './SushiPartyLogo';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../theme/themes';
 
 interface PartySplashProps {
   onFinish: () => void;
@@ -25,6 +27,8 @@ const logPartyFlow = (...args: unknown[]) => {
 };
 
 export function PartySplash({ onFinish, duration = 3400 }: PartySplashProps) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const contentOpacity = useSharedValue(1);
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.82);
@@ -115,6 +119,8 @@ function OrbitingBite({
   index: number;
   progress: SharedValue<number>;
 }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const style = useAnimatedStyle(() => {
     const angle = (progress.value * Math.PI * 2) + (index * Math.PI) / 2;
     return {
@@ -133,10 +139,10 @@ function OrbitingBite({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1a0f0a',
+    backgroundColor: t.color.bg,
   },
   content: {
     flex: 1,
@@ -150,7 +156,7 @@ const styles = StyleSheet.create({
     width: 280,
     height: 280,
     borderRadius: 140,
-    backgroundColor: '#fdd835',
+    backgroundColor: t.color.accentSoft,
   },
   logoWrap: {
     alignItems: 'center',
@@ -178,14 +184,14 @@ const styles = StyleSheet.create({
   loadingTrack: {
     width: 168,
     height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(255,250,242,0.22)',
+    borderRadius: t.radius.sm,
+    backgroundColor: t.color.border,
     overflow: 'hidden',
   },
   loadingFill: {
     width: '100%',
     height: '100%',
-    borderRadius: 4,
-    backgroundColor: '#e53935',
+    borderRadius: t.radius.sm,
+    backgroundColor: t.color.accent,
   },
 });

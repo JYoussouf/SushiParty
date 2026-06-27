@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,13 +13,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { SushiPartyLogo } from '../../src/components';
 
 type CredentialMode = 'sign-in' | 'create';
+type Styles = ReturnType<typeof makeStyles>;
 
 // iOS OAuth client ID from Google Cloud Console (Application type: iOS, Bundle ID: com.joseppy.sushiparty)
 const GOOGLE_IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID;
@@ -31,6 +35,8 @@ const facebookConfigured = !!FACEBOOK_APP_ID && !FACEBOOK_APP_ID.startsWith('you
 
 export default function LoginScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { signIn, signUp, signInWithAppleOAuth, signInWithGoogleCode, signInWithFacebookOAuth } = useAuth();
   const [credentialMode, setCredentialMode] = useState<CredentialMode>('sign-in');
   const [credentialsOpen, setCredentialsOpen] = useState(false);
@@ -154,8 +160,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
       <View style={styles.content}>
         {/* Hero */}
@@ -173,6 +181,7 @@ export default function LoginScreen() {
             textColor="#fff"
             onPress={handleAppleSignIn}
             disabled={loading}
+            styles={styles}
           />
           {googleConfigured && (
             <SocialButton
@@ -184,6 +193,7 @@ export default function LoginScreen() {
               borderColor="#e0e0e0"
               onPress={handleGoogleSignIn}
               disabled={loading}
+              styles={styles}
             />
           )}
           {facebookConfigured && (
@@ -195,6 +205,7 @@ export default function LoginScreen() {
               textColor="#fff"
               onPress={handleFacebookSignIn}
               disabled={loading}
+              styles={styles}
             />
           )}
         </View>
@@ -209,12 +220,19 @@ export default function LoginScreen() {
         {/* Email options */}
         <View style={styles.emailGroup}>
           <TouchableOpacity
-            style={[styles.emailBtn, styles.emailBtnPrimary]}
+            style={styles.emailBtnPrimaryShadow}
             onPress={() => openCredentials('sign-in')}
             disabled={loading}
             activeOpacity={0.82}
           >
-            <Text style={styles.emailBtnTextPrimary}>Sign in with email</Text>
+            <LinearGradient
+              colors={t.color.accentGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.emailBtn, styles.emailBtnPrimary]}
+            >
+              <Text style={styles.emailBtnTextPrimary}>Sign in with email</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.emailBtn, styles.emailBtnSecondary]}
@@ -258,7 +276,7 @@ export default function LoginScreen() {
                     value={displayName}
                     onChangeText={setDisplayName}
                     placeholder="Display name"
-                    placeholderTextColor="#bbb"
+                    placeholderTextColor={t.color.textTertiary}
                     autoCapitalize="words"
                     autoCorrect={false}
                     spellCheck={false}
@@ -270,7 +288,7 @@ export default function LoginScreen() {
                     value={username}
                     onChangeText={(v) => setUsername(v.toLowerCase())}
                     placeholder="username"
-                    placeholderTextColor="#bbb"
+                    placeholderTextColor={t.color.textTertiary}
                     autoCapitalize="none"
                     autoCorrect={false}
                     maxLength={20}
@@ -283,7 +301,7 @@ export default function LoginScreen() {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="Email"
-                placeholderTextColor="#bbb"
+                placeholderTextColor={t.color.textTertiary}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -294,7 +312,7 @@ export default function LoginScreen() {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="Password"
-                placeholderTextColor="#bbb"
+                placeholderTextColor={t.color.textTertiary}
                 secureTextEntry
                 autoCorrect={false}
                 spellCheck={false}
@@ -308,7 +326,7 @@ export default function LoginScreen() {
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Confirm password"
-                  placeholderTextColor="#bbb"
+                  placeholderTextColor={t.color.textTertiary}
                   secureTextEntry
                   textContentType="newPassword"
                   returnKeyType="done"
@@ -317,18 +335,25 @@ export default function LoginScreen() {
               )}
 
               <TouchableOpacity
-                style={[styles.submitBtn, loading && styles.submitBtnDisabled]}
+                style={[styles.submitBtnShadow, loading && styles.submitBtnDisabled]}
                 onPress={() => void handleCredentialSubmit()}
                 disabled={loading}
                 activeOpacity={0.85}
               >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>
-                    {credentialMode === 'create' ? 'Create Account' : 'Sign In'}
-                  </Text>
-                )}
+                <LinearGradient
+                  colors={t.color.accentGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.submitBtn}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={t.color.onAccent} />
+                  ) : (
+                    <Text style={styles.submitBtnText}>
+                      {credentialMode === 'create' ? 'Create Account' : 'Sign In'}
+                    </Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -347,7 +372,8 @@ export default function LoginScreen() {
           </KeyboardAvoidingView>
         </>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -360,6 +386,7 @@ function SocialButton({
   borderColor,
   onPress,
   disabled,
+  styles,
 }: {
   label: string;
   icon: string;
@@ -369,6 +396,7 @@ function SocialButton({
   borderColor?: string;
   onPress: () => void;
   disabled?: boolean;
+  styles: Styles;
 }) {
   return (
     <TouchableOpacity
@@ -399,11 +427,12 @@ function friendlyAuthError(message: string): string {
   return message;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff8f2',
+    backgroundColor: t.color.bg,
   },
+  safe: { flex: 1 },
   content: {
     flex: 1,
     paddingHorizontal: 24,
@@ -420,8 +449,8 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: 14,
-    color: '#a07060',
-    fontWeight: '500',
+    color: t.color.textSecondary,
+    fontFamily: t.font.bodyMedium,
     letterSpacing: 0.2,
   },
 
@@ -431,15 +460,11 @@ const styles = StyleSheet.create({
   },
   socialBtn: {
     height: 54,
-    borderRadius: 16,
+    borderRadius: t.radius.md,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    shadowColor: '#1a1326',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    ...t.shadow.card,
   },
   socialBtnIconWrap: {
     width: 28,
@@ -447,7 +472,7 @@ const styles = StyleSheet.create({
   },
   socialBtnIcon: {
     fontSize: 17,
-    fontWeight: '800',
+    fontFamily: t.font.bodyBold,
     lineHeight: 20,
   },
   socialBtnLabel: {
@@ -455,7 +480,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginRight: 28,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: t.font.bodySemibold,
     letterSpacing: 0.1,
   },
   socialBtnDisabled: {
@@ -480,12 +505,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#d8c8bc',
+    backgroundColor: t.color.border,
   },
   dividerText: {
     fontSize: 13,
-    color: '#b09080',
-    fontWeight: '500',
+    color: t.color.textTertiary,
+    fontFamily: t.font.bodyMedium,
   },
 
   // ── Email buttons ─────────────────────────────────────────
@@ -494,33 +519,32 @@ const styles = StyleSheet.create({
   },
   emailBtn: {
     height: 52,
-    borderRadius: 16,
+    borderRadius: t.radius.button,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  emailBtnPrimaryShadow: {
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
   emailBtnPrimary: {
-    backgroundColor: '#e53935',
-    shadowColor: '#e53935',
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
+    width: '100%',
   },
   emailBtnSecondary: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#e53935',
+    borderColor: t.color.accent,
   },
   emailBtnTextPrimary: {
-    color: '#fff',
+    color: t.color.onAccent,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: t.font.bodyBold,
     letterSpacing: 0.1,
   },
   emailBtnTextSecondary: {
-    color: '#e53935',
+    color: t.color.accent,
     fontSize: 15,
-    fontWeight: '600',
+    fontFamily: t.font.bodySemibold,
   },
 
   // ── Bottom sheet ──────────────────────────────────────────
@@ -536,11 +560,11 @@ const styles = StyleSheet.create({
   },
   sheet: {
     maxHeight: '100%',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    backgroundColor: t.color.surface,
+    borderTopLeftRadius: t.radius.lg,
+    borderTopRightRadius: t.radius.lg,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#e8ddd8',
+    borderColor: t.color.border,
   },
   sheetContent: {
     padding: 24,
@@ -554,54 +578,53 @@ const styles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 20,
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
   },
   sheetClose: {
     fontSize: 15,
-    fontWeight: '600',
-    color: '#aaa',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textTertiary,
   },
   input: {
     height: 52,
-    borderRadius: 14,
+    borderRadius: t.radius.md,
     borderWidth: 1.5,
-    borderColor: '#e8ddd8',
-    backgroundColor: '#fdfaf8',
+    borderColor: t.color.border,
+    backgroundColor: t.color.surfaceAlt,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#222',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
+  },
+  submitBtnShadow: {
+    marginTop: 4,
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
   },
   submitBtn: {
-    marginTop: 4,
     height: 52,
-    borderRadius: 16,
-    backgroundColor: '#e53935',
+    borderRadius: t.radius.button,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#e53935',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 4,
   },
   submitBtnDisabled: {
-    backgroundColor: '#f4a09e',
+    opacity: 0.6,
     shadowOpacity: 0,
     elevation: 0,
   },
   submitBtnText: {
-    color: '#fff',
+    color: t.color.onAccent,
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: t.font.bodyBold,
   },
   modeSwitch: {
     alignItems: 'center',
     paddingVertical: 8,
   },
   modeSwitchText: {
-    color: '#e53935',
+    color: t.color.accent,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: t.font.bodySemibold,
   },
 });

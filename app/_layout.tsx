@@ -2,11 +2,24 @@ import { useEffect, useState } from 'react';
 import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useFonts, PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
+import {
+  PlayfairDisplay_500Medium,
+  PlayfairDisplay_600SemiBold,
+  PlayfairDisplay_700Bold,
+  PlayfairDisplay_600SemiBold_Italic,
+} from '@expo-google-fonts/playfair-display';
+import {
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+} from '@expo-google-fonts/inter';
 import { View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { RestaurantProvider } from '../src/contexts/RestaurantContext';
 import { SessionProvider, useSession } from '../src/contexts/SessionContext';
 import { TransitionProvider } from '../src/contexts/TransitionContext';
+import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { IntroSplash } from '../src/components';
 import { palette } from '../src/theme/pixel';
 
@@ -156,7 +169,17 @@ function RootLayoutNav() {
 
 export default function RootLayout() {
   const [introDone, setIntroDone] = useState(false);
-  const [fontsLoaded] = useFonts({ PressStart2P_400Regular });
+  const [fontsLoaded] = useFonts({
+    PressStart2P_400Regular,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+    PlayfairDisplay_600SemiBold_Italic,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   if (!fontsLoaded) {
     return <View style={{ flex: 1, backgroundColor: palette.bg }} />;
@@ -164,16 +187,18 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <SessionProvider>
-          <TransitionProvider>
-            <RestaurantProvider>
-              <RootLayoutNav />
-            </RestaurantProvider>
-          </TransitionProvider>
-        </SessionProvider>
-      </AuthProvider>
-      {!introDone && <IntroSplash onFinish={() => setIntroDone(true)} />}
+      <ThemeProvider>
+        <AuthProvider>
+          <SessionProvider>
+            <TransitionProvider>
+              <RestaurantProvider>
+                <RootLayoutNav />
+              </RestaurantProvider>
+            </TransitionProvider>
+          </SessionProvider>
+        </AuthProvider>
+        {!introDone && <IntroSplash onFinish={() => setIntroDone(true)} />}
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

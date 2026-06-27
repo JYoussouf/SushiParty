@@ -1,6 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Text, Pressable, StyleSheet, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -8,12 +9,15 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../theme/themes';
 
 interface SushiTileProps {
   name: string;
   emoji: string;
   count: number;
   tint: TileTint;
+  category?: string;
   onIncrement: () => void;
   onDecrement: () => void;
   disabled?: boolean;
@@ -38,10 +42,16 @@ export function SushiTile({
   emoji,
   count,
   tint,
+  category,
   onIncrement,
   onDecrement,
   disabled = false,
 }: SushiTileProps) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
+  const badgeGradient: [string, string] = category
+    ? t.category(category).gradient
+    : [tint.badge, tint.badge];
   const scale = useSharedValue(1);
   const badgeScale = useSharedValue(1);
   const [floats, setFloats] = useState<FloatingPlus[]>([]);
@@ -96,7 +106,13 @@ export function SushiTile({
           {name}
         </Text>
         {count > 0 && (
-          <Animated.View style={[styles.badge, { backgroundColor: tint.badge }, badgeStyle]}>
+          <Animated.View style={[styles.badge, badgeStyle]}>
+            <LinearGradient
+              colors={badgeGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={StyleSheet.absoluteFill}
+            />
             <Pressable
               onPress={onDecrement}
               disabled={disabled}
@@ -113,6 +129,8 @@ export function SushiTile({
 }
 
 function FloatingEmoji({ offsetX, emoji }: { offsetX: number; emoji: string }) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const y = useSharedValue(0);
   const opacity = useSharedValue(1);
   const scale = useSharedValue(1);
@@ -139,7 +157,7 @@ function FloatingEmoji({ offsetX, emoji }: { offsetX: number; emoji: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   wrapper: {
     flex: 1,
     aspectRatio: 1,
@@ -169,8 +187,8 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 11,
-    fontWeight: '600',
-    color: '#666',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
     textAlign: 'center',
   },
   badge: {
@@ -181,11 +199,9 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     borderWidth: 2,
-    borderColor: '#fff',
-    shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 2 },
+    borderColor: t.color.surface,
+    overflow: 'hidden',
+    ...t.shadow.glow(t.color.accent),
   },
   badgePressable: {
     flex: 1,
@@ -196,8 +212,8 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 13,
-    fontWeight: '900',
-    color: '#fff',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   floatWrap: {
     position: 'absolute',

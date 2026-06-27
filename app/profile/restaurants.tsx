@@ -1,14 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { BackButton } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { getUserRestaurantInsights, type RankedRestaurant } from '../../src/lib/analytics';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 
 export default function RestaurantInsightsScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const [restaurants, setRestaurants] = useState<RankedRestaurant[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,14 +37,16 @@ export default function RestaurantInsightsScreen() {
   }, [userProfile]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <BackButton onPress={() => router.back()} />
       </View>
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#e53935" />
+          <ActivityIndicator color={t.color.accent} />
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
@@ -67,34 +74,37 @@ export default function RestaurantInsightsScreen() {
           )}
         </ScrollView>
       )}
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   content: { padding: 20, gap: 12 },
-  title: { fontSize: 28, fontWeight: '800', color: '#222' },
-  subtitle: { fontSize: 15, color: '#777', marginBottom: 6 },
+  title: { fontSize: 28, fontFamily: t.font.display, color: t.color.textPrimary },
+  subtitle: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary, marginBottom: 6 },
   emptyCard: {
-    borderRadius: 18,
+    borderRadius: t.radius.md,
     padding: 18,
-    backgroundColor: '#fafafa',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
   },
-  emptyText: { fontSize: 14, color: '#777' },
+  emptyText: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
   card: {
-    borderRadius: 18,
+    borderRadius: t.radius.md,
     padding: 16,
     gap: 6,
-    backgroundColor: '#fff7f5',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f4d7d4',
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
-  name: { fontSize: 18, fontWeight: '800', color: '#222' },
-  meta: { fontSize: 13, color: '#777' },
-  item: { fontSize: 14, color: '#444' },
+  name: { fontSize: 18, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  meta: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
+  item: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
 });

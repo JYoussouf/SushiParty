@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SushiSession } from '../types';
 import { getAttendeeNames, getSessionTotalPieces } from '../lib/sessionSummary';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../theme/themes';
 
 interface SessionCardProps {
   session: SushiSession;
@@ -15,6 +17,8 @@ function getModeLabel(mode: SushiSession['mode']): string {
 }
 
 export function SessionCard({ session, onPress }: SessionCardProps) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const totalPieces = getSessionTotalPieces(session);
   const attendeeNames = getAttendeeNames(session);
   const submittedAt = new Date(session.submittedAt ?? session.startedAt);
@@ -52,14 +56,15 @@ export function SessionCard({ session, onPress }: SessionCardProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   card: {
-    backgroundColor: '#fafafa',
-    borderRadius: 18,
+    backgroundColor: t.color.surface,
+    borderRadius: t.radius.lg,
     padding: 16,
     gap: 12,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   cardPressed: {
     opacity: 0.86,
@@ -75,17 +80,18 @@ const styles = StyleSheet.create({
   },
   restaurantName: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#222',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   dateText: {
     fontSize: 13,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textTertiary,
   },
   totalPieces: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#e53935',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
   metaRow: {
     flexDirection: 'row',
@@ -95,22 +101,24 @@ const styles = StyleSheet.create({
   modeBadge: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 999,
-    backgroundColor: '#ffeaea',
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.accentSoft,
   },
   modeBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#e53935',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.onAccent,
   },
   attendeeText: {
     flex: 1,
     fontSize: 13,
-    color: '#666',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   noteText: {
     fontSize: 13,
     lineHeight: 19,
-    color: '#555',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
 });

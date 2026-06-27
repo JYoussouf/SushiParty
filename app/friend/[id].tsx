@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   SafeAreaView,
@@ -7,9 +7,12 @@ import {
   Text,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { getFriendById, getFriendSessions } from '../../src/lib/local/friends';
 import { getSessionTotalPieces } from '../../src/lib/sessionSummary';
 import type { SushiSession, User } from '../../src/types';
@@ -25,6 +28,8 @@ function getInitials(name: string): string {
 
 export default function FriendProfileScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const params = useLocalSearchParams<{ id?: string }>();
   const [friend, setFriend] = useState<User | null>(null);
   const [sessions, setSessions] = useState<SushiSession[]>([]);
@@ -56,25 +61,29 @@ export default function FriendProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.loadingState}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#e53935" />
-      </SafeAreaView>
+      <View style={styles.loadingState}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+        <StatusBar style={t.isDark ? 'light' : 'dark'} />
+        <ActivityIndicator size="large" color={t.color.accent} />
+      </View>
     );
   }
 
   if (!friend) {
     return (
-      <SafeAreaView style={styles.loadingState}>
-        <StatusBar style="dark" />
+      <View style={styles.loadingState}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+        <StatusBar style={t.isDark ? 'light' : 'dark'} />
         <Text style={styles.emptyText}>Friend not found.</Text>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
         <BackButton onPress={() => router.back()} />
       </View>
@@ -104,19 +113,21 @@ export default function FriendProfileScreen() {
           ))}
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.bg,
   },
+  safe: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
   loadingState: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -126,12 +137,13 @@ const styles = StyleSheet.create({
   },
   hero: {
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: t.radius.lg,
     padding: 24,
-    backgroundColor: '#fff6f3',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f5ddd7',
+    borderColor: t.color.border,
     gap: 6,
+    ...t.shadow.card,
   },
   avatar: {
     width: 84,
@@ -139,41 +151,43 @@ const styles = StyleSheet.create({
     borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#e53935',
+    backgroundColor: t.color.accent,
     marginBottom: 6,
   },
   avatarText: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#fff',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   name: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#222',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
   },
   username: {
     fontSize: 15,
-    color: '#888',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   heroMeta: {
     fontSize: 13,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textTertiary,
   },
   section: {
     gap: 10,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#222',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   sessionCard: {
-    borderRadius: 18,
+    borderRadius: t.radius.md,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
     gap: 4,
   },
   sessionHeader: {
@@ -184,20 +198,22 @@ const styles = StyleSheet.create({
   restaurantName: {
     flex: 1,
     fontSize: 16,
-    fontWeight: '700',
-    color: '#222',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textPrimary,
   },
   totalPieces: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#e53935',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
   sessionMeta: {
     fontSize: 13,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textTertiary,
   },
   emptyText: {
     fontSize: 16,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
 import { useSession } from '../../src/hooks/useSession';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 
 const logPartyFlow = (...args: unknown[]) => {
   console.log('[party-flow]', Date.now(), ...args);
@@ -21,10 +24,14 @@ export default function SessionModeScreen() {
   const { setMode, createGroup } = useSession();
   const [creatingGroup, setCreatingGroup] = useState(false);
   const [createGroupError, setCreateGroupError] = useState<string | null>(null);
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.navBar}>
         <BackButton onPress={() => router.back()} />
       </View>
@@ -87,47 +94,49 @@ export default function SessionModeScreen() {
           </View>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff5ec' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   navBar: { paddingHorizontal: 16, paddingVertical: 8 },
   scroll: { padding: 20, gap: 18, paddingBottom: 30 },
   hero: {
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 22,
     gap: 8,
-    backgroundColor: '#ffe4d1',
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
-    borderColor: '#f5c6aa',
+    borderColor: t.color.border,
   },
   eyebrow: {
     fontSize: 12,
-    fontWeight: '800',
+    fontFamily: t.font.bodyBold,
     letterSpacing: 1,
     textTransform: 'uppercase',
-    color: '#c46738',
+    color: t.color.accent,
   },
-  title: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: '#2d2019' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6f594d' },
+  title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
+  subtitle: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
   choiceCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
-    borderRadius: 24,
+    borderRadius: t.radius.lg,
     padding: 18,
-    backgroundColor: '#fffdf9',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
   },
   choiceCardSolo: {
-    backgroundColor: '#fff7f0',
+    backgroundColor: t.color.surfaceAlt,
   },
   choiceEmoji: { fontSize: 34 },
   choiceBody: { flex: 1, gap: 4 },
-  choiceTitle: { fontSize: 18, fontWeight: '900', color: '#2d2019' },
-  choiceText: { fontSize: 14, lineHeight: 20, color: '#7f695d' },
-  errorText: { fontSize: 14, color: '#c0392b', textAlign: 'center' },
+  choiceTitle: { fontSize: 18, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  choiceText: { fontSize: 14, lineHeight: 20, fontFamily: t.font.body, color: t.color.textSecondary },
+  errorText: { fontSize: 14, fontFamily: t.font.bodyMedium, color: t.color.danger, textAlign: 'center' },
 });

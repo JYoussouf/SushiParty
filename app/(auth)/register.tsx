@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,16 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 
 export default function RegisterScreen() {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { signUp } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [username, setUsername] = useState('');
@@ -62,11 +67,13 @@ export default function RegisterScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? undefined : 'height'}
-    >
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <KeyboardAvoidingView
+        style={styles.kb}
+        behavior={Platform.OS === 'ios' ? undefined : 'height'}
+      >
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
@@ -86,7 +93,7 @@ export default function RegisterScreen() {
             value={displayName}
             onChangeText={setDisplayName}
             placeholder="Sushi Master"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={t.color.textTertiary}
             autoCapitalize="words"
             textContentType="name"
           />
@@ -97,7 +104,7 @@ export default function RegisterScreen() {
             value={username}
             onChangeText={(t) => setUsername(t.toLowerCase())}
             placeholder="sushi_master"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={t.color.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
           />
@@ -109,7 +116,7 @@ export default function RegisterScreen() {
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={t.color.textTertiary}
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
@@ -122,7 +129,7 @@ export default function RegisterScreen() {
             value={password}
             onChangeText={setPassword}
             placeholder="••••••••"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={t.color.textTertiary}
             secureTextEntry
             textContentType="newPassword"
           />
@@ -134,7 +141,7 @@ export default function RegisterScreen() {
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             placeholder="••••••••"
-            placeholderTextColor="#bbb"
+            placeholderTextColor={t.color.textTertiary}
             secureTextEntry
             textContentType="newPassword"
             onSubmitEditing={handleSignUp}
@@ -142,15 +149,23 @@ export default function RegisterScreen() {
           />
 
           <TouchableOpacity
-            style={[styles.primaryBtn, loading && styles.primaryBtnDisabled]}
+            style={[styles.primaryBtnShadow, loading && styles.primaryBtnDisabled]}
             onPress={handleSignUp}
             disabled={loading}
+            activeOpacity={0.85}
           >
-            {loading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryBtnText}>Create Account</Text>
-            )}
+            <LinearGradient
+              colors={t.color.accentGradient}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.primaryBtn}
+            >
+              {loading ? (
+                <ActivityIndicator color={t.color.onAccent} />
+              ) : (
+                <Text style={styles.primaryBtnText}>Create Account</Text>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
 
           <Link href="/(auth)/login" asChild>
@@ -160,7 +175,8 @@ export default function RegisterScreen() {
           </Link>
         </View>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -177,11 +193,12 @@ function friendlyAuthError(message: string): string {
   return message;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.bg,
   },
+  kb: { flex: 1 },
   scroll: {
     padding: 24,
     paddingTop: 40,
@@ -196,12 +213,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 26,
-    fontWeight: '800',
-    color: '#222',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
   },
   subtitle: {
     fontSize: 15,
-    color: '#888',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     marginTop: 4,
   },
   form: {
@@ -209,41 +227,48 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#444',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
     marginBottom: 2,
     marginTop: 12,
   },
   input: {
     height: 50,
     borderWidth: 1.5,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
+    borderColor: t.color.border,
+    borderRadius: t.radius.md,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#222',
-    backgroundColor: '#fafafa',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
+    backgroundColor: t.color.surface,
   },
   hint: {
     fontSize: 12,
-    color: '#aaa',
+    fontFamily: t.font.body,
+    color: t.color.textTertiary,
     marginTop: 2,
+  },
+  primaryBtnShadow: {
+    marginTop: 20,
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
   },
   primaryBtn: {
     height: 52,
-    borderRadius: 26,
-    backgroundColor: '#e53935',
+    borderRadius: t.radius.button,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 20,
   },
   primaryBtnDisabled: {
-    backgroundColor: '#ffcdd2',
+    opacity: 0.6,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   primaryBtnText: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#fff',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   backLink: {
     alignItems: 'center',
@@ -251,7 +276,7 @@ const styles = StyleSheet.create({
   },
   backLinkText: {
     fontSize: 15,
-    color: '#e53935',
-    fontWeight: '600',
+    color: t.color.accent,
+    fontFamily: t.font.bodySemibold,
   },
 });

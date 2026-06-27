@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, type StyleProp, type ViewStyle } from 'react-native';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../theme/themes';
 
 interface BackButtonProps {
   onPress: () => void;
@@ -9,6 +11,8 @@ interface BackButtonProps {
 }
 
 export function BackButton({ onPress, disabled, label = 'Back', style }: BackButtonProps) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   return (
     <TouchableOpacity
       style={[styles.button, disabled && styles.buttonDisabled, style]}
@@ -22,18 +26,18 @@ export function BackButton({ onPress, disabled, label = 'Back', style }: BackBut
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   button: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 13,
     paddingVertical: 8,
-    backgroundColor: '#ffeaea',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#ffd0cc',
+    borderColor: t.color.border,
   },
   buttonDisabled: {
     opacity: 0.5,
@@ -41,13 +45,13 @@ const styles = StyleSheet.create({
   icon: {
     fontSize: 16,
     lineHeight: 18,
-    fontWeight: '900',
-    color: '#e53935',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
   label: {
     fontSize: 14,
     lineHeight: 18,
-    fontWeight: '800',
-    color: '#e53935',
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
 });

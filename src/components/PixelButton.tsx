@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, Text, StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { palette, pixelFamily } from '../theme/pixel';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../theme/themes';
 
 interface PixelButtonProps {
   label: string;
@@ -18,80 +20,81 @@ export function PixelButton({
   label,
   onPress,
   disabled = false,
-  color = palette.red,
-  textColor = palette.white,
+  color,
+  textColor,
   size = 'md',
   icon,
   style,
 }: PixelButtonProps) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const paddings = size === 'lg' ? { v: 16, h: 18 } : size === 'sm' ? { v: 8, h: 10 } : { v: 12, h: 14 };
   const fontSize = size === 'lg' ? 16 : size === 'sm' ? 9 : 11;
   const shadowOffset = size === 'lg' ? 5 : size === 'sm' ? 2 : 4;
+
+  // When no explicit color is given, use the theme's accent gradient (modern in Tokyo,
+  // flat-looking pixel red in classic since both gradient stops are the brand red).
+  const useGradient = !color && !disabled;
+  const gradientColors = t.color.accentGradient;
+  const resolvedLabelColor = disabled ? t.color.textTertiary : textColor ?? t.color.onAccent;
 
   const handlePress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onPress();
   };
 
+  const content = (
+    <View style={styles.row}>
+      {icon ? <Text style={[styles.icon, { fontSize: fontSize * 1.5 }]}>{icon}</Text> : null}
+      <Text
+        style={[styles.label, { color: resolvedLabelColor, fontSize }]}
+        numberOfLines={1}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+
   return (
-    <View style={[styles.wrap, style]}>
-      <View
-        style={[
-          styles.shadow,
-          {
-            backgroundColor: palette.ink,
-            transform: [{ translateX: shadowOffset }, { translateY: shadowOffset }],
-          },
-        ]}
-        pointerEvents="none"
-      />
+    <View style={[styles.wrap, !disabled && styles.wrapGlow, style]}>
       <Pressable
         onPress={handlePress}
         disabled={disabled}
         style={({ pressed }) => [
           styles.btn,
           {
-            backgroundColor: disabled ? palette.bgAlt : color,
-            borderColor: palette.ink,
+            backgroundColor: disabled ? t.color.surfaceAlt : color ?? t.color.accent,
             paddingVertical: paddings.v,
             paddingHorizontal: paddings.h,
             transform: pressed ? [{ translateX: shadowOffset }, { translateY: shadowOffset }] : [],
           },
         ]}
       >
-        <View style={styles.row}>
-          {icon ? <Text style={[styles.icon, { fontSize: fontSize * 1.5 }]}>{icon}</Text> : null}
-          <Text
-            style={[
-              styles.label,
-              {
-                color: disabled ? palette.inkSoft : textColor,
-                fontSize,
-              },
-            ]}
-            numberOfLines={1}
-          >
-            {label}
-          </Text>
-        </View>
+        {useGradient ? (
+          <LinearGradient
+            colors={gradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        ) : null}
+        {content}
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   wrap: {
     position: 'relative',
+    borderRadius: t.radius.button,
   },
-  shadow: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  wrapGlow: {
+    ...t.shadow.glow(t.color.accent),
   },
   btn: {
-    borderWidth: 3,
+    borderRadius: t.radius.button,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -104,7 +107,7 @@ const styles = StyleSheet.create({
     lineHeight: undefined as unknown as number,
   },
   label: {
-    fontFamily: pixelFamily,
+    fontFamily: t.font.bodyBold,
     letterSpacing: 0.5,
     textAlign: 'center',
   },

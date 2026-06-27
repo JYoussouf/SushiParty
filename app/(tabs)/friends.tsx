@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,9 +16,12 @@ import {
   View,
 } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useFriends } from '../../src/hooks/useFriends';
 import { getFriendChallenges } from '../../src/lib/challenges';
@@ -37,6 +40,8 @@ function getInitials(name: string): string {
 
 export default function FriendsScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const { friends, activity, searchResults, loading, searching, addingFriendId, refresh, search, addFriend, clearSearch } =
     useFriends();
@@ -121,24 +126,34 @@ export default function FriendsScreen() {
         <Text style={styles.title}>Friends</Text>
         <Text style={styles.subtitle}>Add people and keep an eye on their sushi runs.</Text>
       </View>
-      <TouchableOpacity style={styles.addButton} onPress={() => setShowAddModal(true)}>
-        <Text style={styles.addButtonText}>Add Friend</Text>
+      <TouchableOpacity style={styles.addShadow} onPress={() => setShowAddModal(true)} activeOpacity={0.85}>
+        <LinearGradient
+          colors={t.color.accentGradient}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.addButton}
+        >
+          <Text style={styles.addButtonText}>Add Friend</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
 
   if (loading && friends.length === 0) {
     return (
-      <SafeAreaView style={styles.loadingState}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#e53935" />
-      </SafeAreaView>
+      <View style={styles.loadingState}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+        <StatusBar style={t.isDark ? 'light' : 'dark'} />
+        <ActivityIndicator size="large" color={t.color.accent} />
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={loading} onRefresh={() => void refresh()} />}
@@ -230,10 +245,13 @@ export default function FriendsScreen() {
         </View>
         </Animated.View>
       </ScrollView>
+      </SafeAreaView>
 
       <Modal visible={showAddModal} animationType="slide" onRequestClose={closeModal}>
-        <SafeAreaView style={styles.modalContainer}>
-          <StatusBar style="dark" />
+        <View style={styles.modalContainer}>
+          <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+          <SafeAreaView style={styles.modalSafe}>
+          <StatusBar style={t.isDark ? 'light' : 'dark'} />
           <KeyboardAvoidingView
             style={{ flex: 1 }}
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -251,14 +269,14 @@ export default function FriendsScreen() {
             value={query}
             onChangeText={handleSearchChange}
             placeholder="Search username or display name"
-            placeholderTextColor="#aaa"
+            placeholderTextColor={t.color.textTertiary}
             autoCapitalize="none"
             autoCorrect={false}
           />
 
           {searching ? (
             <View style={styles.modalState}>
-              <ActivityIndicator color="#e53935" />
+              <ActivityIndicator color={t.color.accent} />
             </View>
           ) : (
             <FlatList
@@ -278,7 +296,7 @@ export default function FriendsScreen() {
                     disabled={addingFriendId === item.uid}
                   >
                     {addingFriendId === item.uid ? (
-                      <ActivityIndicator color="#fff" />
+                      <ActivityIndicator color={t.color.onAccent} />
                     ) : (
                       <Text style={styles.searchAddButtonText}>Add</Text>
                     )}
@@ -297,20 +315,24 @@ export default function FriendsScreen() {
             />
           )}
           </KeyboardAvoidingView>
-        </SafeAreaView>
+          </SafeAreaView>
+        </View>
       </Modal>
-    </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.bg,
+  },
+  safe: {
+    flex: 1,
   },
   loadingState: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.bg,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -326,74 +348,80 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 28,
-    fontWeight: '800',
-    color: '#222',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
   },
   subtitle: {
     marginTop: 4,
     fontSize: 15,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
     maxWidth: 240,
   },
+  addShadow: {
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
   addButton: {
-    borderRadius: 999,
+    borderRadius: t.radius.button,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#e53935',
   },
   addButtonText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   section: {
     gap: 10,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#222',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
   },
   emptyCard: {
-    borderRadius: 18,
+    borderRadius: t.radius.lg,
     padding: 18,
-    backgroundColor: '#fafafa',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
     gap: 8,
   },
   emptyTitle: {
     fontSize: 17,
-    fontWeight: '700',
-    color: '#222',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   emptyText: {
     fontSize: 14,
     lineHeight: 20,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   emptyButton: {
     marginTop: 4,
     alignSelf: 'flex-start',
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#ffeaea',
+    backgroundColor: t.color.accentSoft,
   },
   emptyButtonText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#e53935',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   friendCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     padding: 16,
-    borderRadius: 18,
-    backgroundColor: '#fafafa',
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
+    ...t.shadow.card,
   },
   avatar: {
     width: 48,
@@ -401,12 +429,12 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffeaea',
+    backgroundColor: t.color.accentSoft,
   },
   avatarText: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#e53935',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   friendBody: {
     flex: 1,
@@ -414,64 +442,71 @@ const styles = StyleSheet.create({
   },
   friendName: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#222',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   friendUsername: {
     fontSize: 13,
-    color: '#888',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   friendMeta: {
     marginTop: 4,
     fontSize: 13,
-    color: '#666',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   friendChevron: {
     fontSize: 22,
-    color: '#bbb',
+    color: t.color.textTertiary,
   },
   activityCard: {
-    borderRadius: 18,
+    borderRadius: t.radius.lg,
     padding: 16,
-    backgroundColor: '#fff6f3',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f5ddd7',
+    borderColor: t.color.border,
     gap: 4,
   },
   activityTitle: {
     fontSize: 15,
-    fontWeight: '700',
-    color: '#222',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   activityMeta: {
     fontSize: 13,
-    color: '#777',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   challengeCard: {
-    borderRadius: 18,
+    borderRadius: t.radius.lg,
     padding: 16,
-    backgroundColor: '#fff6e7',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0d7a0',
+    borderColor: t.color.border,
     gap: 4,
   },
   challengeTitle: {
     fontSize: 15,
-    fontWeight: '800',
-    color: '#8b6a1d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.amber,
   },
   challengeText: {
     fontSize: 13,
-    color: '#6e5723',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   challengeMeta: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#8b6a1d',
+    fontFamily: t.font.bodyBold,
+    color: t.color.amber,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: t.color.bg,
+  },
+  modalSafe: {
+    flex: 1,
     padding: 20,
   },
   modalHeader: {
@@ -482,23 +517,24 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 24,
-    fontWeight: '800',
-    color: '#222',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
   },
   modalClose: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#e53935',
+    fontFamily: t.font.bodySemibold,
+    color: t.color.accent,
   },
   searchInput: {
     height: 50,
-    borderRadius: 14,
+    borderRadius: t.radius.md,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
+    borderColor: t.color.border,
+    backgroundColor: t.color.surface,
     paddingHorizontal: 16,
     fontSize: 16,
-    color: '#222',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
   },
   searchResults: {
     paddingTop: 16,
@@ -508,11 +544,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 16,
+    borderRadius: t.radius.md,
     padding: 16,
-    backgroundColor: '#fafafa',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: t.color.border,
   },
   searchRowBody: {
     flex: 1,
@@ -520,26 +556,27 @@ const styles = StyleSheet.create({
   },
   searchName: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#222',
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
   },
   searchUsername: {
     fontSize: 13,
-    color: '#888',
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
   searchAddButton: {
     minWidth: 72,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 999,
+    borderRadius: t.radius.pill,
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#e53935',
+    backgroundColor: t.color.accent,
   },
   searchAddButtonText: {
     fontSize: 14,
-    fontWeight: '700',
-    color: '#fff',
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
   modalState: {
     paddingTop: 24,

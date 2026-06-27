@@ -11,9 +11,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { BackButton, SessionCard } from '../../src/components';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { buildSessionExportText } from '../../src/lib/exportSessions';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
@@ -50,6 +53,8 @@ function compareSessions(left: SushiSession, right: SushiSession, sort: SortOpti
 
 export default function HistoryScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const [allSessions, setAllSessions] = useState<SushiSession[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -115,17 +120,20 @@ export default function HistoryScreen() {
 
   if (initialLoading) {
     return (
-      <SafeAreaView style={styles.loadingState}>
-        <StatusBar style="dark" />
-        <ActivityIndicator size="large" color="#e53935" />
-      </SafeAreaView>
+      <View style={styles.loadingState}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+        <StatusBar style={t.isDark ? 'light' : 'dark'} />
+        <ActivityIndicator size="large" color={t.color.accent} />
+      </View>
     );
   }
 
   if (allSessions.length === 0 && !refreshing) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar style="dark" />
+      <View style={styles.container}>
+        <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+        <SafeAreaView style={styles.safe}>
+        <StatusBar style={t.isDark ? 'light' : 'dark'} />
         <View style={styles.backRow}>
           <BackButton onPress={() => router.replace('/(tabs)/home')} />
         </View>
@@ -139,13 +147,16 @@ export default function HistoryScreen() {
             <Text style={styles.emptyButtonText}>Start counting</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+        </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <FlatList
         data={displayedSessions}
         keyExtractor={(item) => item.id}
@@ -179,7 +190,7 @@ export default function HistoryScreen() {
               value={query}
               onChangeText={setQuery}
               placeholder="Search restaurant, note, or attendee"
-              placeholderTextColor="#aaa"
+              placeholderTextColor={t.color.textTertiary}
               autoCorrect={false}
               spellCheck={false}
             />
@@ -210,53 +221,56 @@ export default function HistoryScreen() {
         ListFooterComponent={
           displayedSessions.length < filteredSessions.length ? (
             <View style={styles.footerLoader}>
-              <ActivityIndicator color="#e53935" />
+              <ActivityIndicator color={t.color.accent} />
             </View>
           ) : (
             <View style={styles.footerSpacing} />
           )
         }
       />
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff' },
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   list: { padding: 20, gap: 12 },
   header: { marginBottom: 8, gap: 10 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' },
-  title: { fontSize: 28, fontWeight: '800', color: '#222' },
-  subtitle: { fontSize: 15, color: '#777' },
-  exportButton: { borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#ffeaea' },
-  exportButtonText: { fontSize: 14, fontWeight: '700', color: '#e53935' },
+  title: { fontSize: 28, fontFamily: t.font.display, color: t.color.textPrimary },
+  subtitle: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary },
+  exportButton: { borderRadius: t.radius.pill, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: t.color.accentSoft },
+  exportButtonText: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   backRow: { paddingHorizontal: 20, paddingTop: 16 },
   searchInput: {
     height: 48,
-    borderRadius: 14,
+    borderRadius: t.radius.md,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
-    backgroundColor: '#fafafa',
+    borderColor: t.color.border,
+    backgroundColor: t.color.surface,
     paddingHorizontal: 16,
     fontSize: 15,
-    color: '#222',
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
   },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
-  sortLabel: { fontSize: 12, fontWeight: '700', color: '#888', textTransform: 'uppercase', letterSpacing: 0.6, marginRight: 2 },
-  filterChip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#f5f5f5' },
-  filterChipActive: { backgroundColor: '#ffeaea' },
-  filterChipText: { fontSize: 12, fontWeight: '700', color: '#777' },
-  filterChipTextActive: { color: '#e53935' },
-  filteredEmptyCard: { borderRadius: 16, padding: 16, backgroundColor: '#fafafa', borderWidth: 1, borderColor: '#f0f0f0' },
-  filteredEmptyTitle: { fontSize: 16, fontWeight: '700', color: '#222' },
-  filteredEmptyText: { marginTop: 4, fontSize: 13, color: '#777' },
+  sortLabel: { fontSize: 12, fontFamily: t.font.bodyBold, color: t.color.textSecondary, textTransform: 'uppercase', letterSpacing: 0.6, marginRight: 2 },
+  filterChip: { borderRadius: t.radius.pill, paddingHorizontal: 12, paddingVertical: 8, backgroundColor: t.color.surfaceAlt },
+  filterChipActive: { backgroundColor: t.color.accentSoft },
+  filterChipText: { fontSize: 12, fontFamily: t.font.bodyBold, color: t.color.textSecondary },
+  filterChipTextActive: { color: t.color.onAccent },
+  filteredEmptyCard: { borderRadius: t.radius.md, padding: 16, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
+  filteredEmptyTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  filteredEmptyText: { marginTop: 4, fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 },
-  loadingState: { flex: 1, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center' },
+  loadingState: { flex: 1, backgroundColor: t.color.bg, justifyContent: 'center', alignItems: 'center' },
   emptyEmoji: { fontSize: 64, marginBottom: 16 },
-  emptyTitle: { fontSize: 24, fontWeight: '700', color: '#222', textAlign: 'center' },
-  emptySubtitle: { marginTop: 8, fontSize: 16, lineHeight: 22, color: '#888', textAlign: 'center' },
-  emptyButton: { marginTop: 20, borderRadius: 999, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: '#e53935' },
-  emptyButtonText: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  emptyTitle: { fontSize: 24, fontFamily: t.font.display, color: t.color.textPrimary, textAlign: 'center' },
+  emptySubtitle: { marginTop: 8, fontSize: 16, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary, textAlign: 'center' },
+  emptyButton: { marginTop: 20, borderRadius: t.radius.button, paddingHorizontal: 20, paddingVertical: 12, backgroundColor: t.color.accent },
+  emptyButtonText: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   footerLoader: { paddingVertical: 16 },
   footerSpacing: { height: 20 },
 });

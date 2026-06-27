@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -12,27 +12,34 @@ import {
   View,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../src/components';
+import { useTheme, useThemeControls } from '../src/contexts/ThemeContext';
+import type { Theme } from '../src/theme/themes';
 import { useAuth } from '../src/contexts/AuthContext';
 import { buildSessionExportCsv } from '../src/lib/exportSessions';
 import { getAllSessions } from '../src/lib/cloudflare/sessions';
+
+type Styles = ReturnType<typeof makeStyles>;
 
 const SOUND_VOL_KEY = '@sushi_sound_volume';
 const MUSIC_VOL_KEY = '@sushi_music_volume';
 const SOUND_MUTE_KEY = '@sushi_sound_muted';
 const MUSIC_MUTE_KEY = '@sushi_music_muted';
 
-function VolumeRow({ label, icon, volume, muted, onVolumeChange, onToggleMute }: {
+function VolumeRow({ label, icon, volume, muted, onVolumeChange, onToggleMute, t, styles }: {
   label: string;
   icon: string;
   volume: number;
   muted: boolean;
   onVolumeChange: (v: number) => void;
   onToggleMute: () => void;
+  t: Theme;
+  styles: Styles;
 }) {
   const muteScale = useRef(new Animated.Value(1)).current;
 
@@ -45,8 +52,7 @@ function VolumeRow({ label, icon, volume, muted, onVolumeChange, onToggleMute }:
     onToggleMute();
   };
 
-  const iconOpacity = muted ? 0.35 : 1;
-  const sliderColor = muted ? '#d9c5bb' : '#df5a31';
+  const sliderColor = muted ? t.color.textTertiary : t.color.accent;
 
   return (
     <View style={styles.volumeCard}>
@@ -76,7 +82,7 @@ function VolumeRow({ label, icon, volume, muted, onVolumeChange, onToggleMute }:
           onVolumeChange(v);
         }}
         minimumTrackTintColor={sliderColor}
-        maximumTrackTintColor="#efd8ca"
+        maximumTrackTintColor={t.color.border}
         thumbTintColor={sliderColor}
         disabled={false}
       />
@@ -90,6 +96,9 @@ function VolumeRow({ label, icon, volume, muted, onVolumeChange, onToggleMute }:
 
 export default function SettingsScreen() {
   const router = useRouter();
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
+  const { name: themeName, setTheme } = useThemeControls();
   const { userProfile, accountBacked, signOut } = useAuth();
 
   const [soundVolume, setSoundVolume] = useState(0.8);
@@ -151,8 +160,10 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+    <View style={styles.container}>
+      <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
+      <SafeAreaView style={styles.safe}>
+      <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.topRow}>
           <BackButton onPress={() => router.back()} />
@@ -160,6 +171,29 @@ export default function SettingsScreen() {
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>Settings</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Appearance</Text>
+          <View style={styles.appearanceCard}>
+            <Text style={styles.appearanceLabel}>Theme</Text>
+            <View style={styles.themeOptions}>
+              <ThemeOption
+                label="Tokyo Nights"
+                emoji="🌙"
+                active={themeName === 'tokyo'}
+                onPress={() => setTheme('tokyo')}
+                styles={styles}
+              />
+              <ThemeOption
+                label="Classic"
+                emoji="☀️"
+                active={themeName === 'classic'}
+                onPress={() => setTheme('classic')}
+                styles={styles}
+              />
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -172,6 +206,8 @@ export default function SettingsScreen() {
               muted={soundMuted}
               onVolumeChange={handleSoundVolume}
               onToggleMute={handleSoundMute}
+              t={t}
+              styles={styles}
             />
             <View style={styles.soundDivider} />
             <VolumeRow
@@ -181,6 +217,8 @@ export default function SettingsScreen() {
               muted={musicMuted}
               onVolumeChange={handleMusicVolume}
               onToggleMute={handleMusicMute}
+              t={t}
+              styles={styles}
             />
           </View>
         </View>
@@ -223,38 +261,95 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff6ee' },
+function ThemeOption({ label, emoji, active, onPress, styles }: {
+  label: string;
+  emoji: string;
+  active: boolean;
+  onPress: () => void;
+  styles: Styles;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.themeOption, active && styles.themeOptionActive]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text style={styles.themeOptionEmoji}>{emoji}</Text>
+      <Text style={[styles.themeOptionLabel, active && styles.themeOptionLabelActive]}>{label}</Text>
+      {active && <Text style={styles.themeOptionCheck}>✓</Text>}
+    </TouchableOpacity>
+  );
+}
+
+const makeStyles = (t: Theme) => StyleSheet.create({
+  container: { flex: 1, backgroundColor: t.color.bg },
+  safe: { flex: 1 },
   scroll: { padding: 20, gap: 18, paddingBottom: 40 },
   topRow: { flexDirection: 'row', justifyContent: 'flex-start' },
   hero: {
-    borderRadius: 28,
+    borderRadius: t.radius.lg,
     padding: 22,
-    backgroundColor: '#ffead8',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#f5cfb7',
+    borderColor: t.color.border,
     gap: 8,
+    ...t.shadow.card,
   },
-  eyebrow: { fontSize: 12, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', color: '#c46a3c' },
-  title: { fontSize: 30, lineHeight: 34, fontWeight: '900', color: '#2f221b' },
-  subtitle: { fontSize: 15, lineHeight: 22, color: '#6f5a50' },
+  eyebrow: { fontSize: 12, fontFamily: t.font.bodyBold, letterSpacing: 1, textTransform: 'uppercase', color: t.color.accent },
+  title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
+  subtitle: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
   section: { gap: 10 },
-  sectionTitle: { fontSize: 21, fontWeight: '900', color: '#2f221b' },
+  sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
+
+  // ── Appearance ─────────────────────────────────────────────
+  appearanceCard: {
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    padding: 16,
+    gap: 12,
+  },
+  appearanceLabel: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  themeOptions: { flexDirection: 'row', gap: 10 },
+  themeOption: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: t.color.border,
+  },
+  themeOptionActive: {
+    borderColor: t.color.accent,
+    backgroundColor: t.color.accentSoft,
+    ...t.shadow.glow(t.color.accent),
+  },
+  themeOptionEmoji: { fontSize: 18, lineHeight: 22 },
+  themeOptionLabel: { fontSize: 14, fontFamily: t.font.bodySemibold, color: t.color.textSecondary },
+  themeOptionLabelActive: { color: t.isDark ? t.color.onAccent : t.color.accent },
+  themeOptionCheck: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.isDark ? t.color.onAccent : t.color.accent },
 
   soundCard: {
-    borderRadius: 22,
-    backgroundColor: '#fffdf9',
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
     overflow: 'hidden',
   },
   soundDivider: {
     height: 1,
-    backgroundColor: '#f0e0d4',
+    backgroundColor: t.color.border,
     marginHorizontal: 16,
   },
   volumeCard: {
@@ -269,26 +364,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   volumeIcon: { fontSize: 18 },
-  volumeLabel: { fontSize: 15, fontWeight: '800', color: '#2f221b', flex: 1 },
+  volumeLabel: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.textPrimary, flex: 1 },
   volumePercent: {
     minWidth: 36,
     alignItems: 'flex-end',
   },
-  volumeValue: { fontSize: 13, fontWeight: '700', color: '#df5a31' },
-  volumeValueMuted: { color: '#c4a898' },
+  volumeValue: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.accent },
+  volumeValueMuted: { color: t.color.textTertiary },
   muteBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f5ede7',
+    backgroundColor: t.color.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
   },
   muteBtnActive: {
-    backgroundColor: '#fde8e0',
-    borderColor: '#df5a31',
+    backgroundColor: t.color.accentSoft,
+    borderColor: t.color.accent,
   },
   muteIcon: { fontSize: 16 },
   slider: { width: '100%', height: 36, marginHorizontal: -4 },
@@ -298,23 +393,23 @@ const styles = StyleSheet.create({
     marginTop: -4,
     paddingHorizontal: 2,
   },
-  sliderLabelText: { fontSize: 10, color: '#c4a898', fontWeight: '600', letterSpacing: 0.3 },
+  sliderLabelText: { fontSize: 10, color: t.color.textTertiary, fontFamily: t.font.bodySemibold, letterSpacing: 0.3 },
 
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 16,
-    borderRadius: 22,
+    borderRadius: t.radius.lg,
     padding: 16,
-    backgroundColor: '#fffdf9',
+    backgroundColor: t.color.surface,
     borderWidth: 1,
-    borderColor: '#efd8ca',
+    borderColor: t.color.border,
   },
-  rowTitle: { fontSize: 16, fontWeight: '800', color: '#2f221b' },
-  rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, color: '#816c61', maxWidth: 240 },
-  rowAction: { fontSize: 13, fontWeight: '800', color: '#d35a2f' },
-  destructiveRow: { borderColor: '#f2b4a2', backgroundColor: '#fff4ef' },
-  destructiveTitle: { fontSize: 16, fontWeight: '800', color: '#b33e1f' },
-  destructiveAction: { fontSize: 13, fontWeight: '800', color: '#b33e1f' },
+  rowTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary, maxWidth: 240 },
+  rowAction: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
+  destructiveRow: { borderColor: t.color.danger, backgroundColor: t.color.surface },
+  destructiveTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.danger },
+  destructiveAction: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.danger },
 });

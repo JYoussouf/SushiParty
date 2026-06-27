@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -8,6 +8,8 @@ import Animated, {
   withDelay,
   Easing,
 } from 'react-native-reanimated';
+import { useTheme } from '../contexts/ThemeContext';
+import type { Theme } from '../theme/themes';
 
 interface IntroSplashProps {
   onFinish: () => void;
@@ -15,6 +17,8 @@ interface IntroSplashProps {
 }
 
 export function IntroSplash({ onFinish, duration = 1400 }: IntroSplashProps) {
+  const t = useTheme();
+  const styles = useMemo(() => makeStyles(t), [t]);
   const containerOpacity = useSharedValue(1);
   const logoOpacity = useSharedValue(0);
   const logoTranslate = useSharedValue(8);
@@ -65,14 +69,14 @@ export function IntroSplash({ onFinish, duration = 1400 }: IntroSplashProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (t: Theme) => StyleSheet.create({
   container: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: t.color.bg,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
@@ -83,21 +87,21 @@ const styles = StyleSheet.create({
   },
   logo: {
     fontSize: 44,
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
     letterSpacing: -0.5,
   },
   underlineTrack: {
     width: 200,
     height: 3,
-    borderRadius: 2,
-    backgroundColor: '#f0f0f0',
+    borderRadius: t.radius.sm,
+    backgroundColor: t.color.surfaceAlt,
     overflow: 'hidden',
     alignItems: 'flex-start',
   },
   underlineFill: {
     height: '100%',
-    backgroundColor: '#e53935',
-    borderRadius: 2,
+    backgroundColor: t.color.accent,
+    borderRadius: t.radius.sm,
   },
 });
