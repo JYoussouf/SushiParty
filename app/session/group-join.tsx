@@ -90,6 +90,19 @@ export default function GroupJoinScreen() {
     void handleJoinGroup(normalized);
   }, [deepLinkedCode, handleJoinGroup]);
 
+  // Focus the hidden input on mount so the keyboard is up immediately for
+  // manual code entry. Skip when arriving via a deep link that auto-joins (the
+  // keyboard would flash before we navigate away) or while the QR scanner is
+  // open (the keyboard would fight the camera). The short delay lets the screen
+  // transition settle — focusing synchronously mid-transition often fails to
+  // raise the keyboard in React Native.
+  useEffect(() => {
+    if (deepLinkedCode || scanning) return;
+    const timer = setTimeout(() => inputRef.current?.focus(), 400);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleOpenScanner = async () => {
     setScanError(null);
     const { status, canAskAgain } = await Camera.requestCameraPermissionsAsync();
