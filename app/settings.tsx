@@ -202,32 +202,6 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Account</Text>
 
-
-          {accountBacked && (
-            <TouchableOpacity
-              style={[styles.row, styles.destructiveRow]}
-              onPress={() =>
-                Alert.alert('Sign out', 'You will be signed out of your account.', [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-                ])
-              }
-            >
-              <View>
-                <Text style={styles.destructiveTitle}>Sign out</Text>
-                <Text style={styles.rowNote}>Sign out of your account on this device.</Text>
-              </View>
-              <Text style={styles.destructiveAction}>Sign out</Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity style={[styles.row, styles.destructiveRow]} onPress={handleReset}>
-            <View>
-              <Text style={styles.destructiveTitle}>Delete my Account</Text>
-              <Text style={styles.rowNote}>Clear this device profile and all local party history?</Text>
-            </View>
-            <Text style={styles.destructiveAction}>Delete</Text>
-          </TouchableOpacity>
           <TouchableOpacity style={styles.row} onPress={() => void handleExportHistory()}>
             <View>
               <Text style={styles.rowTitle}>Export my Party Data</Text>
@@ -235,6 +209,25 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.rowAction}>Export</Text>
           </TouchableOpacity>
+
+          <View style={styles.dangerZone}>
+            {accountBacked && (
+              <TouchableOpacity
+                style={styles.dangerLink}
+                onPress={() =>
+                  Alert.alert('Sign out', 'You will be signed out of your account.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+                  ])
+                }
+              >
+                <Text style={styles.dangerLinkText}>Sign out</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity style={styles.dangerLink} onPress={handleReset}>
+              <Text style={styles.dangerLinkText}>Delete my account</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
       </SafeAreaView>
@@ -256,7 +249,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     gap: 8,
     ...t.shadow.card,
   },
-  eyebrow: { fontSize: 12, fontFamily: t.font.bodyBold, letterSpacing: 1, textTransform: 'uppercase', color: t.color.accent },
+  eyebrow: { fontSize: 28, lineHeight: 32, fontFamily: t.font.display, color: t.color.textPrimary },
   title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
   subtitle: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
   section: { gap: 10 },
@@ -365,7 +358,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rowTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary, maxWidth: 240 },
   rowAction: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
-  destructiveRow: { borderColor: t.color.danger, backgroundColor: t.color.surface },
-  destructiveTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.danger },
-  destructiveAction: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.danger },
+  dangerZone: {
+    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 20,
+  },
+  dangerLink: { paddingVertical: 4 },
+  dangerLinkText: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.danger },
 });
