@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { SushiPartyLogo } from '../../src/components';
+import { SushiPartyLogo, ItemSprite } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -46,7 +46,7 @@ type Card =
   | { kind: 'trivia';    ribbon: string; headline: string; detail: string; emoji: string; tag: string }
   | { kind: 'history';   ribbon: string; headline: string; detail: string; emoji: string; tag: string }
   | { kind: 'vibe';      ribbon: string; mood: string; sub: string; emoji: string; tag: string }
-  | { kind: 'stat';      ribbon: string; title: string; sub: string; emoji: string; tag: string };
+  | { kind: 'stat';      ribbon: string; title: string; sub: string; emoji: string; tag: string; spriteKey?: string | undefined; spriteCategory?: string | undefined };
 
 const CARDS: Card[] = [
   // ── Wisdom / mantras ───────────────────────────────────────────────────────
@@ -126,6 +126,8 @@ function computeStatCards(sessions: SushiSession[], uid: string | undefined, men
         title: item.name,
         sub: `${favItemCount} ${favItemCount === 1 ? 'piece' : 'pieces'} so far`,
         emoji: getItemEmoji(item.imageKey, item.category),
+        spriteKey: item.imageKey,
+        spriteCategory: item.category,
         tag: 'Top order',
       });
     }
@@ -329,7 +331,11 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.plateRight}>
-            <Text style={styles.plateEmoji}>{card.emoji}</Text>
+            {card.kind === 'stat' && card.spriteKey ? (
+              <ItemSprite imageKey={card.spriteKey} category={card.spriteCategory} size={50} />
+            ) : (
+              <Text style={styles.plateEmoji}>{card.emoji}</Text>
+            )}
           </View>
         </View>
       </Animated.View>

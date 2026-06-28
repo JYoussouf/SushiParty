@@ -1,0 +1,599 @@
+{
+  "generated": "2026-06-28",
+  "style": "kawaii",
+  "source": "parametric pixel engine (original, no external art)",
+  "sprite": {
+    "size": 96,
+    "grid": 24,
+    "transparent": true
+  },
+  "idle": {
+    "frames": 2,
+    "frameSize": 96,
+    "sheet": [
+      192,
+      96
+    ],
+    "fps": 3,
+    "motion": "frame0 rest, frame1 up 1px"
+  },
+  "count": 96,
+  "items": [
+    {
+      "key": "nigiri_any",
+      "name": "Any Nigiri",
+      "category": "nigiri",
+      "sharesWith": "nigiri_salmon"
+    },
+    {
+      "key": "nigiri_salmon",
+      "name": "Salmon",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_tuna",
+      "name": "Tuna",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_yellowtail",
+      "name": "Yellowtail",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_shrimp",
+      "name": "Shrimp",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_eel",
+      "name": "Eel",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_scallop",
+      "name": "Scallop",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_octopus",
+      "name": "Octopus",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "nigiri_egg",
+      "name": "Egg (Tamago)",
+      "category": "nigiri",
+      "sharesWith": null
+    },
+    {
+      "key": "sashimi_any",
+      "name": "Any Sashimi",
+      "category": "sashimi",
+      "sharesWith": "sashimi_salmon"
+    },
+    {
+      "key": "sashimi_salmon",
+      "name": "Salmon",
+      "category": "sashimi",
+      "sharesWith": null
+    },
+    {
+      "key": "sashimi_tuna",
+      "name": "Tuna",
+      "category": "sashimi",
+      "sharesWith": null
+    },
+    {
+      "key": "sashimi_yellowtail",
+      "name": "Yellowtail",
+      "category": "sashimi",
+      "sharesWith": null
+    },
+    {
+      "key": "sashimi_octopus",
+      "name": "Octopus",
+      "category": "sashimi",
+      "sharesWith": null
+    },
+    {
+      "key": "sashimi_scallop",
+      "name": "Scallop",
+      "category": "sashimi",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_any",
+      "name": "Any Roll",
+      "category": "roll",
+      "sharesWith": "roll_tuna"
+    },
+    {
+      "key": "roll_california",
+      "name": "California",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_spicy_tuna",
+      "name": "Spicy Tuna",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_salmon_avocado",
+      "name": "Salmon Avocado",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_salmon",
+      "name": "Salmon",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_philadelphia",
+      "name": "Philadelphia",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_cucumber",
+      "name": "Cucumber (Kappa)",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_avocado",
+      "name": "Avocado",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_tuna",
+      "name": "Tuna (Tekka)",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "roll_yellowtail",
+      "name": "Yellowtail",
+      "category": "roll",
+      "sharesWith": null
+    },
+    {
+      "key": "handroll_any",
+      "name": "Any Hand Roll",
+      "category": "handroll",
+      "sharesWith": "handroll_salmon"
+    },
+    {
+      "key": "handroll_salmon",
+      "name": "Salmon",
+      "category": "handroll",
+      "sharesWith": null
+    },
+    {
+      "key": "handroll_tuna",
+      "name": "Tuna",
+      "category": "handroll",
+      "sharesWith": null
+    },
+    {
+      "key": "handroll_spicy_tuna",
+      "name": "Spicy Tuna",
+      "category": "handroll",
+      "sharesWith": null
+    },
+    {
+      "key": "handroll_shrimp_tempura",
+      "name": "Shrimp Tempura",
+      "category": "handroll",
+      "sharesWith": null
+    },
+    {
+      "key": "handroll_california",
+      "name": "California",
+      "category": "handroll",
+      "sharesWith": null
+    },
+    {
+      "key": "handroll_yellowtail",
+      "name": "Yellowtail",
+      "category": "handroll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_any",
+      "name": "Any Special",
+      "category": "special_roll",
+      "sharesWith": "special_roll_rainbow"
+    },
+    {
+      "key": "special_roll_rainbow",
+      "name": "Rainbow",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_dragon",
+      "name": "Dragon",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_dynamite",
+      "name": "Dynamite",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_volcano",
+      "name": "Volcano",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_spider",
+      "name": "Spider",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_caterpillar",
+      "name": "Caterpillar",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_roll_shrimp_tempura",
+      "name": "Shrimp Tempura",
+      "category": "special_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "tempura_any",
+      "name": "Any Tempura",
+      "category": "tempura",
+      "sharesWith": "tempura_shrimp"
+    },
+    {
+      "key": "tempura_shrimp",
+      "name": "Shrimp",
+      "category": "tempura",
+      "sharesWith": null
+    },
+    {
+      "key": "tempura_vegetable",
+      "name": "Vegetable",
+      "category": "tempura",
+      "sharesWith": null
+    },
+    {
+      "key": "tempura_chicken",
+      "name": "Chicken",
+      "category": "tempura",
+      "sharesWith": null
+    },
+    {
+      "key": "salad_any",
+      "name": "Any Salad",
+      "category": "salad",
+      "sharesWith": "salad_house"
+    },
+    {
+      "key": "salad_seaweed",
+      "name": "Seaweed",
+      "category": "salad",
+      "sharesWith": null
+    },
+    {
+      "key": "salad_mango",
+      "name": "Mango",
+      "category": "salad",
+      "sharesWith": null
+    },
+    {
+      "key": "salad_house",
+      "name": "House",
+      "category": "salad",
+      "sharesWith": null
+    },
+    {
+      "key": "salad_sunomono",
+      "name": "Sunomono",
+      "category": "salad",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_any",
+      "name": "Any Soup",
+      "category": "soup",
+      "sharesWith": "soup_miso"
+    },
+    {
+      "key": "soup_miso",
+      "name": "Miso",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_hot_sour",
+      "name": "Hot & Sour",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_tom_yum",
+      "name": "Tom Yum",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_egg_drop",
+      "name": "Egg Drop",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_wonton",
+      "name": "Wonton",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_seaweed",
+      "name": "Seaweed",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "soup_sumashi",
+      "name": "Sumashi (Clear)",
+      "category": "soup",
+      "sharesWith": null
+    },
+    {
+      "key": "rice_any",
+      "name": "Any Rice",
+      "category": "rice",
+      "sharesWith": "rice_fried"
+    },
+    {
+      "key": "rice_fried",
+      "name": "Fried Rice",
+      "category": "rice",
+      "sharesWith": null
+    },
+    {
+      "key": "rice_donburi",
+      "name": "Donburi",
+      "category": "rice",
+      "sharesWith": null
+    },
+    {
+      "key": "rice_onigiri",
+      "name": "Onigiri",
+      "category": "rice",
+      "sharesWith": null
+    },
+    {
+      "key": "rice_chirashi",
+      "name": "Chirashi",
+      "category": "rice",
+      "sharesWith": null
+    },
+    {
+      "key": "noodles_any",
+      "name": "Any Noodles",
+      "category": "noodles",
+      "sharesWith": "noodles_ramen"
+    },
+    {
+      "key": "noodles_ramen",
+      "name": "Ramen",
+      "category": "noodles",
+      "sharesWith": null
+    },
+    {
+      "key": "noodles_udon",
+      "name": "Udon",
+      "category": "noodles",
+      "sharesWith": null
+    },
+    {
+      "key": "noodles_soba",
+      "name": "Soba",
+      "category": "noodles",
+      "sharesWith": null
+    },
+    {
+      "key": "noodles_yaki_udon",
+      "name": "Yaki Udon",
+      "category": "noodles",
+      "sharesWith": null
+    },
+    {
+      "key": "noodles_pad_thai",
+      "name": "Pad Thai",
+      "category": "noodles",
+      "sharesWith": null
+    },
+    {
+      "key": "teriyaki_any",
+      "name": "Any Teriyaki",
+      "category": "teriyaki",
+      "sharesWith": "teriyaki_chicken"
+    },
+    {
+      "key": "teriyaki_chicken",
+      "name": "Chicken",
+      "category": "teriyaki",
+      "sharesWith": null
+    },
+    {
+      "key": "teriyaki_salmon",
+      "name": "Salmon",
+      "category": "teriyaki",
+      "sharesWith": null
+    },
+    {
+      "key": "teriyaki_beef",
+      "name": "Beef",
+      "category": "teriyaki",
+      "sharesWith": null
+    },
+    {
+      "key": "teriyaki_tofu",
+      "name": "Tofu",
+      "category": "teriyaki",
+      "sharesWith": null
+    },
+    {
+      "key": "skewers_any",
+      "name": "Any Skewer",
+      "category": "skewers",
+      "sharesWith": "skewers_chicken"
+    },
+    {
+      "key": "skewers_chicken",
+      "name": "Chicken Yakitori",
+      "category": "skewers",
+      "sharesWith": null
+    },
+    {
+      "key": "skewers_beef",
+      "name": "Beef",
+      "category": "skewers",
+      "sharesWith": null
+    },
+    {
+      "key": "skewers_shrimp",
+      "name": "Shrimp",
+      "category": "skewers",
+      "sharesWith": null
+    },
+    {
+      "key": "skewers_veggie",
+      "name": "Veggie",
+      "category": "skewers",
+      "sharesWith": null
+    },
+    {
+      "key": "spring_roll_any",
+      "name": "Any Spring Roll",
+      "category": "spring_roll",
+      "sharesWith": "spring_roll_vegetable"
+    },
+    {
+      "key": "spring_roll_vegetable",
+      "name": "Vegetable",
+      "category": "spring_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "spring_roll_shrimp",
+      "name": "Shrimp",
+      "category": "spring_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "spring_roll_pork",
+      "name": "Pork",
+      "category": "spring_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "spring_roll_fresh",
+      "name": "Fresh",
+      "category": "spring_roll",
+      "sharesWith": null
+    },
+    {
+      "key": "special_any",
+      "name": "Any Special",
+      "category": "special",
+      "sharesWith": "special_gyoza"
+    },
+    {
+      "key": "special_edamame",
+      "name": "Edamame",
+      "category": "special",
+      "sharesWith": null
+    },
+    {
+      "key": "special_gyoza",
+      "name": "Gyoza",
+      "category": "special",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_any",
+      "name": "Any Dessert",
+      "category": "dessert",
+      "sharesWith": "dessert_mochi"
+    },
+    {
+      "key": "dessert_ice_cream",
+      "name": "Ice Cream",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_mochi",
+      "name": "Mochi",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_green_tea_ice_cream",
+      "name": "Green Tea Ice Cream",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_tempura_ice_cream",
+      "name": "Tempura Ice Cream",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_cheesecake",
+      "name": "Cheesecake",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_tiramisu",
+      "name": "Tiramisu",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_banana_tempura",
+      "name": "Banana Tempura",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_lava_cake",
+      "name": "Chocolate Lava Cake",
+      "category": "dessert",
+      "sharesWith": null
+    },
+    {
+      "key": "dessert_mango_pudding",
+      "name": "Mango Pudding",
+      "category": "dessert",
+      "sharesWith": null
+    }
+  ]
+}

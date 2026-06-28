@@ -21,10 +21,9 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BackButton } from '../../src/components';
+import { BackButton, ItemSprite } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
-import { getItemEmoji } from '../../src/lib/itemEmoji';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { useSession } from '../../src/hooks/useSession';
 import { useMenu } from '../../src/hooks/useMenu';
@@ -143,14 +142,13 @@ export default function ScoreboardScreen() {
         isAny && getCount(item.id) === 0
           ? catItems.find((catItem) => getCount(catItem.id) > 0)
           : item;
-      const emoji = getItemEmoji(item.imageKey, item.category);
       const cat = t.category(item.category);
 
       return (
         <View key={item.id} style={styles.itemCard}>
           <View style={styles.itemCardLeft}>
             <View style={styles.itemEmojiBadge}>
-              <Text style={styles.itemEmojiText}>{emoji}</Text>
+              <ItemSprite imageKey={item.imageKey} category={item.category} size={36} />
             </View>
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{displayName}</Text>
@@ -207,12 +205,11 @@ export default function ScoreboardScreen() {
           <View style={styles.itemList}>
             {displayItems.map((item) => {
               const count = getCount(item.id);
-              const emoji = getItemEmoji(item.imageKey, item.category);
               return (
                 <View key={item.id} style={styles.itemCard}>
                   <View style={styles.itemCardLeft}>
                     <View style={styles.itemEmojiBadge}>
-                      <Text style={styles.itemEmojiText}>{emoji}</Text>
+                      <ItemSprite imageKey={item.imageKey} category={item.category} size={36} />
                     </View>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName}>{item.name}</Text>

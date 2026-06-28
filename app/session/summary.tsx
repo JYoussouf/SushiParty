@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components/BackButton';
+import { ItemSprite } from '../../src/components/ItemSprite';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -493,7 +494,7 @@ export default function SessionSummaryScreen() {
                             {catExpanded && catItems.map((item) => (
                               <View key={item.id} style={styles.itemRow}>
                                 <View style={styles.itemLabelRow}>
-                                  <Text style={styles.itemEmoji}>{getItemEmoji(item.imageKey, item.category)}</Text>
+                                  <ItemSprite imageKey={item.imageKey} category={item.category} size={22} />
                                   <Text style={styles.itemName}>{item.name}</Text>
                                 </View>
                                 <Text style={styles.itemCount}>{item.count}</Text>
