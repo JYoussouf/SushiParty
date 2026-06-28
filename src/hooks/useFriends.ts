@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import {
   addFriendToProfile,
@@ -21,6 +21,9 @@ export function useFriends() {
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Tracks the latest query so out-of-order responses can be discarded
+  const latestQueryRef = useRef('');
 
   const loadFriendData = useCallback(
     async (friendIds: string[]) => {
@@ -61,25 +64,51 @@ export function useFriends() {
   }, [refresh]);
 
   const search = useCallback(
-    async (query: string) => {
-      if (!userProfile) {
+    (query: string) => {
+      latestQueryRef.current = query;
+
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+
+      // Below the minimum length: don't hit the network, clear stale results.
+      if (!userProfile || query.trim().length < 2) {
         setSearchResults([]);
+        setSearching(false);
         return;
       }
 
       setSearching(true);
-      try {
-        const results = await searchUsersByUsername(query, [userProfile.uid, ...userProfile.friendIds]);
-        setSearchResults(results);
-      } finally {
-        setSearching(false);
-      }
+      debounceRef.current = setTimeout(() => {
+        void searchUsersByUsername(query, [userProfile.uid, ...userProfile.friendIds])
+          .then((results) => {
+            // Ignore responses for a query that has since been superseded.
+            if (latestQueryRef.current !== query) return;
+            setSearchResults(results);
+          })
+          .catch(() => {
+            if (latestQueryRef.current !== query) return;
+            setSearchResults([]);
+          })
+          .finally(() => {
+            if (latestQueryRef.current !== query) return;
+            setSearching(false);
+          });
+      }, 300);
     },
     [userProfile],
   );
 
   const clearSearch = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    latestQueryRef.current = '';
     setSearchResults([]);
+    setSearching(false);
+  }, []);
+
+  // Clear any pending debounced search on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
   const addFriend = useCallback(

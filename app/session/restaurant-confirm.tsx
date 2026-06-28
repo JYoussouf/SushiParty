@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
 import {
   ActivityIndicator,
@@ -28,6 +28,9 @@ import type { Restaurant } from '../../src/types';
 
 type RestaurantWithDistance = Restaurant & { distanceKm?: number };
 
+// Session-scoped cache so repeat searches are instant (cleared on app restart)
+const searchCache = new Map<string, RestaurantWithDistance[]>();
+
 export default function SessionRestaurantConfirmScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id?: string; origin?: string }>();
@@ -40,7 +43,9 @@ export default function SessionRestaurantConfirmScreen() {
   const [searchResults, setSearchResults] = useState<RestaurantWithDistance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [listLoading, setListLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sessionId = Array.isArray(params.id) ? params.id[0] : params.id;
   const origin = Array.isArray(params.origin) ? params.origin[0] : params.origin;
@@ -60,16 +65,43 @@ export default function SessionRestaurantConfirmScreen() {
 
   const handleSearchChange = useCallback((text: string) => {
     setSearchQuery(text);
+
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
     if (text.trim().length < 2) {
       setSearchResults([]);
+      setSearchLoading(false);
       return;
     }
-    void searchRestaurantsByName(text)
-      .then(setSearchResults)
-      .catch((error: unknown) => {
-        const message = error instanceof Error ? error.message : 'Could not search restaurants.';
-        Alert.alert('Restaurant lookup failed', message);
-      });
+
+    const cacheKey = text.trim().toLowerCase();
+    if (searchCache.has(cacheKey)) {
+      setSearchResults(searchCache.get(cacheKey)!);
+      setSearchLoading(false);
+      return;
+    }
+
+    setSearchLoading(true);
+    debounceRef.current = setTimeout(() => {
+      searchRestaurantsByName(text)
+        .then((results) => {
+          searchCache.set(cacheKey, results);
+          setSearchResults(results);
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : 'Could not search restaurants.';
+          Alert.alert('Restaurant lookup failed', message);
+          setSearchResults([]);
+        })
+        .finally(() => setSearchLoading(false));
+    }, 350);
+  }, []);
+
+  // Clear any pending debounced search on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
   }, []);
 
   const goToSummary = useCallback(
@@ -142,17 +174,22 @@ export default function SessionRestaurantConfirmScreen() {
       </View>
 
       <View style={styles.searchBar}>
-        <TextInput
-          style={styles.searchInput}
-          value={searchQuery}
-          onChangeText={handleSearchChange}
-          placeholder="Search restaurants by name"
-          placeholderTextColor={t.color.textTertiary}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          editable={!saving}
-        />
+        <View style={styles.searchInputWrap}>
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={handleSearchChange}
+            placeholder="Search restaurants by name"
+            placeholderTextColor={t.color.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            editable={!saving}
+          />
+          {searchLoading && (
+            <ActivityIndicator style={styles.searchSpinner} size="small" color={t.color.accent} />
+          )}
+        </View>
       </View>
 
       {!showSearch && (
@@ -195,7 +232,7 @@ export default function SessionRestaurantConfirmScreen() {
           </TouchableOpacity>
         )}
         ListEmptyComponent={
-          listLoading ? (
+          (showSearch ? searchLoading : listLoading) ? (
             <View style={styles.emptyState}>
               <ActivityIndicator color={t.color.accent} />
             </View>
@@ -238,6 +275,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   title: { fontSize: 32, lineHeight: 36, fontFamily: t.font.display, color: t.color.textPrimary },
   subtitle: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
   searchBar: { paddingHorizontal: 20, paddingBottom: 14 },
+  searchInputWrap: { justifyContent: 'center' },
+  searchSpinner: { position: 'absolute', right: 16 },
   searchInput: {
     borderRadius: t.radius.md,
     borderWidth: 1,

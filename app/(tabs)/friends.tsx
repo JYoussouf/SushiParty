@@ -306,9 +306,9 @@ export default function FriendsScreen() {
               ListEmptyComponent={
                 <View style={styles.modalState}>
                   <Text style={styles.emptyText}>
-                    {query.trim()
+                    {query.trim().length >= 2
                       ? 'No users matched that search.'
-                      : 'Start typing to search the local friend directory.'}
+                      : 'Type at least 2 characters to search the local friend directory.'}
                   </Text>
                 </View>
               }
