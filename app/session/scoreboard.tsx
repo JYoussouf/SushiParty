@@ -357,6 +357,25 @@ export default function ScoreboardScreen() {
     );
   };
 
+  const handleReset = () => {
+    if (sessionTotalPieces === 0) {
+      void reset();
+      return;
+    }
+    Alert.alert(
+      'Reset all counts?',
+      'This will clear every count for this party. This cannot be undone.',
+      [
+        { text: 'Keep counts', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => void reset(),
+        },
+      ],
+    );
+  };
+
   return (
     <View style={styles.container}>
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
@@ -555,7 +574,7 @@ export default function ScoreboardScreen() {
         <View style={styles.footerActions}>
           <TouchableOpacity
             style={styles.resetBtn}
-            onPress={() => void reset()}
+            onPress={handleReset}
             disabled={submitting}
           >
             <Text style={styles.resetBtnText}>Reset</Text>
