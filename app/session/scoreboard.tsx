@@ -175,6 +175,7 @@ export default function ScoreboardScreen() {
               </Text>
             </View>
             <TouchableOpacity
+              style={styles.stepperPlusTouchable}
               onPress={() => void increment(item.id)}
               disabled={!currentUserCanEditActive}
             >
@@ -236,6 +237,7 @@ export default function ScoreboardScreen() {
                       </Text>
                     </View>
                     <TouchableOpacity
+                      style={styles.stepperPlusTouchable}
                       onPress={() => void increment(item.id)}
                       disabled={!currentUserCanEditActive}
                     >
@@ -1030,9 +1032,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   stepperCountTextActive: {
     color: t.color.textPrimary,
   },
-  stepperPlus: {
+  stepperPlusTouchable: {
     width: 52,
     alignSelf: 'stretch',
+  },
+  stepperPlus: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
