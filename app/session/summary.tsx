@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BackButton } from '../../src/components/BackButton';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -146,6 +147,7 @@ export default function SessionSummaryScreen() {
   const [allAchievements, setAllAchievements] = useState<Achievement[]>([]);
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   const [expandedBreakdownCats, setExpandedBreakdownCats] = useState<Set<string>>(new Set());
+  const [leaving, setLeaving] = useState(false);
 
   const toggleBreakdownCat = (userId: string, cat: string) => {
     const key = `${userId}:${cat}`;
@@ -269,6 +271,10 @@ export default function SessionSummaryScreen() {
   };
 
   const handleDone = async () => {
+    // Guard against re-entry: a double-tap (or header + bottom button) must not
+    // double-fire navigation or the interstitial.
+    if (leaving) return;
+    setLeaving(true);
     if (origin === 'history') {
       router.back();
       return;
@@ -357,6 +363,13 @@ export default function SessionSummaryScreen() {
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
+      <View style={styles.header}>
+        <BackButton
+          onPress={() => void handleDone()}
+          disabled={leaving}
+          label={origin === 'history' ? 'History' : 'Home'}
+        />
+      </View>
       <ScrollView contentContainerStyle={styles.content}>
         <LinearGradient
           colors={t.color.accentGradient}
@@ -575,14 +588,21 @@ export default function SessionSummaryScreen() {
           </View>
         )}
 
-        <TouchableOpacity style={styles.doneButton} onPress={() => void handleDone()} activeOpacity={0.85}>
+        <TouchableOpacity
+          style={[styles.doneButton, leaving && styles.doneButtonDisabled]}
+          onPress={() => void handleDone()}
+          activeOpacity={0.85}
+          disabled={leaving}
+        >
           <LinearGradient
             colors={t.color.accentGradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.doneButtonInner}
           >
-            <Text style={styles.doneButtonText}>Let's Go Home!</Text>
+            <Text style={styles.doneButtonText}>
+              {origin === 'history' ? 'Back to History' : "Let's Go Home!"}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
@@ -673,6 +693,7 @@ export default function SessionSummaryScreen() {
 const makeStyles = (t: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.color.bg },
   safe: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4 },
   loadingContainer: { flex: 1, backgroundColor: t.color.bg, justifyContent: 'center', alignItems: 'center' },
   content: { padding: 20, paddingBottom: 28, gap: 18 },
   heroCard: {
@@ -865,6 +886,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderRadius: t.radius.button,
     ...t.shadow.glow(t.color.accent),
   },
+  doneButtonDisabled: { opacity: 0.6 },
   doneButtonInner: {
     borderRadius: t.radius.button,
     paddingVertical: 16,
