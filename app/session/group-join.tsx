@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   StyleSheet,
@@ -145,6 +147,10 @@ export default function GroupJoinScreen() {
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
+      <KeyboardAvoidingView
+        style={styles.kb}
+        behavior={Platform.OS === 'ios' ? undefined : 'height'}
+      >
 
       {/* Top bar */}
       <View style={styles.topBar}>
@@ -220,8 +226,9 @@ export default function GroupJoinScreen() {
         </View>
       )}
 
-      {/* Footer actions */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+      {/* Submit actions — placed right under the code row so they stay
+          visible above the keyboard instead of being pinned to the bottom. */}
+      <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.primaryBtnShadow, (!canJoin || loading) && styles.primaryBtnShadowDisabled]}
           onPress={() => void handleJoinGroup()}
@@ -249,6 +256,7 @@ export default function GroupJoinScreen() {
           <Text style={styles.ghostBtnText}>Scan QR code instead</Text>
         </TouchableOpacity>
       </View>
+      </KeyboardAvoidingView>
 
       {/* QR scanner modal */}
       <Modal visible={scanning} animationType="fade" statusBarTranslucent>
@@ -288,6 +296,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: t.color.bg,
   },
   safe: {
+    flex: 1,
+  },
+  kb: {
     flex: 1,
   },
 
@@ -406,10 +417,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
 
   // ── Footer ──────────────────────────────────────────────
   footer: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 0,
+    paddingHorizontal: 20,
+    marginTop: 28,
     gap: 10,
   },
   primaryBtnShadow: {
