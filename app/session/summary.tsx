@@ -276,7 +276,9 @@ export default function SessionSummaryScreen() {
     // Occasional interstitial at the natural break — after the user has enjoyed
     // their results and is heading home (no-op unless ads are enabled / due).
     await showInterstitialIfDue();
-    router.replace({ pathname: '/session/party-intro', params: { next: 'home' } });
+    // Head straight home — the celebratory splash belongs before a party starts,
+    // not on the way out, where it would just be dead delay.
+    router.replace('/(tabs)/home');
   };
 
   const toggleFriendSelection = (friendId: string) => {

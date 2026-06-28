@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { PartySplash } from '../../src/components';
 
@@ -9,14 +9,11 @@ const logPartyFlow = (...args: unknown[]) => {
 
 export default function PartyIntroScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ next?: string }>();
-  const next = Array.isArray(params.next) ? params.next[0] : params.next;
-  const target = next === 'home' ? '/(tabs)/home' : '/session/scoreboard';
 
   const finishSplash = useCallback(() => {
-    logPartyFlow('party-intro onFinish replace target', { target });
-    router.replace(target);
-  }, [router, target]);
+    logPartyFlow('party-intro onFinish replace scoreboard');
+    router.replace('/session/scoreboard');
+  }, [router]);
 
   React.useEffect(() => {
     logPartyFlow('party-intro mounted');
@@ -26,7 +23,7 @@ export default function PartyIntroScreen() {
   return (
     <>
       <StatusBar style="light" />
-      <PartySplash duration={3600} onFinish={finishSplash} />
+      <PartySplash onFinish={finishSplash} />
     </>
   );
 }

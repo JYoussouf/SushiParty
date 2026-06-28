@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   interpolate,
@@ -26,9 +26,20 @@ const logPartyFlow = (...args: unknown[]) => {
   console.log('[party-flow]', Date.now(), ...args);
 };
 
-export function PartySplash({ onFinish, duration = 3400 }: PartySplashProps) {
+export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const finishedRef = useRef(false);
+
+  const finishOnce = useCallback(
+    (reason: string) => {
+      if (finishedRef.current) return;
+      finishedRef.current = true;
+      logPartyFlow('party-splash finish', { reason });
+      onFinish();
+    },
+    [onFinish],
+  );
   const contentOpacity = useSharedValue(1);
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.82);
@@ -65,14 +76,13 @@ export function PartySplash({ onFinish, duration = 3400 }: PartySplashProps) {
     );
 
     const timer = setTimeout(() => {
-      logPartyFlow('party-splash timer fired');
-      onFinish();
+      finishOnce('timer');
     }, duration);
     return () => {
       logPartyFlow('party-splash cleanup');
       clearTimeout(timer);
     };
-  }, [contentOpacity, duration, logoOpacity, logoScale, logoY, onFinish, orbit, plateScale, shimmer]);
+  }, [contentOpacity, duration, finishOnce, logoOpacity, logoScale, logoY, orbit, plateScale, shimmer]);
 
   const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
   const logoStyle = useAnimatedStyle(() => ({
@@ -88,8 +98,13 @@ export function PartySplash({ onFinish, duration = 3400 }: PartySplashProps) {
   }));
 
   return (
-    <View style={styles.container} pointerEvents="none">
-      <Animated.View style={[styles.content, contentStyle]}>
+    <Pressable
+      style={styles.container}
+      onPress={() => finishOnce('tap')}
+      accessibilityRole="button"
+      accessibilityLabel="Skip intro"
+    >
+      <Animated.View style={[styles.content, contentStyle]} pointerEvents="none">
         <Animated.View style={[styles.glow, glowStyle]} />
         <Animated.View style={[styles.logoWrap, logoStyle]}>
           <SushiPartyLogo size="lg" />
@@ -106,7 +121,7 @@ export function PartySplash({ onFinish, duration = 3400 }: PartySplashProps) {
           <Animated.View style={[styles.loadingFill, glowStyle]} />
         </View>
       </Animated.View>
-    </View>
+    </Pressable>
   );
 }
 
