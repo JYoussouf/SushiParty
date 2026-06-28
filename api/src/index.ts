@@ -1495,6 +1495,12 @@ async function route(request: Request, env: Env): Promise<Response> {
     });
   }
 
+  if (request.method === 'GET' && url.pathname === '/support') {
+    return new Response(SUPPORT_HTML, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }
+
   if (request.method === 'POST' && url.pathname === '/auth/device') {
     return handleAuthDevice(request, env);
   }
@@ -1678,6 +1684,41 @@ const DELETE_ACCOUNT_HTML = `<!DOCTYPE html>
 
 <h2>Contact</h2>
 <p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>. See also our <a href="/privacy">Privacy Policy</a>.</p>
+</body>
+</html>`;
+
+const SUPPORT_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sushi Party — Support</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; }
+  a { color: #e53935; }
+</style>
+</head>
+<body>
+<h1>Sushi Party — Support</h1>
+<p>Sushi Party is a scoreboard for all-you-can-eat sushi: tap to count plates, submit your tally, and track your eating history with friends.</p>
+
+<h2>Contact us</h2>
+<p>Questions, bugs, or feedback? Email <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a> and we'll get back to you.</p>
+
+<h2>Common help</h2>
+<ul>
+<li><strong>Counting:</strong> Start a party, pick a restaurant (optional), then tap + on each item. Submit when you're done.</li>
+<li><strong>Location:</strong> Optional — only used to find nearby restaurants. The app works fully without it.</li>
+<li><strong>Account &amp; sign-in:</strong> Sign in with email, Google, or Apple.</li>
+<li><strong>Delete your account:</strong> see our <a href="/delete-account">account deletion page</a>.</li>
+</ul>
+
+<h2>Privacy</h2>
+<p>Read our <a href="/privacy">Privacy Policy</a>.</p>
+
+<p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a></p>
 </body>
 </html>`;
 
