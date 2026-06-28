@@ -44,6 +44,7 @@ export default function RestaurantPickerScreen() {
   const { setRestaurant } = useRestaurant();
 
   const [nearby, setNearby] = useState<RestaurantWithDistance[]>([]);
+  const [hereId, setHereId] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<RestaurantWithDistance[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [nearbyLoading, setNearbyLoading] = useState(false);
@@ -53,23 +54,20 @@ export default function RestaurantPickerScreen() {
   const [searchFocused, setSearchFocused] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load nearby when location becomes available; auto-select if one is within 100m
+  // Load nearby when location becomes available; highlight a within-100m match as a strong
+  // default ("You're here") but never auto-select or auto-exit — the user must tap to confirm.
   useEffect(() => {
     if (!location) return;
     setNearbyLoading(true);
     getNearbyRestaurants(location)
       .then((results) => {
         const here = results.find((r) => r.distanceKm !== undefined && r.distanceKm <= 0.1);
-        if (here) {
-          setRestaurant(here);
-          router.back();
-          return;
-        }
+        setHereId(here?.id ?? null);
         setNearby(results);
       })
       .catch(() => {})
       .finally(() => setNearbyLoading(false));
-  }, [location, router, setRestaurant]);
+  }, [location]);
 
   const handleSearchChange = useCallback(
     (text: string) => {
@@ -206,19 +204,32 @@ export default function RestaurantPickerScreen() {
         keyExtractor={(r) => r.id}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.row} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSelect(item); }}>
-            <View style={styles.rowBody}>
-              <Text style={styles.rowName}>{item.name}</Text>
-              <Text style={styles.rowAddress} numberOfLines={1}>
-                {item.address}
-              </Text>
-            </View>
-            {item.distanceKm !== undefined && (
-              <Text style={styles.rowDistance}>{formatDistance(item.distanceKm)}</Text>
-            )}
-          </TouchableOpacity>
-        )}
+        renderItem={({ item }) => {
+          const isHere = !showSearch && item.id === hereId;
+          return (
+            <TouchableOpacity
+              style={[styles.row, isHere && styles.rowHere]}
+              onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleSelect(item); }}
+            >
+              <View style={styles.rowBody}>
+                <View style={styles.rowNameLine}>
+                  <Text style={styles.rowName}>{item.name}</Text>
+                  {isHere && (
+                    <View style={styles.hereBadge}>
+                      <Text style={styles.hereBadgeText}>You&apos;re here</Text>
+                    </View>
+                  )}
+                </View>
+                <Text style={styles.rowAddress} numberOfLines={1}>
+                  {item.address}
+                </Text>
+              </View>
+              {item.distanceKm !== undefined && (
+                <Text style={styles.rowDistance}>{formatDistance(item.distanceKm)}</Text>
+              )}
+            </TouchableOpacity>
+          );
+        }}
         ListEmptyComponent={
           listLoading ? (
             <View style={styles.emptyState}>
@@ -446,8 +457,26 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingVertical: 14,
     gap: 12,
   },
+  rowHere: {
+    borderLeftWidth: 3,
+    borderLeftColor: t.color.accent,
+    backgroundColor: t.color.surfaceAlt,
+  },
   rowBody: { flex: 1 },
+  rowNameLine: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   rowName: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
+  hereBadge: {
+    backgroundColor: t.color.accent,
+    borderRadius: t.radius.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  hereBadgeText: {
+    fontSize: 11,
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
+    letterSpacing: 0.3,
+  },
   rowAddress: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary, marginTop: 2 },
   rowDistance: { fontSize: 13, color: t.color.textTertiary, fontFamily: t.font.bodySemibold },
   separator: { height: StyleSheet.hairlineWidth, backgroundColor: t.color.border, marginLeft: 16 },
