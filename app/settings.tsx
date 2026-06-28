@@ -18,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../src/components';
-import { useTheme, useThemeControls } from '../src/contexts/ThemeContext';
+import { useTheme } from '../src/contexts/ThemeContext';
 import type { Theme } from '../src/theme/themes';
 import { useAuth } from '../src/contexts/AuthContext';
 import { buildSessionExportCsv } from '../src/lib/exportSessions';
@@ -98,7 +98,6 @@ export default function SettingsScreen() {
   const router = useRouter();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
-  const { name: themeName, setTheme } = useThemeControls();
   const { userProfile, accountBacked, signOut } = useAuth();
 
   const [soundVolume, setSoundVolume] = useState(0.8);
@@ -174,29 +173,6 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Appearance</Text>
-          <View style={styles.appearanceCard}>
-            <Text style={styles.appearanceLabel}>Theme</Text>
-            <View style={styles.themeOptions}>
-              <ThemeOption
-                label="Tokyo Nights"
-                emoji="🌙"
-                active={themeName === 'tokyo'}
-                onPress={() => setTheme('tokyo')}
-                styles={styles}
-              />
-              <ThemeOption
-                label="Classic"
-                emoji="☀️"
-                active={themeName === 'classic'}
-                onPress={() => setTheme('classic')}
-                styles={styles}
-              />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Volume</Text>
           <View style={styles.soundCard}>
             <VolumeRow
@@ -263,26 +239,6 @@ export default function SettingsScreen() {
       </ScrollView>
       </SafeAreaView>
     </View>
-  );
-}
-
-function ThemeOption({ label, emoji, active, onPress, styles }: {
-  label: string;
-  emoji: string;
-  active: boolean;
-  onPress: () => void;
-  styles: Styles;
-}) {
-  return (
-    <TouchableOpacity
-      style={[styles.themeOption, active && styles.themeOptionActive]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <Text style={styles.themeOptionEmoji}>{emoji}</Text>
-      <Text style={[styles.themeOptionLabel, active && styles.themeOptionLabelActive]}>{label}</Text>
-      {active && <Text style={styles.themeOptionCheck}>✓</Text>}
-    </TouchableOpacity>
   );
 }
 

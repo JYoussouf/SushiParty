@@ -5,7 +5,7 @@
     "owner": "joseppy",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/sushi-party.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "scheme": "sushiparty",
@@ -23,8 +23,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/sushi-party.png",
+        "backgroundColor": "#0E1A3D"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,

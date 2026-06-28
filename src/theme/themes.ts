@@ -1,14 +1,9 @@
-// Two coexisting themes selectable at runtime via ThemeContext:
-//   • classic — the original warm cream / Press Start 2P "pixel" look.
-//   • tokyo   — "Tokyo Nights": dark purple gradients, neon coral→pink accents,
-//               glass cards, large rounded pills, Playfair + Inter type.
-//
-// Screens read everything from the active Theme object (see useTheme()), so the
-// whole app can flip between the two looks instantly.
-import { PIXEL_FONT, palette as classicPalette } from './pixel';
+// Single app theme — "Tokyo Nights": dark charcoal background, warm red accent,
+// glass cards, large rounded pills, Playfair + Inter type, colorful per-category
+// counters. Screens read everything from this Theme object via useTheme().
 import { getCategoryTheme } from '../lib/categoryTheme';
 
-export type ThemeName = 'classic' | 'tokyo';
+export type ThemeName = 'tokyo';
 
 export interface CategoryVisual {
   gradient: [string, string];
@@ -59,47 +54,47 @@ export interface Theme {
 
 // ── Tokyo Nights category gradients (neon, dark) ──────────────────────────────
 const TOKYO_CATEGORY: Record<string, [string, string]> = {
-  nigiri: ['#FF9A8B', '#FF6A88'],
-  sashimi: ['#FF87B2', '#FF5C9E'],
-  roll: ['#FFC46B', '#FF9A5A'],
-  handroll: ['#FFB07A', '#FF8A5A'],
-  special_roll: ['#FFD36B', '#FFAE42'],
-  salad: ['#A6E782', '#5FD08A'],
-  soup: ['#C9A0FF', '#9A7AE0'],
-  special: ['#C9A0FF', '#9A7AE0'],
-  dessert: ['#FF9AD1', '#FF6AB0'],
-  rice: ['#B6E08A', '#7FC97A'],
-  noodles: ['#FFC46B', '#FF9A5A'],
-  teriyaki: ['#FFB07A', '#FF8A5A'],
-  skewers: ['#86E0FF', '#5AB0E0'],
-  spring_roll: ['#86E8D2', '#4FC9B0'],
-  other: ['#86E0FF', '#5AB0E0'],
+  nigiri: ['#FF7A5E', '#E53935'],
+  sashimi: ['#5EC8FF', '#1E88E5'],
+  roll: ['#A6E782', '#43A047'],
+  handroll: ['#FFB07A', '#C46A21'],
+  special_roll: ['#FFD36B', '#F5A623'],
+  salad: ['#B6E08A', '#5FB85F'],
+  soup: ['#FFC46B', '#F57C00'],
+  special: ['#C9A0FF', '#8E24AA'],
+  dessert: ['#FF9AD1', '#D81B60'],
+  rice: ['#C9D98A', '#8DA24B'],
+  noodles: ['#FFC46B', '#E07B2A'],
+  teriyaki: ['#E0A878', '#9C5A2E'],
+  skewers: ['#9FB6C0', '#546E7A'],
+  spring_roll: ['#86E8D2', '#00897B'],
+  other: ['#FFC46B', '#F5A623'],
 };
 
 export const tokyoTheme: Theme = {
   name: 'tokyo',
   isDark: true,
   color: {
-    bg: '#0B0712',
-    bgGradient: ['#2A1330', '#140C20', '#0B0712'],
-    surface: '#1A1330',
-    surfaceAlt: '#221A3A',
+    bg: '#0E0C0B',
+    bgGradient: ['#241A18', '#161312', '#0C0A0A'],
+    surface: '#1C1817',
+    surfaceAlt: '#262120',
     border: 'rgba(255,255,255,0.08)',
-    textPrimary: '#F4F1FB',
-    textSecondary: '#9D93B8',
-    textTertiary: '#6E6489',
-    accent: '#FF6F91',
-    accentSoft: '#FF8FA8',
-    accentGradient: ['#FFB199', '#FF6F91'],
-    onAccent: '#2A0E18',
-    success: '#5FD08A',
-    amber: '#FFB35A',
-    cyan: '#6FD3FF',
-    purple: '#B58CFF',
-    tabBar: 'rgba(18,12,28,0.92)',
-    tabActive: '#FF6F91',
-    tabInactive: '#6E6489',
-    danger: '#FF6F91',
+    textPrimary: '#F5F1EE',
+    textSecondary: '#B0A8A2',
+    textTertiary: '#7E756F',
+    accent: '#E53935',
+    accentSoft: '#FF6B5E',
+    accentGradient: ['#FF7A5E', '#E53935'],
+    onAccent: '#FFFFFF',
+    success: '#5FB85F',
+    amber: '#F5A623',
+    cyan: '#3FA9E0',
+    purple: '#A06CD8',
+    tabBar: 'rgba(18,15,14,0.94)',
+    tabActive: '#E53935',
+    tabInactive: '#7E756F',
+    danger: '#E53935',
   },
   font: {
     display: 'PlayfairDisplay_600SemiBold',
@@ -136,63 +131,5 @@ export const tokyoTheme: Theme = {
   },
 };
 
-export const classicTheme: Theme = {
-  name: 'classic',
-  isDark: false,
-  color: {
-    bg: classicPalette.bg,
-    bgGradient: ['#fffaf2', '#fdf3e3', '#fff4d7'],
-    surface: '#fffdf8',
-    surfaceAlt: '#fff4d7',
-    border: 'rgba(26,19,38,0.12)',
-    textPrimary: classicPalette.ink,
-    textSecondary: classicPalette.inkSoft,
-    textTertiary: '#7a6452',
-    accent: classicPalette.red,
-    accentSoft: '#ee5d52',
-    accentGradient: ['#ee5d52', classicPalette.red],
-    onAccent: '#ffffff',
-    success: classicPalette.green,
-    amber: classicPalette.yellow,
-    cyan: classicPalette.blue,
-    purple: classicPalette.purple,
-    tabBar: '#fffdf8',
-    tabActive: classicPalette.red,
-    tabInactive: '#7a6452',
-    danger: classicPalette.red,
-  },
-  font: {
-    display: PIXEL_FONT,
-    displayItalic: PIXEL_FONT,
-    body: PIXEL_FONT,
-    bodyMedium: PIXEL_FONT,
-    bodySemibold: PIXEL_FONT,
-    bodyBold: PIXEL_FONT,
-  },
-  radius: { sm: 4, md: 8, lg: 12, pill: 10, button: 10 },
-  shadow: {
-    card: {
-      shadowColor: classicPalette.shadow,
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      shadowOffset: { width: 4, height: 4 },
-      elevation: 0,
-    },
-    glow: () => ({
-      shadowColor: classicPalette.shadow,
-      shadowOpacity: 1,
-      shadowRadius: 0,
-      shadowOffset: { width: 2, height: 2 },
-      elevation: 0,
-    }),
-  },
-  category: (cat: string): CategoryVisual => {
-    const base = getCategoryTheme(cat);
-    return { gradient: [base.bg, base.bgActive], accent: base.accent, emoji: base.emoji };
-  },
-};
-
-export const THEMES: Record<ThemeName, Theme> = {
-  classic: classicTheme,
-  tokyo: tokyoTheme,
-};
+// Single active theme for the app.
+export const appTheme: Theme = tokyoTheme;

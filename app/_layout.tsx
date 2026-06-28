@@ -21,7 +21,7 @@ import { SessionProvider, useSession } from '../src/contexts/SessionContext';
 import { TransitionProvider } from '../src/contexts/TransitionContext';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
 import { IntroSplash } from '../src/components';
-import { palette } from '../src/theme/pixel';
+import { appTheme } from '../src/theme/themes';
 
 let didInitialRedirect = false;
 
@@ -182,7 +182,7 @@ export default function RootLayout() {
   });
 
   if (!fontsLoaded) {
-    return <View style={{ flex: 1, backgroundColor: palette.bg }} />;
+    return <View style={{ flex: 1, backgroundColor: appTheme.color.bg }} />;
   }
 
   return (

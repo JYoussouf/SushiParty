@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SushiPartyLogo } from '../../src/components';
-import { useTheme, useThemeControls } from '../../src/contexts/ThemeContext';
+import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSession } from '../../src/hooks/useSession';
@@ -202,7 +202,6 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const t = useTheme();
-  const { name: themeName, toggleTheme } = useThemeControls();
   const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
   const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
@@ -273,14 +272,9 @@ export default function HomeScreen() {
             <Text style={styles.profileName} numberOfLines={1}>{userProfile.displayName}</Text>
           ) : null}
         </TouchableOpacity>
-        <View style={styles.topActions}>
-          <TouchableOpacity style={styles.iconButton} onPress={toggleTheme} accessibilityLabel="Toggle theme">
-            <Text style={styles.iconButtonText}>{themeName === 'tokyo' ? '🌙' : '☀️'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/settings')}>
-            <Text style={styles.iconButtonText}>⚙️</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/settings')}>
+          <Text style={styles.iconButtonText}>⚙️</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Hero */}
