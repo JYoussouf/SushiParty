@@ -65,7 +65,7 @@ function AnimatedEmote({
 
   return (
     <Animated.View style={style}>
-      <TouchableOpacity onPress={onPress} style={styles.emoteButton} activeOpacity={0.7}>
+      <TouchableOpacity onPress={onPress} style={styles.emoteButton} activeOpacity={0.7} hitSlop={{ top: 7, bottom: 7 }}>
         <Text style={styles.emoteButtonText}>{emoji}</Text>
       </TouchableOpacity>
     </Animated.View>

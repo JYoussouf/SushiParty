@@ -201,6 +201,7 @@ export default function HistoryScreen() {
                 <TouchableOpacity
                   key={key}
                   style={[styles.filterChip, sortOption === key && styles.filterChipActive]}
+                  hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
                   onPress={() => setSortOption(key)}
                 >
                   <Text style={[styles.filterChipText, sortOption === key && styles.filterChipTextActive]}>

@@ -431,6 +431,7 @@ export default function ScoreboardScreen() {
         <View style={styles.modePill}>
           <Pressable
             style={[styles.modeBtn, scoreboardMode === 'simple' && styles.modeBtnActive]}
+            hitSlop={{ top: 6, bottom: 6 }}
             onPress={() => {
               if (scoreboardMode !== 'simple') {
                 setScoreboardMode('simple');
@@ -446,6 +447,7 @@ export default function ScoreboardScreen() {
           </Pressable>
           <Pressable
             style={[styles.modeBtn, scoreboardMode === 'detailed' && styles.modeBtnActive]}
+            hitSlop={{ top: 6, bottom: 6 }}
             onPress={() => {
               if (scoreboardMode !== 'detailed') {
                 setScoreboardMode('detailed');

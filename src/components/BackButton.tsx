@@ -19,6 +19,7 @@ export function BackButton({ onPress, disabled, label = 'Back', style }: BackBut
       onPress={onPress}
       disabled={disabled}
       activeOpacity={0.75}
+      hitSlop={{ top: 6, bottom: 6 }}
     >
       <Text style={styles.icon}>←</Text>
       <Text style={styles.label}>{label}</Text>
