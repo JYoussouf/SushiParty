@@ -269,7 +269,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: t.color.accentSoft,
   },
-  secondaryButtonText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
+  secondaryButtonText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   listContent: { paddingHorizontal: 20, paddingBottom: 140, paddingTop: 6 },
   separator: { height: 10 },
   row: {

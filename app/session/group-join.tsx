@@ -300,7 +300,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   ribbonText: {
     fontSize: 11,
     fontFamily: t.font.bodyBold,
-    color: t.color.accent,
+    color: t.color.onAccent,
     letterSpacing: 1,
     textTransform: 'uppercase',
   },

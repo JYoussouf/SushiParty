@@ -705,7 +705,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     paddingVertical: 8,
     backgroundColor: t.color.accentSoft,
   },
-  actionChipText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
+  actionChipText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   plateCard: {
     borderRadius: t.radius.lg,
     padding: 18,
@@ -935,6 +935,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   addNoteButtonText: {
     fontSize: 15,
     fontFamily: t.font.bodyBold,
-    color: t.color.accent,
+    color: t.color.onAccent,
   },
 });

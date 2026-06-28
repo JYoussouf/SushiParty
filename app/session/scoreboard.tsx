@@ -866,7 +866,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     lineHeight: 20,
   },
   participantNameActive: {
-    color: t.color.accent,
+    color: t.color.onAccent,
   },
   participantTotal: {
     fontSize: 12,
@@ -1067,7 +1067,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   menuToggleText: {
     fontSize: 12,
     fontFamily: t.font.bodyBold,
-    color: t.color.accent,
+    color: t.color.onAccent,
   },
   footerActions: {
     flexDirection: 'row',
