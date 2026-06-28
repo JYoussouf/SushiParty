@@ -55,7 +55,7 @@ function AvatarButton({ avatar, selected, onSelect, styles }: { avatar: string; 
 
 const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 
-type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 'error';
 
 export default function OnboardingScreen() {
   const router = useRouter();
@@ -89,7 +89,7 @@ export default function OnboardingScreen() {
         const taken = await isUsernameTaken(trimmed);
         setUsernameStatus(taken ? 'taken' : 'available');
       } catch {
-        setUsernameStatus('idle');
+        setUsernameStatus('error');
       }
     }, 500);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
@@ -97,7 +97,11 @@ export default function OnboardingScreen() {
 
   const canContinue =
     name.trim().length > 0 &&
-    usernameStatus === 'available';
+    (usernameStatus === 'available' ||
+      // Network check failed (offline/API down): treat as non-blocking so the
+      // user isn't dead-ended. The handle is validated server-side at
+      // completeOnboarding. Still require a locally well-formed handle.
+      (usernameStatus === 'error' && USERNAME_RE.test(username.trim().toLowerCase())));
 
   const handleContinue = async () => {
     if (!canContinue || saving) return;
@@ -206,6 +210,7 @@ export default function OnboardingScreen() {
               {usernameStatus === 'available' && '✓ Username is available'}
               {usernameStatus === 'taken' && 'That username is taken'}
               {usernameStatus === 'invalid' && '3–20 characters: letters, numbers, underscores'}
+              {usernameStatus === 'error' && "Couldn't check that handle — you can continue and we'll confirm it."}
             </Text>
           </View>
 
