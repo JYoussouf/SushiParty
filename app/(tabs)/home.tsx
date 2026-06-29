@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { SushiPartyLogo, ItemSprite } from '../../src/components';
+import { SushiPartyLogo, ItemSpriteIdle } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -332,7 +332,7 @@ export default function HomeScreen() {
 
           <View style={styles.plateRight}>
             {card.kind === 'stat' && card.spriteKey ? (
-              <ItemSprite imageKey={card.spriteKey} category={card.spriteCategory} size={50} />
+              <ItemSpriteIdle imageKey={card.spriteKey} category={card.spriteCategory} size={48} />
             ) : (
               <Text style={styles.plateEmoji}>{card.emoji}</Text>
             )}

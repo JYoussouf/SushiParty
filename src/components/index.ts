@@ -6,3 +6,4 @@ export { IntroSplash } from './IntroSplash';
 export { PartySplash } from './PartySplash';
 export { SushiPartyLogo } from './SushiPartyLogo';
 export { ItemSprite } from './ItemSprite';
+export { ItemSpriteIdle } from './ItemSpriteIdle';

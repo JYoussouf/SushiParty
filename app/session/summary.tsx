@@ -494,7 +494,7 @@ export default function SessionSummaryScreen() {
                             {catExpanded && catItems.map((item) => (
                               <View key={item.id} style={styles.itemRow}>
                                 <View style={styles.itemLabelRow}>
-                                  <ItemSprite imageKey={item.imageKey} category={item.category} size={22} />
+                                  <ItemSprite imageKey={item.imageKey} category={item.category} size={24} />
                                   <Text style={styles.itemName}>{item.name}</Text>
                                 </View>
                                 <Text style={styles.itemCount}>{item.count}</Text>

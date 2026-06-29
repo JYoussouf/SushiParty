@@ -21,7 +21,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BackButton, ItemSprite } from '../../src/components';
+import { BackButton, ItemSpriteIdle } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
@@ -148,7 +148,7 @@ export default function ScoreboardScreen() {
         <View key={item.id} style={styles.itemCard}>
           <View style={styles.itemCardLeft}>
             <View style={styles.itemEmojiBadge}>
-              <ItemSprite imageKey={item.imageKey} category={item.category} size={36} />
+              <ItemSpriteIdle imageKey={item.imageKey} category={item.category} size={48} active={displayCount > 0} />
             </View>
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>{displayName}</Text>
@@ -209,7 +209,7 @@ export default function ScoreboardScreen() {
                 <View key={item.id} style={styles.itemCard}>
                   <View style={styles.itemCardLeft}>
                     <View style={styles.itemEmojiBadge}>
-                      <ItemSprite imageKey={item.imageKey} category={item.category} size={36} />
+                      <ItemSpriteIdle imageKey={item.imageKey} category={item.category} size={48} active={count > 0} />
                     </View>
                     <View style={styles.itemInfo}>
                       <Text style={styles.itemName}>{item.name}</Text>
@@ -946,18 +946,14 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     minWidth: 0,
   },
   itemEmojiBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 48,
+    height: 48,
+    borderRadius: 16,
     backgroundColor: t.color.surfaceAlt,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: t.color.border,
-  },
-  itemEmojiText: {
-    fontSize: 22,
-    lineHeight: 26,
   },
   itemInfo: {
     flex: 1,
