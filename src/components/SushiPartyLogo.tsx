@@ -47,15 +47,17 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
   },
   tokyoWord: {
+    // Italic is already baked into the font family (PlayfairDisplay_..._Italic).
+    // Adding fontStyle: 'italic' makes Android look for an italic variant of an
+    // already-italic font, fail to resolve it, and drop/fall back the glyph run
+    // (the nested "party" span vanishes, "sushi" renders as synthesized system italic).
     fontFamily: t.font.displayItalic,
-    fontStyle: 'italic',
     color: t.color.textPrimary,
     letterSpacing: -1,
   },
   tokyoAccent: {
     color: t.color.accent,
     fontFamily: t.font.displayItalic,
-    fontStyle: 'italic',
   },
   // Classic
   wrap: {
