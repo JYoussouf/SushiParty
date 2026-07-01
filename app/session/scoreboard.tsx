@@ -1,13 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
   Pressable,
   View,
   Text,
+  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -17,6 +17,8 @@ import Animated, {
   withSpring,
   withSequence,
 } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -35,16 +37,22 @@ import { getRestaurantStats } from '../../src/lib/local/restaurantStats';
 import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
 import { getSessionTemplates } from '../../src/lib/local/templates';
 import { isAnomaly } from '../../src/lib/stats/anomalyDetection';
-import type { SessionTemplate } from '../../src/types';
+import type { SessionTemplate, SushiItem } from '../../src/types';
 
 const logPartyFlow = (...args: unknown[]) => {
   console.log('[party-flow]', Date.now(), ...args);
 };
 
+// Approx. height of the absolutely-positioned footer (menu toggle + action row +
+// vertical padding), before the safe-area inset is added on top. Used to keep the
+// last list card clear of the footer while scrolling.
+const FOOTER_CLEARANCE = 120;
+
 export default function ScoreboardScreen() {
   const router = useRouter();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
   const { userProfile } = useAuth();
   const { restaurant, clearRestaurant, setRestaurant } = useRestaurant();
   const {
@@ -70,6 +78,7 @@ export default function ScoreboardScreen() {
     stdDev: number;
   } | null>(null);
   const [scoreboardMode, setScoreboardMode] = useState<'simple' | 'detailed'>('simple');
+  const [query, setQuery] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const tallyScale = useSharedValue(1);
   const tallyStyle = useAnimatedStyle(() => ({ transform: [{ scale: tallyScale.value }] }));
@@ -124,9 +133,23 @@ export default function ScoreboardScreen() {
     {},
   );
 
+  const normalizedQuery = query.trim().toLowerCase();
+  const matchesQuery = useCallback(
+    (item: SushiItem) =>
+      item.name.toLowerCase().includes(normalizedQuery) ||
+      getCategoryLabel(item.category).toLowerCase().includes(normalizedQuery),
+    [normalizedQuery],
+  );
+
   // Simple mode: vertical card list with inline CountStepper
   const simpleList = useMemo(() => {
     const visible = Object.values(categorized).flatMap((items) => {
+      // While searching, expand real items so specific matches surface
+      // (collapsed "-any" aggregates would hide them).
+      if (normalizedQuery) {
+        const real = items.filter((item) => !item.id.endsWith('-any'));
+        return (real.length > 0 ? real : items).filter(matchesQuery);
+      }
       const anyItem = items.find((item) => item.id.endsWith('-any'));
       const collapsible = !!anyItem && items.length > 1;
       return collapsible && anyItem ? [anyItem] : items;
@@ -190,13 +213,15 @@ export default function ScoreboardScreen() {
         </View>
       );
     });
-  }, [categorized, getCount, increment, decrement, currentUserCanEditActive, styles, t]);
+  }, [categorized, getCount, increment, decrement, currentUserCanEditActive, normalizedQuery, matchesQuery, styles, t]);
 
   // Detailed mode: sectioned list with same card+stepper UX
   const detailedList = useMemo(() => {
     return Object.entries(categorized).map(([cat, catItems]) => {
       const items = catItems.filter((item) => !item.id.endsWith('-any'));
-      const displayItems = items.length > 0 ? items : catItems;
+      const baseItems = items.length > 0 ? items : catItems;
+      const displayItems = normalizedQuery ? baseItems.filter(matchesQuery) : baseItems;
+      if (displayItems.length === 0) return null;
       const catVisual = t.category(cat);
 
       return (
@@ -255,7 +280,11 @@ export default function ScoreboardScreen() {
         </View>
       );
     });
-  }, [categorized, getCount, increment, decrement, currentUserCanEditActive, styles, t]);
+  }, [categorized, getCount, increment, decrement, currentUserCanEditActive, normalizedQuery, matchesQuery, styles, t]);
+
+  const filteredItemCount = normalizedQuery
+    ? activeMenu.items.filter((item) => !item.id.endsWith('-any') && matchesQuery(item)).length
+    : activeMenu.items.length;
 
   const persistSession = async (flagged: boolean) => {
     if (!userProfile) {
@@ -378,7 +407,7 @@ export default function ScoreboardScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={styles.safe}>
+      <View style={[styles.safe, { paddingTop: insets.top }]}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
       {/* Header: back | center */}
@@ -546,22 +575,72 @@ export default function ScoreboardScreen() {
         </View>
       )}
 
+      {/* Search */}
+      <View style={styles.searchWrap}>
+        <View style={styles.searchBar}>
+          <Svg width={16} height={16} viewBox="0 0 24 24" style={styles.searchIcon}>
+            <Path
+              fill={t.color.textTertiary}
+              d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0A4.5 4.5 0 1 1 14 9.5 4.5 4.5 0 0 1 9.5 14z"
+            />
+          </Svg>
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search what you're eating"
+            placeholderTextColor={t.color.textTertiary}
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="off"
+            returnKeyType="search"
+            underlineColorAndroid="transparent"
+            accessibilityLabel="Search menu items"
+          />
+          {query.length > 0 && (
+            <TouchableOpacity
+              style={styles.searchClear}
+              onPress={() => setQuery('')}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Clear search"
+            >
+              <Svg width={10} height={10} viewBox="0 0 24 24">
+                <Path
+                  fill={t.color.textSecondary}
+                  d="M18.3 5.71a1 1 0 0 0-1.41 0L12 10.59 7.11 5.7A1 1 0 0 0 5.7 7.11L10.59 12 5.7 16.89a1 1 0 1 0 1.41 1.41L12 13.41l4.89 4.89a1 1 0 0 0 1.41-1.41L13.41 12l4.89-4.89a1 1 0 0 0 0-1.4z"
+                />
+              </Svg>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* Item list / grid */}
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {scoreboardMode === 'simple' ? (
           <View style={styles.itemList}>{simpleList}</View>
         ) : (
           <View>{detailedList}</View>
         )}
-        <View style={styles.listPadding} />
+        {normalizedQuery.length > 0 && filteredItemCount === 0 && (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>No matches</Text>
+            <Text style={styles.emptyText}>
+              Nothing on this menu matches “{query.trim()}”.
+            </Text>
+          </View>
+        )}
+        <View style={{ height: FOOTER_CLEARANCE + insets.bottom }} />
       </ScrollView>
 
       {/* Footer */}
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
         {canToggle && (
           <TouchableOpacity
             style={styles.menuToggle}
@@ -649,7 +728,7 @@ export default function ScoreboardScreen() {
           </View>
         </View>
       </Modal>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
@@ -700,7 +779,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   // ── Tally card (plate) ──────────────────────────────────
   tallySection: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 4,
   },
   tallyCard: {
@@ -710,7 +789,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: t.color.surface,
     borderRadius: t.radius.lg,
     paddingHorizontal: 20,
-    paddingVertical: 18,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: t.color.border,
     ...t.shadow.card,
@@ -779,7 +858,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   modePill: {
     flexDirection: 'row',
@@ -913,6 +992,67 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 13,
     fontFamily: t.font.body,
     color: t.color.amber,
+  },
+
+  // ── Search ──────────────────────────────────────────────
+  searchWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 8,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 44,
+    paddingHorizontal: 14,
+    borderRadius: t.radius.pill,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    ...t.shadow.card,
+  },
+  searchIcon: {
+    opacity: 0.7,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: t.font.body,
+    color: t.color.textPrimary,
+    padding: 0,
+    // Height + centering keeps the caret/text vertically centered on Android,
+    // where TextInput otherwise adds asymmetric font padding.
+    height: '100%',
+    textAlignVertical: 'center',
+    includeFontPadding: false,
+  },
+  searchClear: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: t.color.surfaceAlt,
+  },
+
+  // ── Empty state ─────────────────────────────────────────
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: 48,
+    paddingHorizontal: 24,
+    gap: 6,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
+  },
+  emptyText: {
+    fontSize: 14,
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
+    textAlign: 'center',
   },
 
   // ── Item list (simple mode) ─────────────────────────────
@@ -1058,10 +1198,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
 
 
-  listPadding: {
-    height: 130,
-  },
-
   // ── Footer ──────────────────────────────────────────────
   footer: {
     position: 'absolute',
@@ -1070,7 +1206,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     paddingTop: 10,
-    paddingBottom: 28,
     backgroundColor: t.color.surface,
     borderTopWidth: 1,
     borderTopColor: t.color.border,
