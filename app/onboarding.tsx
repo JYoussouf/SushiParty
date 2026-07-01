@@ -37,8 +37,8 @@ function AvatarButton({ avatar, selected, onSelect, styles }: { avatar: string; 
   const handlePress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     scale.value = withSequence(
-      withSpring(1.3, { damping: 6, stiffness: 300 }),
-      withSpring(1, { damping: 12, stiffness: 200 }),
+      withSpring(1.22, { duration: 90 }),
+      withSpring(1, { duration: 140 }),
     );
     onSelect(avatar);
   };
@@ -176,8 +176,8 @@ export default function OnboardingScreen() {
                   onSelect={(a) => {
                     setSelectedAvatar(a);
                     previewScale.value = withSequence(
-                      withSpring(1.18, { damping: 6, stiffness: 300 }),
-                      withSpring(1, { damping: 12, stiffness: 200 }),
+                      withSpring(1.12, { duration: 90 }),
+                      withSpring(1, { duration: 150 }),
                     );
                   }}
                 />
