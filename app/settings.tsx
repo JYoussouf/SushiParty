@@ -8,6 +8,7 @@ import {
   Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -102,7 +103,12 @@ export default function SettingsScreen() {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
-  const { userProfile, accountBacked, signOut } = useAuth();
+  const { userProfile, accountBacked, signOut, changeUsername } = useAuth();
+
+  const [usernameInput, setUsernameInput] = useState(userProfile?.username ?? '');
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [usernameSaved, setUsernameSaved] = useState(false);
+  const [usernameSaving, setUsernameSaving] = useState(false);
 
   const [soundVolume, setSoundVolume] = useState(0.8);
   const [musicVolume, setMusicVolume] = useState(0.5);
@@ -144,6 +150,34 @@ export default function SettingsScreen() {
     const next = !musicMuted;
     setMusicMuted(next);
     void AsyncStorage.setItem(MUSIC_MUTE_KEY, String(next));
+  };
+
+  useEffect(() => {
+    setUsernameInput(userProfile?.username ?? '');
+  }, [userProfile?.username]);
+
+  const currentUsername = userProfile?.username ?? '';
+  const trimmedUsername = usernameInput.trim().toLowerCase();
+  const usernameDirty = trimmedUsername !== currentUsername;
+
+  const handleChangeUsername = async () => {
+    setUsernameError(null);
+    setUsernameSaved(false);
+    if (!usernameDirty) return;
+    if (!/^[a-z0-9_]{3,20}$/.test(trimmedUsername)) {
+      setUsernameError('Username must be 3-20 characters: letters, numbers, and underscores only.');
+      return;
+    }
+    setUsernameSaving(true);
+    try {
+      await changeUsername(trimmedUsername);
+      setUsernameSaved(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (e) {
+      setUsernameError(e instanceof Error ? e.message : 'Could not change username.');
+    } finally {
+      setUsernameSaving(false);
+    }
   };
 
   const handleExportHistory = async () => {
@@ -200,6 +234,50 @@ export default function SettingsScreen() {
               t={t}
               styles={styles}
             />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Username</Text>
+          <View style={styles.usernameCard}>
+            <View style={styles.usernameInputRow}>
+              <View style={styles.usernameInputWrap}>
+                <Text style={styles.usernameAt}>@</Text>
+                <TextInput
+                  style={styles.usernameInput}
+                  value={usernameInput}
+                  onChangeText={(text) => {
+                    setUsernameInput(text);
+                    setUsernameError(null);
+                    setUsernameSaved(false);
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="off"
+                  maxLength={20}
+                  placeholder="username"
+                  placeholderTextColor={t.color.textTertiary}
+                  editable={!usernameSaving}
+                  returnKeyType="done"
+                  onSubmitEditing={() => void handleChangeUsername()}
+                />
+              </View>
+              <TouchableOpacity
+                style={[styles.rowActionBtn, (!usernameDirty || usernameSaving) && styles.rowActionBtnDisabled]}
+                activeOpacity={0.85}
+                disabled={!usernameDirty || usernameSaving}
+                onPress={() => void handleChangeUsername()}
+              >
+                <Text style={styles.rowActionBtnText}>{usernameSaving ? 'Saving…' : 'Save'}</Text>
+              </TouchableOpacity>
+            </View>
+            {usernameError ? (
+              <Text style={styles.usernameError}>{usernameError}</Text>
+            ) : usernameSaved ? (
+              <Text style={styles.usernameSuccess}>Username updated.</Text>
+            ) : (
+              <Text style={styles.rowNote}>You can change your username once every 7 days.</Text>
+            )}
           </View>
         </View>
 
@@ -363,6 +441,48 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   rowTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary },
 
+  // ── Username ───────────────────────────────────────────────
+  usernameCard: {
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    padding: 16,
+    gap: 10,
+  },
+  usernameInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  usernameInputWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    height: 44,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.surfaceAlt,
+    borderWidth: 1.5,
+    borderColor: t.color.border,
+  },
+  usernameAt: {
+    fontSize: 15,
+    fontFamily: t.font.bodyBold,
+    color: t.color.textTertiary,
+    marginRight: 2,
+  },
+  usernameInput: {
+    flex: 1,
+    fontSize: 15,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textPrimary,
+    padding: 0,
+    includeFontPadding: false,
+  },
+  usernameError: { fontSize: 13, lineHeight: 19, fontFamily: t.font.bodySemibold, color: t.color.danger },
+  usernameSuccess: { fontSize: 13, lineHeight: 19, fontFamily: t.font.bodySemibold, color: t.color.accent },
+
   // Action button chips — explicitly boxed so they render identically on iOS
   // and Android (bare text links diverge due to Android's includeFontPadding).
   rowActionBtn: {
@@ -377,6 +497,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
+  },
+  rowActionBtnDisabled: {
+    opacity: 0.5,
   },
   rowActionBtnText: {
     fontSize: 13,

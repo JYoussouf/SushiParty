@@ -88,6 +88,7 @@ interface UserRow {
   friend_ids_json: string;
   avatar: string | null;
   created_at: string;
+  username_changed_at: string | null;
 }
 
 interface AccountCredentialRow {
@@ -158,6 +159,7 @@ const MAX_RESTAURANT_CANDIDATES = 50;
 const MAX_RESTAURANT_RESULTS = 10;
 const DEFAULT_RADIUS_KM = 10;
 const TOKEN_TTL_SECONDS = 90 * 24 * 60 * 60;
+const USERNAME_CHANGE_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 const PASSWORD_ITERATIONS = 100_000;
 const PASSWORD_SALT_BYTES = 16;
 const PASSWORD_MIN_LENGTH = 8;
@@ -740,6 +742,54 @@ async function handleUsers(request: Request, env: Env, parts: string[], url: URL
     const body = await readJson<Partial<User>>(request);
     const user = await upsertUser(env, { ...body, uid });
     return json(request, env, { user });
+  }
+
+  // Change the current user's account username, rate-limited to once per 7 days.
+  if (request.method === 'POST' && parts[1] === 'me' && parts[2] === 'username') {
+    const body = await readJson<{ username?: string }>(request);
+    const username = normalizeUsername(body.username, '');
+    if (!isValidAccountUsername(username)) {
+      throw new HttpError(400, 'Username must be 3-20 characters and contain only letters, numbers, and underscores.');
+    }
+
+    const current = await env.DB.prepare('SELECT * FROM users WHERE uid = ?').bind(uid).first<UserRow>();
+    if (!current) throw new HttpError(404, 'User not found.');
+
+    // Re-submitting your own current username is a graceful no-op (no cooldown charged).
+    if (current.username === username) {
+      return json(request, env, { user: rowToUser(current) });
+    }
+
+    if (current.username_changed_at) {
+      const lastChanged = Date.parse(current.username_changed_at);
+      if (!Number.isNaN(lastChanged) && Date.now() - lastChanged < USERNAME_CHANGE_COOLDOWN_MS) {
+        throw new HttpError(429, 'You can change your username once every 7 days.');
+      }
+    }
+
+    const taken = await env.DB.prepare('SELECT uid FROM users WHERE username = ?')
+      .bind(username)
+      .first<{ uid: string }>();
+    if (taken && taken.uid !== uid) {
+      throw new HttpError(409, 'That username is already taken.');
+    }
+
+    const now = new Date().toISOString();
+    try {
+      await env.DB.prepare('UPDATE users SET username = ?, username_changed_at = ?, updated_at = ? WHERE uid = ?')
+        .bind(username, now, now, uid)
+        .run();
+    } catch (error) {
+      const message = error instanceof Error ? error.message.toLowerCase() : '';
+      if (message.includes('unique')) {
+        throw new HttpError(409, 'That username is already taken.');
+      }
+      throw error;
+    }
+
+    const row = await env.DB.prepare('SELECT * FROM users WHERE uid = ?').bind(uid).first<UserRow>();
+    if (!row) throw new HttpError(500, 'Could not load user after saving.');
+    return json(request, env, { user: rowToUser(row) });
   }
 
   if (request.method === 'GET' && parts[1] === 'username' && parts[2] && parts[3] === 'exists') {

@@ -18,6 +18,14 @@ export async function getUserDoc(_uid: string): Promise<User | null> {
   return user;
 }
 
+export async function changeUsername(username: string): Promise<User> {
+  const { user } = await apiRequest<{ user: User }>('/users/me/username', {
+    method: 'POST',
+    body: JSON.stringify({ username }),
+  });
+  return user;
+}
+
 export async function isUsernameTaken(username: string): Promise<boolean> {
   const { taken } = await apiRequest<{ taken: boolean }>(
     `/users/username/${encodeURIComponent(username)}/exists`,

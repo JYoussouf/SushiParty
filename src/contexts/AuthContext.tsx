@@ -16,7 +16,7 @@ import {
   syncDeviceIdentity,
   type AuthSession,
 } from '../lib/cloudflare/auth';
-import { createUserDoc, getUserDoc } from '../lib/cloudflare/users';
+import { changeUsername as changeUsernameRemote, createUserDoc, getUserDoc } from '../lib/cloudflare/users';
 import { getApiToken, clearApiToken } from '../lib/cloudflare/authToken';
 import { hasApiBaseUrl } from '../lib/cloudflare/client';
 import { signInWithApple, exchangeGoogleCode, signInWithFacebook } from '../lib/oauth';
@@ -34,6 +34,7 @@ interface AuthContextValue {
   onboardingDone: boolean;
   completeOnboarding: (displayName: string, avatar: string, username: string) => Promise<void>;
   updateLocalProfile: (updates: Partial<Pick<User, 'displayName' | 'avatar'>>) => Promise<void>;
+  changeUsername: (username: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string, username: string) => Promise<void>;
   signInWithAppleOAuth: () => Promise<void>;
@@ -109,6 +110,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateLocalProfile = async (updates: Partial<Pick<User, 'displayName' | 'avatar'>>) => {
     const updated = await updateDeviceProfile(updates);
     setUserProfile(updated);
+  };
+
+  const changeUsername = async (username: string) => {
+    const updated = await changeUsernameRemote(username);
+    const stored = await updateDeviceProfile({ username: updated.username });
+    setUserProfile(stored);
   };
 
   const completeOnboarding = async (displayName: string, avatar: string, username: string) => {
@@ -210,6 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         onboardingDone,
         completeOnboarding,
         updateLocalProfile,
+        changeUsername,
         signIn,
         signUp,
         signInWithAppleOAuth,
