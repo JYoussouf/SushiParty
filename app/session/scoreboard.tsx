@@ -70,11 +70,22 @@ export default function ScoreboardScreen() {
     groupOwnerUid,
     groupPhase,
     groupContext,
+    endVote,
     endParty,
+    startEndVote,
+    acceptEndVote,
+    cancelEndVote,
     currentUserCanEditActive,
     completeSession,
   } = useSession();
   const isHost = !!userProfile && userProfile.uid === groupOwnerUid;
+
+  // End-party vote state derived for the footer UI.
+  const voteActive = mode === 'group' && !!endVote?.active;
+  const acceptedUserIds = endVote?.acceptedUserIds ?? [];
+  const currentUserAccepted = !!userProfile && acceptedUserIds.includes(userProfile.uid);
+  // Only count acceptances from participants still in the party.
+  const readyCount = participants.filter((p) => acceptedUserIds.includes(p.userId)).length;
   const { activeMenu, useGlobalMenu, setUseGlobalMenu, canToggle } = useMenu();
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
@@ -99,9 +110,18 @@ export default function ScoreboardScreen() {
   // One-shot guard so a guest's end-of-party navigation fires exactly once, even if
   // the 'ended' phase re-broadcasts. Reset on unmount so the next party works.
   const endedNavRef = useRef(false);
+  // One-shot guard so the HOST submits + navigates exactly once when the party ends
+  // (either the vote passed unanimously and the server flipped phase, or the host
+  // used the "End now" override). persistSession sets this too, so an override can't
+  // double-fire against the ended-phase effect below.
+  const hostSubmitRef = useRef(false);
+  // Always-latest pointer to persistSession so the ended-phase effect can call it
+  // without listing the (non-memoized) function as a dependency.
+  const persistRef = useRef<(flagged: boolean) => Promise<void>>(async () => {});
   useEffect(() => {
     return () => {
       endedNavRef.current = false;
+      hostSubmitRef.current = false;
     };
   }, []);
 
@@ -150,6 +170,17 @@ export default function ScoreboardScreen() {
       }
     })();
   }, [mode, isHost, groupPhase, userProfile, participants, groupContext, groupCode, router]);
+
+  // Host follows the party to results when the shared phase flips to 'ended' — this
+  // fires when the vote passes unanimously (server-driven, even if the host's own
+  // "End now" wasn't tapped). persistSession submits the host's session, tears the
+  // party down, and navigates. Guarded so the host-override path can't double-submit.
+  useEffect(() => {
+    if (mode !== 'group' || !isHost || groupPhase !== 'ended') return;
+    if (hostSubmitRef.current || !userProfile) return;
+    hostSubmitRef.current = true;
+    void persistRef.current(false);
+  }, [mode, isHost, groupPhase, userProfile]);
 
   useEffect(() => {
     logPartyFlow('scoreboard mounted');
@@ -354,13 +385,20 @@ export default function ScoreboardScreen() {
       return;
     }
 
+    // Trip the host-submit guard so the ended-phase effect can't also fire this.
+    if (mode === 'group') {
+      hostSubmitRef.current = true;
+    }
+
     setSubmitting(true);
     try {
       // Group host: broadcast phase='ended' FIRST so every guest follows into their
       // own results. Awaited before the backend submit/DO-teardown below, and delivered
       // in-order over each guest's socket, so guests reliably process 'ended' (build +
       // persist local + navigate) before the subsequent draft=null teardown resets them.
-      if (mode === 'group') {
+      // Skipped when the phase is ALREADY 'ended' (unanimous vote): the broadcast has
+      // happened and guests are already navigating, so re-ending would be redundant.
+      if (mode === 'group' && groupPhase !== 'ended') {
         await endParty();
       }
 
@@ -400,6 +438,8 @@ export default function ScoreboardScreen() {
       setSubmitting(false);
     }
   };
+  // Keep the ended-phase effect pointing at the freshest persistSession closure.
+  persistRef.current = persistSession;
 
   const handleSubmit = async () => {
     if (sessionTotalPieces === 0) return;
@@ -711,7 +751,7 @@ export default function ScoreboardScreen() {
 
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
-        {canToggle && (
+        {canToggle && !voteActive && (
           <TouchableOpacity
             style={styles.menuToggle}
             onPress={() => setUseGlobalMenu(!useGlobalMenu)}
@@ -721,6 +761,74 @@ export default function ScoreboardScreen() {
             </Text>
           </TouchableOpacity>
         )}
+
+        {/* End-party vote (group) — host runs the vote; guests accept it. */}
+        {voteActive && (
+          <View style={styles.voteCard}>
+            <Text style={styles.voteTitle}>
+              {isHost ? 'Ending the party' : 'Host wants to end the party'}
+            </Text>
+            <Text style={styles.voteProgress}>{readyCount}/{participants.length} ready</Text>
+            <View style={styles.voteChips}>
+              {participants.map((p) => {
+                const ready = acceptedUserIds.includes(p.userId);
+                return (
+                  <View
+                    key={p.userId}
+                    style={[styles.voteChip, ready && styles.voteChipReady]}
+                  >
+                    <Text style={[styles.voteChipText, ready && styles.voteChipTextReady]}>
+                      {ready ? '✓ ' : ''}{p.displayName}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+            {isHost ? (
+              <View style={styles.voteActions}>
+                <TouchableOpacity
+                  style={styles.voteSecondary}
+                  onPress={() => void cancelEndVote()}
+                  disabled={submitting}
+                >
+                  <Text style={styles.voteSecondaryText}>Cancel vote</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.votePrimary}
+                  onPress={() => void handleSubmit()}
+                  disabled={submitting}
+                  activeOpacity={0.85}
+                >
+                  {submitting ? (
+                    <ActivityIndicator color={t.color.onAccent} />
+                  ) : (
+                    <Text style={styles.votePrimaryText}>End now</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : currentUserAccepted ? (
+              <View style={styles.voteReadyPill}>
+                <Text style={styles.voteReadyPillText}>You're ready ✓</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.voteAcceptBtn}
+                onPress={() => void acceptEndVote()}
+                activeOpacity={0.85}
+              >
+                <LinearGradient
+                  colors={t.color.accentGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.voteAcceptInner}
+                >
+                  <Text style={styles.voteAcceptText}>I'm ready</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         <View style={styles.footerActions}>
           <TouchableOpacity
             style={styles.resetBtn}
@@ -729,28 +837,38 @@ export default function ScoreboardScreen() {
           >
             <Text style={styles.resetBtnText}>Reset</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.submitBtn,
-              (sessionTotalPieces === 0 || submitting) && styles.submitBtnDisabled,
-            ]}
-            disabled={sessionTotalPieces === 0 || submitting}
-            onPress={() => void handleSubmit()}
-            activeOpacity={0.85}
-          >
-            <LinearGradient
-              colors={(sessionTotalPieces === 0 || submitting) ? [t.color.surfaceAlt, t.color.surfaceAlt] : t.color.accentGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.submitBtnInner}
+          {/* Solo: submit directly. Group host (no open vote): start the end vote.
+              Group guests / host mid-vote: no primary button — they use the vote card. */}
+          {(mode !== 'group' || (isHost && !voteActive)) && (
+            <TouchableOpacity
+              style={[
+                styles.submitBtn,
+                (sessionTotalPieces === 0 || submitting) && styles.submitBtnDisabled,
+              ]}
+              disabled={sessionTotalPieces === 0 || submitting}
+              onPress={() => {
+                if (mode === 'group' && isHost) {
+                  void startEndVote();
+                } else {
+                  void handleSubmit();
+                }
+              }}
+              activeOpacity={0.85}
             >
-              {submitting ? (
-                <ActivityIndicator color={t.color.onAccent} />
-              ) : (
-                <Text style={[styles.submitBtnText, sessionTotalPieces === 0 && styles.submitBtnTextDisabled]}>Party's Over!</Text>
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
+              <LinearGradient
+                colors={(sessionTotalPieces === 0 || submitting) ? [t.color.surfaceAlt, t.color.surfaceAlt] : t.color.accentGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.submitBtnInner}
+              >
+                {submitting ? (
+                  <ActivityIndicator color={t.color.onAccent} />
+                ) : (
+                  <Text style={[styles.submitBtnText, sessionTotalPieces === 0 && styles.submitBtnTextDisabled]}>Party's Over!</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 
@@ -1339,6 +1457,119 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   submitBtnTextDisabled: {
     color: t.color.textTertiary,
+  },
+
+  // ── End-party vote ──────────────────────────────────────
+  voteCard: {
+    borderRadius: t.radius.md,
+    padding: 14,
+    gap: 10,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.accent,
+    ...t.shadow.card,
+  },
+  voteTitle: {
+    fontSize: 15,
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
+    letterSpacing: -0.2,
+  },
+  voteProgress: {
+    fontSize: 12,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: -4,
+  },
+  voteChips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  voteChip: {
+    borderRadius: t.radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    backgroundColor: t.color.surfaceAlt,
+    borderWidth: 1,
+    borderColor: t.color.border,
+  },
+  voteChipReady: {
+    backgroundColor: t.color.accentSoft,
+    borderColor: t.color.accent,
+  },
+  voteChipText: {
+    fontSize: 12,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
+  },
+  voteChipTextReady: {
+    color: t.color.accent,
+  },
+  voteActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  voteSecondary: {
+    flex: 1,
+    height: 46,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voteSecondaryText: {
+    fontSize: 14,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
+  },
+  votePrimary: {
+    flex: 1,
+    height: 46,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...t.shadow.glow(t.color.accent),
+  },
+  votePrimaryText: {
+    fontSize: 14,
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
+    letterSpacing: -0.2,
+  },
+  voteAcceptBtn: {
+    height: 46,
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
+  voteAcceptInner: {
+    flex: 1,
+    borderRadius: t.radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voteAcceptText: {
+    fontSize: 15,
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
+    letterSpacing: -0.2,
+  },
+  voteReadyPill: {
+    height: 46,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.accentSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  voteReadyPillText: {
+    fontSize: 14,
+    fontFamily: t.font.bodyBold,
+    color: t.color.accent,
   },
 
   // ── Anomaly modal ───────────────────────────────────────

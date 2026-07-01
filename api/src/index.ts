@@ -72,6 +72,13 @@ interface Menu {
 
 type GroupPhase = 'lobby' | 'active' | 'ended';
 
+interface GroupEndVote {
+  active: boolean;
+  startedBy: string;
+  acceptedUserIds: string[];
+  startedAt: string;
+}
+
 interface GroupSessionDraft {
   id: string;
   code: string;
@@ -81,6 +88,8 @@ interface GroupSessionDraft {
   updatedAt: string;
   expiresAt: string;
   participants: SessionParticipant[];
+  // Host-initiated end-party vote (issue #31). Absent unless a vote is/was open.
+  endVote?: GroupEndVote;
   // Shared session context the host populates at /start so guests can build results.
   restaurantId?: string;
   restaurantName?: string;
@@ -1178,7 +1187,8 @@ async function handleGroups(request: Request, env: Env, parts: string[]): Promis
 
   if (!groupId) throw new HttpError(404, 'Route not found.');
 
-  const route = parts[2] ? `/${parts[2]}` : '/';
+  // Preserve multi-segment sub-paths (e.g. /end-vote/start) when proxying to the DO.
+  const route = parts.length > 2 ? `/${parts.slice(2).join('/')}` : '/';
   const body = request.method === 'GET' ? undefined : await request.text();
   const groupInit: RequestInit = { method: request.method };
   if (body) {
@@ -1289,6 +1299,78 @@ export class GroupParty {
         return Response.json({ error: 'Only the party owner can end the party.' }, { status: 403 });
       }
       const next = { ...draft, phase: 'ended' as GroupPhase, updatedAt: new Date().toISOString() };
+      await this.writeDraft(next);
+      await this.broadcast(next);
+      return Response.json({ draft: next });
+    }
+
+    // Host opens an end-party vote. Does NOT change phase; the host implicitly accepts.
+    if (request.method === 'POST' && path === '/end-vote/start') {
+      const body = await readJson<{ ownerUid: string }>(request);
+      const draft = await this.requireDraft();
+      if (draft.ownerUid !== body.ownerUid) {
+        return Response.json({ error: 'Only the party owner can start an end vote.' }, { status: 403 });
+      }
+      const now = new Date().toISOString();
+      const next = {
+        ...draft,
+        endVote: {
+          active: true,
+          startedBy: body.ownerUid,
+          acceptedUserIds: [body.ownerUid],
+          startedAt: now,
+        },
+        updatedAt: now,
+      };
+      await this.writeDraft(next);
+      await this.broadcast(next);
+      return Response.json({ draft: next });
+    }
+
+    // Any participant accepts the vote. When every current participant has accepted,
+    // the DO itself flips to phase='ended' (so it works even if the host is backgrounded).
+    // Coverage is "every participant.userId is in acceptedUserIds", so a departed
+    // non-voter can never deadlock the vote.
+    if (request.method === 'POST' && path === '/end-vote/accept') {
+      const body = await readJson<{ userId: string }>(request);
+      const draft = await this.requireDraft();
+      if (!draft.endVote || !draft.endVote.active) {
+        // No open vote — idempotent no-op so a late/duplicate accept can't error.
+        return Response.json({ draft });
+      }
+      const acceptedUserIds = draft.endVote.acceptedUserIds.includes(body.userId)
+        ? draft.endVote.acceptedUserIds
+        : [...draft.endVote.acceptedUserIds, body.userId];
+      const everyoneAccepted = draft.participants.every((participant) =>
+        acceptedUserIds.includes(participant.userId),
+      );
+      const now = new Date().toISOString();
+      const next: GroupSessionDraft = everyoneAccepted
+        ? {
+            ...draft,
+            phase: 'ended' as GroupPhase,
+            endVote: { ...draft.endVote, active: false, acceptedUserIds },
+            updatedAt: now,
+          }
+        : {
+            ...draft,
+            endVote: { ...draft.endVote, acceptedUserIds },
+            updatedAt: now,
+          };
+      await this.writeDraft(next);
+      await this.broadcast(next);
+      return Response.json({ draft: next });
+    }
+
+    // Host abandons the vote. Removes the vote state; phase is unchanged.
+    if (request.method === 'POST' && path === '/end-vote/cancel') {
+      const body = await readJson<{ ownerUid: string }>(request);
+      const draft = await this.requireDraft();
+      if (draft.ownerUid !== body.ownerUid) {
+        return Response.json({ error: 'Only the party owner can cancel the end vote.' }, { status: 403 });
+      }
+      const { endVote: _cancelled, ...rest } = draft;
+      const next: GroupSessionDraft = { ...rest, updatedAt: new Date().toISOString() };
       await this.writeDraft(next);
       await this.broadcast(next);
       return Response.json({ draft: next });

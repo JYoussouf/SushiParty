@@ -1,11 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { useAuth } from './AuthContext';
 import {
+  acceptEndVote as acceptEndVoteRequest,
+  cancelEndVote as cancelEndVoteRequest,
   createGroupParty,
   endGroupParty,
   joinGroupParty,
   removeGroupParty,
   resetGroupPartyParticipantCounts,
+  startEndVote as startEndVoteRequest,
   startGroupParty,
   subscribeToGroupParty,
   updateGroupPartyParticipantAvatar,
@@ -13,7 +16,7 @@ import {
   type GroupPartyStartContext,
 } from '../lib/cloudflare/groupParties';
 import { DEFAULT_CAT_AVATAR } from '../lib/catAvatars';
-import type { GroupPhase, GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
+import type { GroupEndVote, GroupPhase, GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
 
 // Shared session context carried on the draft (host-populated at start). Exposed so a
 // guest can reconstruct their results when the party ends.
@@ -39,10 +42,14 @@ interface SessionContextValue {
   groupOwnerUid: string | null;
   groupPhase: GroupPhase;
   groupContext: GroupSessionContext | null;
+  endVote: GroupEndVote | null;
   createGroup: () => Promise<GroupSessionDraft>;
   joinGroup: (code: string) => Promise<GroupSessionDraft>;
   startParty: (context?: GroupPartyStartContext) => Promise<void>;
   endParty: () => Promise<void>;
+  startEndVote: () => Promise<void>;
+  acceptEndVote: () => Promise<void>;
+  cancelEndVote: () => Promise<void>;
   setParticipantAvatar: (avatar: string) => Promise<void>;
   currentUserParticipantIndex: number;
   currentUserCanEditActive: boolean;
@@ -74,6 +81,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [groupOwnerUid, setGroupOwnerUid] = useState<string | null>(null);
   const [groupPhase, setGroupPhase] = useState<GroupPhase>('lobby');
   const [groupContext, setGroupContext] = useState<GroupSessionContext | null>(null);
+  const [endVote, setEndVote] = useState<GroupEndVote | null>(null);
   const [localAvatar, setLocalAvatar] = useState<string>(
     () => userProfile?.avatar ?? DEFAULT_CAT_AVATAR,
   );
@@ -140,6 +148,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             }
           : null,
       );
+      setEndVote(draft.endVote ?? null);
       setModeState('group');
       setDraftActive(true);
     },
@@ -167,6 +176,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupOwnerUid(null);
         setGroupPhase('lobby');
         setGroupContext(null);
+        setEndVote(null);
         setModeState('single');
         setDraftActive(false);
         setParticipants([localParticipant]);
@@ -189,6 +199,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupOwnerUid(null);
         setGroupPhase('lobby');
         setGroupContext(null);
+        setEndVote(null);
       }
 
       setModeState(nextMode);
@@ -267,7 +278,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setGroupCode(null);
       setGroupOwnerUid(null);
       setGroupPhase('lobby');
-        setGroupContext(null);
+      setGroupContext(null);
+      setEndVote(null);
     }
 
     setModeState('single');
@@ -328,6 +340,40 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [groupSessionId, syncFromDraft, userProfile]);
 
+  // Host-only: open a vote to end the party (broadcast, phase stays 'active').
+  const startEndVote = useCallback(async () => {
+    if (!groupSessionId || !userProfile) {
+      return;
+    }
+    const draft = await startEndVoteRequest(groupSessionId, userProfile.uid);
+    if (draft) {
+      syncFromDraft(draft);
+    }
+  }, [groupSessionId, syncFromDraft, userProfile]);
+
+  // Any participant: accept the open end vote. The server flips to 'ended' once
+  // everyone has accepted.
+  const acceptEndVote = useCallback(async () => {
+    if (!groupSessionId || !userProfile) {
+      return;
+    }
+    const draft = await acceptEndVoteRequest(groupSessionId, userProfile.uid);
+    if (draft) {
+      syncFromDraft(draft);
+    }
+  }, [groupSessionId, syncFromDraft, userProfile]);
+
+  // Host-only: abandon the open end vote.
+  const cancelEndVote = useCallback(async () => {
+    if (!groupSessionId || !userProfile) {
+      return;
+    }
+    const draft = await cancelEndVoteRequest(groupSessionId, userProfile.uid);
+    if (draft) {
+      syncFromDraft(draft);
+    }
+  }, [groupSessionId, syncFromDraft, userProfile]);
+
   const setParticipantAvatar = useCallback(
     async (avatar: string) => {
       setLocalAvatar(avatar);
@@ -378,10 +424,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     groupOwnerUid,
     groupPhase,
     groupContext,
+    endVote,
     createGroup,
     joinGroup,
     startParty,
     endParty,
+    startEndVote,
+    acceptEndVote,
+    cancelEndVote,
     setParticipantAvatar,
     currentUserParticipantIndex,
     currentUserCanEditActive:

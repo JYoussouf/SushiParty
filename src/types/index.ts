@@ -58,6 +58,16 @@ export interface SushiSession {
 
 export type GroupPhase = 'lobby' | 'active' | 'ended';
 
+// Host-initiated "end party" vote. The host starts it; every participant accepts.
+// Once acceptedUserIds covers all participants (or the host overrides via /end),
+// the party moves to phase='ended'. Optional so non-voting drafts stay valid.
+export interface GroupEndVote {
+  active: boolean;
+  startedBy: string; // owner uid that opened the vote (implicitly accepts)
+  acceptedUserIds: string[]; // participants who have accepted (deduped)
+  startedAt: string; // ISO
+}
+
 export interface GroupSessionDraft {
   id: string;
   code: string;
@@ -67,6 +77,8 @@ export interface GroupSessionDraft {
   updatedAt: string;
   expiresAt: string;
   participants: SessionParticipant[];
+  // Host-initiated end-party vote state (issue #31). Absent unless a vote is/was open.
+  endVote?: GroupEndVote;
   // Shared session context the host populates when the party starts (phase='active').
   // Optional so lobby/legacy drafts stay valid. Lets guests reconstruct results at end.
   restaurantId?: string;

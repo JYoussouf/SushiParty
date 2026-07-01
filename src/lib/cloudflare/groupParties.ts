@@ -137,6 +137,54 @@ export async function endGroupParty(
   return draft;
 }
 
+// ─── End-party vote (issue #31) ───────────────────────────────────────────────
+
+// Host opens a vote to end the party. Does not end it yet; the host implicitly accepts.
+export async function startEndVote(
+  groupPartyId: string,
+  ownerUid: string,
+): Promise<GroupSessionDraft | null> {
+  const { draft } = await apiRequest<{ draft: GroupSessionDraft }>(
+    `/groups/${encodeURIComponent(groupPartyId)}/end-vote/start`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ ownerUid }),
+    },
+  );
+  return draft;
+}
+
+// Any participant accepts the open vote. When everyone has accepted, the server flips
+// the party to phase='ended' itself.
+export async function acceptEndVote(
+  groupPartyId: string,
+  userId: string,
+): Promise<GroupSessionDraft | null> {
+  const { draft } = await apiRequest<{ draft: GroupSessionDraft }>(
+    `/groups/${encodeURIComponent(groupPartyId)}/end-vote/accept`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    },
+  );
+  return draft;
+}
+
+// Host abandons the open vote.
+export async function cancelEndVote(
+  groupPartyId: string,
+  ownerUid: string,
+): Promise<GroupSessionDraft | null> {
+  const { draft } = await apiRequest<{ draft: GroupSessionDraft }>(
+    `/groups/${encodeURIComponent(groupPartyId)}/end-vote/cancel`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ ownerUid }),
+    },
+  );
+  return draft;
+}
+
 // Realtime lobby subscription. Only a draft the SERVER sends (including an
 // explicit null on deletion/expiry) drives onChange — a transport error or an
 // unparseable frame must NOT be reported as null, because SessionContext treats
