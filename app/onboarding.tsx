@@ -191,7 +191,7 @@ export default function OnboardingScreen() {
             <Text style={styles.avatarHint}>One of a kind, just like you!</Text>
             <View>
               <TextInput
-                style={[styles.input, usernameFocused && styles.inputFocused, usernameStatus === 'taken' && styles.inputError]}
+                style={[styles.input, usernameFocused && styles.inputFocused, usernameStatus === 'available' && styles.inputSuccess, usernameStatus === 'taken' && styles.inputError]}
                 value={username}
                 onChangeText={(v) => setUsername(v.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
                 placeholder="letters, numbers, underscores"
@@ -347,6 +347,7 @@ const makeStyles = (t: Theme, compact: boolean) => {
   hint: { fontSize: 12, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 17 },
   hintSuccess: { color: t.color.success },
   hintError: { color: t.color.danger },
+  inputSuccess: { borderColor: t.color.success },
   inputError: { borderColor: t.color.danger },
   usernameIndicator: { position: 'absolute', right: 16, top: 17 },
   continueShadow: {
