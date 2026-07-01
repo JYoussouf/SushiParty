@@ -17,6 +17,7 @@ import * as Haptics from 'expo-haptics';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BackButton } from '../src/components';
 import { useTheme } from '../src/contexts/ThemeContext';
 import type { Theme } from '../src/theme/themes';
@@ -25,6 +26,8 @@ import { buildSessionExportCsv } from '../src/lib/exportSessions';
 import { getAllSessions } from '../src/lib/cloudflare/sessions';
 
 type Styles = ReturnType<typeof makeStyles>;
+
+const SCROLL_PADDING_BOTTOM = 40;
 
 const SOUND_VOL_KEY = '@sushi_sound_volume';
 const MUSIC_VOL_KEY = '@sushi_music_volume';
@@ -98,6 +101,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
   const { userProfile, accountBacked, signOut } = useAuth();
 
   const [soundVolume, setSoundVolume] = useState(0.8);
@@ -163,7 +167,9 @@ export default function SettingsScreen() {
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        contentContainerStyle={[styles.scroll, { paddingBottom: SCROLL_PADDING_BOTTOM + insets.bottom }]}
+      >
         <View style={styles.topRow}>
           <BackButton onPress={() => router.back()} />
         </View>
@@ -238,7 +244,7 @@ export default function SettingsScreen() {
 const makeStyles = (t: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.color.bg },
   safe: { flex: 1 },
-  scroll: { padding: 20, gap: 18, paddingBottom: 40 },
+  scroll: { padding: 20, gap: 18, paddingBottom: SCROLL_PADDING_BOTTOM },
   topRow: { flexDirection: 'row', justifyContent: 'flex-start' },
   hero: {
     borderRadius: t.radius.lg,
