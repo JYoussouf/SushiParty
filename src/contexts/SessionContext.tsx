@@ -51,7 +51,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [mode, setModeState] = useState<SessionMode>('single');
   const [draftActive, setDraftActive] = useState(false);
   const [participants, setParticipants] = useState<SessionParticipant[]>([createLocalParticipant()]);
-  const [activeParticipantIndex, setActiveParticipantIndex] = useState(0);
+  // The plate currently being viewed is tracked by userId (not a raw index) so it
+  // survives realtime draft updates that reorder or mutate the participant list.
+  // `null` means "no explicit selection" -> fall back to the current user's own plate.
+  const [viewedUserId, setViewedUserId] = useState<string | null>(null);
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [groupCode, setGroupCode] = useState<string | null>(null);
   const [groupOwnerUid, setGroupOwnerUid] = useState<string | null>(null);
@@ -70,23 +73,44 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     [localAvatar, userProfile?.displayName, userProfile?.uid],
   );
 
+  const currentUserParticipantIndex = participants.findIndex(
+    (participant) => participant.userId === userProfile?.uid,
+  );
+
+  // Resolve the viewed plate to a concrete index every render. If the viewed
+  // participant is unset or has left the party, fall back to the current user's
+  // own plate (or index 0 if that is somehow missing), never out of bounds.
+  const viewedParticipantIndex = viewedUserId
+    ? participants.findIndex((participant) => participant.userId === viewedUserId)
+    : -1;
+  const activeParticipantIndex =
+    viewedParticipantIndex >= 0
+      ? viewedParticipantIndex
+      : currentUserParticipantIndex >= 0
+        ? currentUserParticipantIndex
+        : 0;
+
+  // Public API stays index-based; internally we remember the participant's userId
+  // so realtime updates keep the same plate in view.
+  const setActiveParticipantIndex = useCallback(
+    (index: number) => {
+      setViewedUserId(participants[index]?.userId ?? null);
+    },
+    [participants],
+  );
+
   const syncFromDraft = useCallback(
     (draft: GroupSessionDraft) => {
+      // Update participant DATA only. Do NOT touch the viewed plate here: doing so
+      // would boot a viewer off a teammate's plate on every realtime count push.
       setParticipants(draft.participants);
       setGroupSessionId(draft.id);
       setGroupCode(draft.code);
       setGroupOwnerUid(draft.ownerUid);
       setModeState('group');
       setDraftActive(true);
-
-      const participantIndex = draft.participants.findIndex(
-        (participant) => participant.userId === userProfile?.uid,
-      );
-      if (participantIndex >= 0) {
-        setActiveParticipantIndex(participantIndex);
-      }
     },
-    [userProfile?.uid],
+    [],
   );
 
   useEffect(() => {
@@ -95,7 +119,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
 
     setParticipants([localParticipant]);
-    setActiveParticipantIndex(0);
+    setViewedUserId(null);
   }, [groupSessionId, localParticipant]);
 
   useEffect(() => {
@@ -111,7 +135,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setModeState('single');
         setDraftActive(false);
         setParticipants([localParticipant]);
-        setActiveParticipantIndex(0);
+        setViewedUserId(null);
         return;
       }
 
@@ -133,7 +157,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setModeState(nextMode);
       setDraftActive(nextMode === 'group' || !leavingGroup);
       setParticipants([localParticipant]);
-      setActiveParticipantIndex(0);
+      setViewedUserId(null);
     },
     [groupSessionId, localParticipant],
   );
@@ -210,7 +234,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setModeState('single');
     setDraftActive(false);
     setParticipants([localParticipant]);
-    setActiveParticipantIndex(0);
+    setViewedUserId(null);
   }, [groupSessionId, localParticipant]);
 
   const createGroup = useCallback(async () => {
@@ -261,10 +285,6 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       );
     },
     [activeParticipantIndex, groupSessionId, mode, syncFromDraft, userProfile],
-  );
-
-  const currentUserParticipantIndex = participants.findIndex(
-    (participant) => participant.userId === userProfile?.uid,
   );
 
   const hasActiveSession =
