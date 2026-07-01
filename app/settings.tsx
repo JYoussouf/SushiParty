@@ -174,9 +174,7 @@ export default function SettingsScreen() {
           <BackButton onPress={() => router.back()} />
         </View>
 
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Settings</Text>
-        </View>
+        <Text style={styles.title}>Settings</Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Volume</Text>
@@ -246,18 +244,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 20, gap: 18, paddingBottom: SCROLL_PADDING_BOTTOM },
   topRow: { flexDirection: 'row', justifyContent: 'flex-start' },
-  hero: {
-    borderRadius: t.radius.lg,
-    padding: 22,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    gap: 8,
-    ...t.shadow.card,
-  },
-  eyebrow: { fontSize: 28, lineHeight: 32, fontFamily: t.font.display, color: t.color.textPrimary },
-  title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
-  subtitle: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
+  title: { fontSize: 28, fontFamily: t.font.display, color: t.color.textPrimary },
   section: { gap: 10 },
   sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
 
