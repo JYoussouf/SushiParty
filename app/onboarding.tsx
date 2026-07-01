@@ -3,14 +3,15 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -60,7 +61,12 @@ type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid' | 
 export default function OnboardingScreen() {
   const router = useRouter();
   const t = useTheme();
-  const styles = useMemo(() => makeStyles(t), [t]);
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  // Shorter viewports (e.g. many Android phones once the nav bar and status bar
+  // are accounted for) need tighter spacing so all content fits without scroll.
+  const compact = windowHeight < 780;
+  const styles = useMemo(() => makeStyles(t, compact), [t, compact]);
   const { completeOnboarding, userProfile } = useAuth();
   const [selectedAvatar, setSelectedAvatar] = useState<string>(userProfile?.avatar ?? '🐱');
   const genericNames = ['Google User', 'Apple User', 'Facebook User'];
@@ -117,13 +123,14 @@ export default function OnboardingScreen() {
   return (
     <View style={styles.container}>
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
-      <SafeAreaView style={styles.safe}>
+      <View style={[styles.safe, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView
         style={styles.kb}
         behavior={Platform.OS === 'ios' ? undefined : 'height'}
       >
         <ScrollView
+          style={styles.kb}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -233,22 +240,31 @@ export default function OnboardingScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
 
-const makeStyles = (t: Theme) => StyleSheet.create({
+const makeStyles = (t: Theme, compact: boolean) => {
+  const preview = compact ? 84 : 110;
+  return StyleSheet.create({
   container: { flex: 1, backgroundColor: t.color.bg },
   safe: { flex: 1 },
   kb: { flex: 1 },
-  scroll: { padding: 28, gap: 32, paddingBottom: 40 },
-  hero: { alignItems: 'center', gap: 14, paddingTop: 12 },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
+    paddingHorizontal: 28,
+    paddingTop: compact ? 12 : 24,
+    paddingBottom: compact ? 16 : 28,
+    gap: compact ? 16 : 28,
+  },
+  hero: { alignItems: 'center', gap: compact ? 8 : 14 },
   avatarPreview: {
     alignSelf: 'center',
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: preview,
+    height: preview,
+    borderRadius: preview / 2,
     backgroundColor: t.color.surface,
     borderWidth: 3,
     borderColor: t.color.accent,
@@ -256,7 +272,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     ...t.shadow.glow(t.color.accent),
   },
-  avatarPreviewEmoji: { fontSize: 62, lineHeight: 72 },
+  avatarPreviewEmoji: { fontSize: compact ? 48 : 62, lineHeight: compact ? 56 : 72 },
   title: {
     fontSize: 36,
     fontFamily: t.font.display,
@@ -271,12 +287,12 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     color: t.color.textSecondary,
     textAlign: 'center',
   },
-  section: { gap: 12 },
+  section: { gap: compact ? 8 : 12 },
   avatarCard: {
     alignItems: 'center',
-    gap: 14,
+    gap: compact ? 10 : 14,
     paddingHorizontal: 24,
-    paddingVertical: 34,
+    paddingVertical: compact ? 20 : 34,
     borderRadius: t.radius.lg,
     backgroundColor: t.color.surface,
     borderWidth: 1,
@@ -339,7 +355,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   continueBtn: {
     borderRadius: t.radius.button,
-    paddingVertical: 18,
+    paddingVertical: compact ? 15 : 18,
     alignItems: 'center',
   },
   continueBtnDisabled: {
@@ -353,4 +369,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     color: t.color.onAccent,
     letterSpacing: 0.3,
   },
-});
+  });
+};
