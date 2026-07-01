@@ -149,7 +149,7 @@ export default function ProfileScreen() {
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <View style={styles.header}>
-        <BackButton onPress={() => router.back()} />
+        <BackButton onPress={() => router.replace('/(tabs)/home')} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.profileTitleRow}>
