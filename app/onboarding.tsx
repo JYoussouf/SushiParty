@@ -210,7 +210,7 @@ export default function OnboardingScreen() {
               {usernameStatus === 'available' && '✓ Username is available'}
               {usernameStatus === 'taken' && 'That username is taken'}
               {usernameStatus === 'invalid' && '3–20 characters: letters, numbers, underscores'}
-              {usernameStatus === 'error' && "Couldn't check that handle — you can continue and we'll confirm it."}
+              {usernameStatus === 'error' && "Couldn't check that handle - you can continue and we'll confirm it."}
             </Text>
           </View>
 

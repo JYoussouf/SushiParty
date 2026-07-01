@@ -57,20 +57,20 @@ const CARDS: Card[] = [
 
   // ── Trivia (modern, behind-the-scenes) ─────────────────────────────────────
   { kind: 'trivia', ribbon: 'Did you know', headline: 'It’s rarely real wasabi',     detail: 'About 95% of restaurants serve dyed horseradish.',         emoji: '🌶', tag: 'Trivia' },
-  { kind: 'trivia', ribbon: 'Did you know', headline: 'Sushi rice has a temperature', detail: 'Body warmth — about 36°C, by tradition.',                  emoji: '🌾', tag: 'Trivia' },
-  { kind: 'trivia', ribbon: 'Did you know', headline: 'Soy sauce is for the fish',    detail: 'Dipping rice-side first makes it fall apart — and salty.', emoji: '🥢', tag: 'Trivia' },
+  { kind: 'trivia', ribbon: 'Did you know', headline: 'Sushi rice has a temperature', detail: 'Body warmth - about 36°C, by tradition.',                  emoji: '🌾', tag: 'Trivia' },
+  { kind: 'trivia', ribbon: 'Did you know', headline: 'Soy sauce is for the fish',    detail: 'Dipping rice-side first makes it fall apart - and salty.', emoji: '🥢', tag: 'Trivia' },
   { kind: 'trivia', ribbon: 'Did you know', headline: 'Ginger is a palate cleanser',  detail: 'Eat it between pieces, never on top of them.',             emoji: '🫚', tag: 'Trivia' },
-  { kind: 'trivia', ribbon: 'Did you know', headline: 'Toro is the belly of tuna',    detail: 'Three grades: akami, chū-toro, ō-toro — fattier each time.', emoji: '🐟', tag: 'Trivia' },
+  { kind: 'trivia', ribbon: 'Did you know', headline: 'Toro is the belly of tuna',    detail: 'Three grades: akami, chū-toro, ō-toro - fattier each time.', emoji: '🐟', tag: 'Trivia' },
   { kind: 'trivia', ribbon: 'Did you know', headline: 'Real chefs don’t wear gloves', detail: 'Bare-hand contact lets them feel rice tension exactly.',   emoji: '🍙', tag: 'Trivia' },
   { kind: 'trivia', ribbon: 'Did you know', headline: 'Nigiri means “two fingers”',   detail: 'Roughly the size you’re meant to shape it into.',          emoji: '✌️', tag: 'Trivia' },
 
   // ── History (origin stories) ───────────────────────────────────────────────
-  { kind: 'history', ribbon: 'Sushi history', headline: 'It started as fish jerky',    detail: 'Narezushi — fermented carp wrapped in rice, ~4th century BC.',   emoji: '📜', tag: 'Origin' },
+  { kind: 'history', ribbon: 'Sushi history', headline: 'It started as fish jerky',    detail: 'Narezushi - fermented carp wrapped in rice, ~4th century BC.',   emoji: '📜', tag: 'Origin' },
   { kind: 'history', ribbon: 'Sushi history', headline: 'Edomae was Tokyo street food', detail: 'Fast nigiri served from carts in 1820s Edo, hand-pressed to order.', emoji: '🏮', tag: 'Origin' },
   { kind: 'history', ribbon: 'Sushi history', headline: 'A 1923 quake spread it',       detail: 'After the Kantō earthquake, Tokyo chefs scattered nigiri across Japan.', emoji: '🗾', tag: 'Origin' },
   { kind: 'history', ribbon: 'Sushi history', headline: 'Conveyor belts began in ’58',  detail: 'Yoshiaki Shiraishi opened the first kaiten-zushi in Osaka.',     emoji: '🍱', tag: 'Origin' },
   { kind: 'history', ribbon: 'Sushi history', headline: 'Nori was once handmade paper', detail: 'Workers pressed and dried algae sheets like washi until the 1940s.', emoji: '🟩', tag: 'Origin' },
-  { kind: 'history', ribbon: 'Sushi history', headline: 'Salmon was a 1980s import',    detail: 'Norway sold Japan on raw salmon — it wasn’t traditional sushi before.', emoji: '🐟', tag: 'Origin' },
+  { kind: 'history', ribbon: 'Sushi history', headline: 'Salmon was a 1980s import',    detail: 'Norway sold Japan on raw salmon - it wasn’t traditional sushi before.', emoji: '🐟', tag: 'Origin' },
   { kind: 'history', ribbon: 'Sushi history', headline: 'Wasabi grows in cold streams', detail: 'Cultivated in mountain riverbeds since the 1500s in Shizuoka.',   emoji: '🍃', tag: 'Origin' },
   { kind: 'history', ribbon: 'Sushi history', headline: 'Itamae train for a decade',    detail: 'Two years on rice alone before they’re trusted to touch fish.',  emoji: '👨‍🍳', tag: 'Origin' },
 
@@ -301,7 +301,7 @@ export default function HomeScreen() {
             {card.kind === 'wisdom' && (
               <>
                 <Text style={styles.plateQuote}>“{card.quote}”</Text>
-                <Text style={styles.plateSub}>— {card.author}</Text>
+                <Text style={styles.plateSub}>- {card.author}</Text>
               </>
             )}
             {card.kind === 'trivia' && (

@@ -123,7 +123,7 @@ export default function GroupJoinScreen() {
 
     const code = extractGroupCode(data);
     if (!code) {
-      setScanError('Not a Sushi Party code — try again.');
+      setScanError('Not a Sushi Party code - try again.');
       scannedRef.current = false;
       return;
     }
@@ -166,7 +166,7 @@ export default function GroupJoinScreen() {
           Drop the{'\n'}6-letter <Text style={styles.heroTitleAccent}>code</Text>
         </Text>
         <Text style={styles.heroSubtitle}>
-          Ask the host — it's on their lobby screen.
+          Ask the host - it's on their lobby screen.
         </Text>
       </View>
 

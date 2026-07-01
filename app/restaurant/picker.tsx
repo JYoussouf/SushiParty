@@ -173,7 +173,7 @@ export default function RestaurantPickerScreen() {
             <View>
               <Text style={styles.sectionLabel}>Location access needed</Text>
               <Text style={styles.helperText}>
-                Location is needed to find nearby spots — enable it to search by distance.
+                Location is needed to find nearby spots - enable it to search by distance.
               </Text>
               <TouchableOpacity style={styles.linkBtn} onPress={refresh}>
                 <Text style={styles.linkBtnText}>Try again</Text>

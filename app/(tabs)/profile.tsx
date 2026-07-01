@@ -202,7 +202,7 @@ export default function ProfileScreen() {
               >
                 <AvatarProgressRing emoji={userProfile?.avatar ?? '🐱'} progress={levelInfo.progress} />
               </TouchableOpacity>
-              <Text style={styles.displayName}>{userProfile?.displayName ?? '—'}</Text>
+              <Text style={styles.displayName}>{userProfile?.displayName ?? '-'}</Text>
               <View style={styles.levelPill}>
                 <Text style={styles.levelPillText}>
                   • Level {levelInfo.level} · {levelTitle(levelInfo.level)}
@@ -243,7 +243,7 @@ export default function ProfileScreen() {
               )}
               <InsightCard
                 title="Most Ordered Item"
-                value={stats.mostOrderedItem ?? '—'}
+                value={stats.mostOrderedItem ?? '-'}
                 note={
                   stats.mostOrderedItem
                     ? `${stats.mostOrderedItemCount} total pieces logged`
