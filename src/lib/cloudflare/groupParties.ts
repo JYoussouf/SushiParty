@@ -137,26 +137,73 @@ export async function endGroupParty(
   return draft;
 }
 
+// Realtime lobby subscription. Only a draft the SERVER sends (including an
+// explicit null on deletion/expiry) drives onChange — a transport error or an
+// unparseable frame must NOT be reported as null, because SessionContext treats
+// a null draft as "party deleted" and ejects the member out of the lobby. A
+// dropped socket (mobile backgrounding, network blip) instead triggers a
+// bounded reconnect so late joins keep flowing to everyone in real time.
+const WS_RECONNECT_BASE_MS = 1000;
+const WS_RECONNECT_MAX_MS = 15000;
+
 export function subscribeToGroupParty(
   groupPartyId: string,
   onChange: (draft: GroupSessionDraft | null) => void,
 ): Unsubscribe {
-  const socket = new WebSocket(apiWebSocketUrl(`/groups/${encodeURIComponent(groupPartyId)}/ws`));
-  socket.onmessage = (event) => {
-    try {
-      const payload = JSON.parse(String(event.data)) as {
-        type?: string;
-        draft?: GroupSessionDraft | null;
-      };
+  const url = apiWebSocketUrl(`/groups/${encodeURIComponent(groupPartyId)}/ws`);
+  let socket: WebSocket | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let attempts = 0;
+  let closed = false;
+
+  const scheduleReconnect = () => {
+    if (closed || reconnectTimer) return;
+    const delay = Math.min(WS_RECONNECT_BASE_MS * 2 ** attempts, WS_RECONNECT_MAX_MS);
+    attempts += 1;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  };
+
+  function connect() {
+    if (closed) return;
+    const ws = new WebSocket(url);
+    socket = ws;
+    ws.onopen = () => {
+      attempts = 0;
+    };
+    ws.onmessage = (event) => {
+      let payload: { type?: string; draft?: GroupSessionDraft | null };
+      try {
+        payload = JSON.parse(String(event.data));
+      } catch {
+        // Ignore unparseable frames — never conflate them with a real teardown.
+        return;
+      }
       if (payload.type === 'draft') {
         onChange(payload.draft ?? null);
       }
-    } catch {
-      onChange(null);
+    };
+    // A transport error is not a party deletion; let onclose drive reconnect.
+    ws.onerror = () => {};
+    ws.onclose = () => {
+      if (socket === ws) socket = null;
+      scheduleReconnect();
+    };
+  }
+
+  connect();
+
+  return () => {
+    closed = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     }
+    socket?.close();
+    socket = null;
   };
-  socket.onerror = () => onChange(null);
-  return () => socket.close();
 }
 
 export async function removeGroupParty(groupPartyId: string): Promise<void> {
