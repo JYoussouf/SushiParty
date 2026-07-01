@@ -206,18 +206,25 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Account</Text>
 
-          <TouchableOpacity style={styles.row} onPress={() => void handleExportHistory()}>
-            <View>
+          <View style={styles.row}>
+            <View style={styles.rowText}>
               <Text style={styles.rowTitle}>Export my Party Data</Text>
               <Text style={styles.rowNote}>Download a readable CSV summary of saved parties.</Text>
             </View>
-            <Text style={styles.rowAction}>Export</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.rowActionBtn}
+              activeOpacity={0.85}
+              onPress={() => void handleExportHistory()}
+            >
+              <Text style={styles.rowActionBtnText}>Export</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.dangerZone}>
             {accountBacked && (
               <TouchableOpacity
-                style={styles.dangerLink}
+                style={styles.actionBtn}
+                activeOpacity={0.85}
                 onPress={() =>
                   Alert.alert('Sign out', 'You will be signed out of your account.', [
                     { text: 'Cancel', style: 'cancel' },
@@ -225,11 +232,15 @@ export default function SettingsScreen() {
                   ])
                 }
               >
-                <Text style={styles.dangerLinkText}>Sign out</Text>
+                <Text style={styles.actionBtnText}>Sign out</Text>
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.dangerLink} onPress={handleReset}>
-              <Text style={styles.dangerLinkText}>Delete my account</Text>
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.dangerBtn]}
+              activeOpacity={0.85}
+              onPress={handleReset}
+            >
+              <Text style={[styles.actionBtnText, styles.dangerBtnText]}>Delete my account</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -348,16 +359,67 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: t.color.border,
   },
+  rowText: { flex: 1 },
   rowTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
-  rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary, maxWidth: 240 },
-  rowAction: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.accent },
+  rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary },
+
+  // Action button chips — explicitly boxed so they render identically on iOS
+  // and Android (bare text links diverge due to Android's includeFontPadding).
+  rowActionBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 18,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: t.color.accent,
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  rowActionBtnText: {
+    fontSize: 13,
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
   dangerZone: {
     marginTop: 8,
     flexDirection: 'row',
     flexWrap: 'wrap',
     alignItems: 'center',
-    gap: 20,
+    gap: 12,
   },
-  dangerLink: { paddingVertical: 4 },
-  dangerLinkText: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.danger },
+  actionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.surface,
+    borderWidth: 1.5,
+    borderColor: t.color.border,
+    shadowColor: '#000000',
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  actionBtnText: {
+    fontSize: 14,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
+  dangerBtn: {
+    borderColor: t.color.danger,
+  },
+  dangerBtnText: {
+    color: t.color.danger,
+    fontFamily: t.font.bodyBold,
+  },
 });
