@@ -29,6 +29,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { CAT_AVATARS } from '../../src/lib/catAvatars';
 import { useSession } from '../../src/hooks/useSession';
 import { useAuth } from '../../src/contexts/AuthContext';
+import { useRestaurant } from '../../src/contexts/RestaurantContext';
+import { useMenu } from '../../src/hooks/useMenu';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 
@@ -176,6 +178,8 @@ export default function LobbyScreen() {
     setMode,
     startParty,
   } = useSession();
+  const { restaurant } = useRestaurant();
+  const { activeMenu } = useMenu();
   const isHost = !!userProfile && userProfile.uid === groupOwnerUid;
   // Guards against navigating into the party more than once (host press + guest
   // phase effect could otherwise both fire before this screen unmounts).
@@ -325,8 +329,18 @@ export default function LobbyScreen() {
           onPress={() => {
             logPartyFlow('lobby start pressed', { groupCode, groupSessionId, isHost });
             if (isHost) {
-              // Broadcast phase='active' so every guest follows, then enter.
-              void startParty();
+              // Broadcast phase='active' so every guest follows, then enter. The host
+              // sends its restaurant/menu/location + a fresh startedAt on the draft so
+              // guests can reconstruct results when the party ends. Sources mirror the
+              // scoreboard's submit path exactly.
+              void startParty({
+                restaurantId: restaurant?.id ?? 'unknown',
+                restaurantName: restaurant?.name ?? 'Unknown Restaurant',
+                location: restaurant?.location ?? { latitude: 0, longitude: 0 },
+                menuId: activeMenu.id,
+                menuVersion: activeMenu.version,
+                startedAt: new Date().toISOString(),
+              });
             }
             enterParty();
           }}

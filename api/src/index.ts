@@ -81,6 +81,13 @@ interface GroupSessionDraft {
   updatedAt: string;
   expiresAt: string;
   participants: SessionParticipant[];
+  // Shared session context the host populates at /start so guests can build results.
+  restaurantId?: string;
+  restaurantName?: string;
+  location?: GeoPoint;
+  menuId?: string;
+  menuVersion?: number;
+  startedAt?: string;
 }
 
 interface UserRow {
@@ -1241,12 +1248,35 @@ export class GroupParty {
     }
 
     if (request.method === 'POST' && path === '/start') {
-      const body = await readJson<{ ownerUid: string }>(request);
+      const body = await readJson<{
+        ownerUid: string;
+        restaurantId?: string;
+        restaurantName?: string;
+        location?: GeoPoint;
+        menuId?: string;
+        menuVersion?: number;
+        startedAt?: string;
+      }>(request);
       const draft = await this.requireDraft();
       if (draft.ownerUid !== body.ownerUid) {
         return Response.json({ error: 'Only the party owner can start the party.' }, { status: 403 });
       }
-      const next = { ...draft, phase: 'active' as GroupPhase, updatedAt: new Date().toISOString() };
+      // Persist the host's session context on the draft so every guest receives
+      // restaurant/menu/location/startedAt at phase='active'. Only overwrite keys
+      // the host actually sent, leaving any prior values intact.
+      const context: Partial<GroupSessionDraft> = {};
+      if (body.restaurantId !== undefined) context.restaurantId = body.restaurantId;
+      if (body.restaurantName !== undefined) context.restaurantName = body.restaurantName;
+      if (body.location !== undefined) context.location = body.location;
+      if (body.menuId !== undefined) context.menuId = body.menuId;
+      if (body.menuVersion !== undefined) context.menuVersion = body.menuVersion;
+      if (body.startedAt !== undefined) context.startedAt = body.startedAt;
+      const next = {
+        ...draft,
+        ...context,
+        phase: 'active' as GroupPhase,
+        updatedAt: new Date().toISOString(),
+      };
       await this.writeDraft(next);
       await this.broadcast(next);
       return Response.json({ draft: next });

@@ -1,7 +1,18 @@
-import type { GroupSessionDraft } from '../../types';
+import type { GeoPoint, GroupSessionDraft } from '../../types';
 import { apiRequest, apiWebSocketUrl } from './client';
 
 type Unsubscribe = () => void;
+
+// Shared session context the host sends when starting a party, so every guest can
+// reconstruct results (restaurant/menu/location/startedAt) at phase='active'.
+export interface GroupPartyStartContext {
+  restaurantId: string;
+  restaurantName: string;
+  location: GeoPoint;
+  menuId: string;
+  menuVersion: number;
+  startedAt: string;
+}
 
 export async function createGroupParty(
   _ownerUid: string,
@@ -100,12 +111,13 @@ export async function updateGroupPartyParticipantAvatar(
 export async function startGroupParty(
   groupPartyId: string,
   ownerUid: string,
+  context?: GroupPartyStartContext,
 ): Promise<GroupSessionDraft | null> {
   const { draft } = await apiRequest<{ draft: GroupSessionDraft }>(
     `/groups/${encodeURIComponent(groupPartyId)}/start`,
     {
       method: 'POST',
-      body: JSON.stringify({ ownerUid }),
+      body: JSON.stringify({ ownerUid, ...(context ?? {}) }),
     },
   );
   return draft;

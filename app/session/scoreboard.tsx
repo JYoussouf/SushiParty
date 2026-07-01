@@ -32,6 +32,8 @@ import { useMenu } from '../../src/hooks/useMenu';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
 import { submitSession } from '../../src/lib/cloudflare/sessions';
+import { submitSession as submitLocalSession } from '../../src/lib/local/sessions';
+import { globalMenu } from '../../src/lib/menus/globalMenu';
 import { prepareInterstitial } from '../../src/lib/ads';
 import { getRestaurantStats } from '../../src/lib/local/restaurantStats';
 import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
@@ -65,9 +67,14 @@ export default function ScoreboardScreen() {
     setActiveParticipantIndex,
     activeParticipantIndex,
     groupCode,
+    groupOwnerUid,
+    groupPhase,
+    groupContext,
+    endParty,
     currentUserCanEditActive,
     completeSession,
   } = useSession();
+  const isHost = !!userProfile && userProfile.uid === groupOwnerUid;
   const { activeMenu, useGlobalMenu, setUseGlobalMenu, canToggle } = useMenu();
   const [submitting, setSubmitting] = useState(false);
   const [templates, setTemplates] = useState<SessionTemplate[]>([]);
@@ -88,6 +95,61 @@ export default function ScoreboardScreen() {
       sum + Object.values(participant.counts).reduce((participantSum, count) => participantSum + count, 0),
     0,
   );
+
+  // One-shot guard so a guest's end-of-party navigation fires exactly once, even if
+  // the 'ended' phase re-broadcasts. Reset on unmount so the next party works.
+  const endedNavRef = useRef(false);
+  useEffect(() => {
+    return () => {
+      endedNavRef.current = false;
+    };
+  }, []);
+
+  // Guests follow the host to results: when the shared phase flips to 'ended', a
+  // non-host builds a SushiSession from the shared draft context + ALL participants,
+  // persists it LOCALLY only (never to D1 — that would duplicate the host's global
+  // record and double-count restaurant stats), then opens the individualized summary.
+  useEffect(() => {
+    if (mode !== 'group' || isHost || groupPhase !== 'ended') return;
+    if (endedNavRef.current || !userProfile) return;
+    endedNavRef.current = true;
+
+    // Snapshot now: the host's DO teardown (draft=null) may reset context shortly after.
+    const finalParticipants = participants;
+    const ctx = groupContext;
+    const code = groupCode;
+
+    void (async () => {
+      try {
+        const localId = await submitLocalSession({
+          ownerUid: userProfile.uid,
+          mode: 'group',
+          // Missing-context fallback (e.g. host on an older client): still show results
+          // built from whatever's available rather than crash. 'unknown'/global menu
+          // mirror the existing unknown-restaurant handling.
+          restaurantId: ctx?.restaurantId ?? 'unknown',
+          restaurantName: ctx?.restaurantName ?? 'Unknown Restaurant',
+          menuId: ctx?.menuId ?? globalMenu.id,
+          menuVersion: ctx?.menuVersion ?? globalMenu.version,
+          location: ctx?.location ?? { latitude: 0, longitude: 0 },
+          participants: finalParticipants,
+          ...(ctx?.startedAt ? { startedAt: ctx.startedAt } : {}),
+          ...(code ? { groupCode: code } : {}),
+        });
+        logPartyFlow('guest end -> summary (local)', { localId });
+        // `local=1` tells summary to load this guest-only session from local storage;
+        // `allowUnknown=1` skips restaurant-confirm (guests don't own the restaurant).
+        router.replace({
+          pathname: '/session/summary',
+          params: { id: localId, origin: 'submit', local: '1', allowUnknown: '1' },
+        });
+      } catch (error) {
+        // Allow a retry if a later 'ended' re-broadcast arrives.
+        endedNavRef.current = false;
+        logPartyFlow('guest end persist failed', error);
+      }
+    })();
+  }, [mode, isHost, groupPhase, userProfile, participants, groupContext, groupCode, router]);
 
   useEffect(() => {
     logPartyFlow('scoreboard mounted');
@@ -294,6 +356,14 @@ export default function ScoreboardScreen() {
 
     setSubmitting(true);
     try {
+      // Group host: broadcast phase='ended' FIRST so every guest follows into their
+      // own results. Awaited before the backend submit/DO-teardown below, and delivered
+      // in-order over each guest's socket, so guests reliably process 'ended' (build +
+      // persist local + navigate) before the subsequent draft=null teardown resets them.
+      if (mode === 'group') {
+        await endParty();
+      }
+
       const sessionId = await submitSession({
         ownerUid: userProfile.uid,
         mode,

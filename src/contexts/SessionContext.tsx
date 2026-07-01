@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import { useAuth } from './AuthContext';
 import {
   createGroupParty,
+  endGroupParty,
   joinGroupParty,
   removeGroupParty,
   resetGroupPartyParticipantCounts,
@@ -9,9 +10,17 @@ import {
   subscribeToGroupParty,
   updateGroupPartyParticipantAvatar,
   updateGroupPartyParticipantCounts,
+  type GroupPartyStartContext,
 } from '../lib/cloudflare/groupParties';
 import { DEFAULT_CAT_AVATAR } from '../lib/catAvatars';
 import type { GroupPhase, GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
+
+// Shared session context carried on the draft (host-populated at start). Exposed so a
+// guest can reconstruct their results when the party ends.
+export type GroupSessionContext = Pick<
+  GroupSessionDraft,
+  'restaurantId' | 'restaurantName' | 'location' | 'menuId' | 'menuVersion' | 'startedAt'
+>;
 
 interface SessionContextValue {
   mode: SessionMode;
@@ -29,9 +38,11 @@ interface SessionContextValue {
   groupSessionId: string | null;
   groupOwnerUid: string | null;
   groupPhase: GroupPhase;
+  groupContext: GroupSessionContext | null;
   createGroup: () => Promise<GroupSessionDraft>;
   joinGroup: (code: string) => Promise<GroupSessionDraft>;
-  startParty: () => Promise<void>;
+  startParty: (context?: GroupPartyStartContext) => Promise<void>;
+  endParty: () => Promise<void>;
   setParticipantAvatar: (avatar: string) => Promise<void>;
   currentUserParticipantIndex: number;
   currentUserCanEditActive: boolean;
@@ -62,6 +73,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [groupCode, setGroupCode] = useState<string | null>(null);
   const [groupOwnerUid, setGroupOwnerUid] = useState<string | null>(null);
   const [groupPhase, setGroupPhase] = useState<GroupPhase>('lobby');
+  const [groupContext, setGroupContext] = useState<GroupSessionContext | null>(null);
   const [localAvatar, setLocalAvatar] = useState<string>(
     () => userProfile?.avatar ?? DEFAULT_CAT_AVATAR,
   );
@@ -112,6 +124,22 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setGroupCode(draft.code);
       setGroupOwnerUid(draft.ownerUid);
       setGroupPhase(draft.phase ?? 'lobby');
+      const hasContext =
+        draft.restaurantId !== undefined ||
+        draft.menuId !== undefined ||
+        draft.startedAt !== undefined;
+      setGroupContext(
+        hasContext
+          ? {
+              ...(draft.restaurantId !== undefined ? { restaurantId: draft.restaurantId } : {}),
+              ...(draft.restaurantName !== undefined ? { restaurantName: draft.restaurantName } : {}),
+              ...(draft.location !== undefined ? { location: draft.location } : {}),
+              ...(draft.menuId !== undefined ? { menuId: draft.menuId } : {}),
+              ...(draft.menuVersion !== undefined ? { menuVersion: draft.menuVersion } : {}),
+              ...(draft.startedAt !== undefined ? { startedAt: draft.startedAt } : {}),
+            }
+          : null,
+      );
       setModeState('group');
       setDraftActive(true);
     },
@@ -138,6 +166,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupCode(null);
         setGroupOwnerUid(null);
         setGroupPhase('lobby');
+        setGroupContext(null);
         setModeState('single');
         setDraftActive(false);
         setParticipants([localParticipant]);
@@ -159,6 +188,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupCode(null);
         setGroupOwnerUid(null);
         setGroupPhase('lobby');
+        setGroupContext(null);
       }
 
       setModeState(nextMode);
@@ -237,6 +267,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setGroupCode(null);
       setGroupOwnerUid(null);
       setGroupPhase('lobby');
+        setGroupContext(null);
     }
 
     setModeState('single');
@@ -269,12 +300,29 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     return draft;
   }, [localAvatar, syncFromDraft, userProfile]);
 
-  const startParty = useCallback(async () => {
+  const startParty = useCallback(
+    async (context?: GroupPartyStartContext) => {
+      if (!groupSessionId || !userProfile) {
+        return;
+      }
+
+      const draft = await startGroupParty(groupSessionId, userProfile.uid, context);
+      if (draft) {
+        syncFromDraft(draft);
+      }
+    },
+    [groupSessionId, syncFromDraft, userProfile],
+  );
+
+  // Host-only: flip the shared phase to 'ended' and broadcast so every guest follows
+  // into their individualized results. Does NOT tear the party down here; the host's
+  // own submit/complete flow (and the DO's TTL) handle cleanup.
+  const endParty = useCallback(async () => {
     if (!groupSessionId || !userProfile) {
       return;
     }
 
-    const draft = await startGroupParty(groupSessionId, userProfile.uid);
+    const draft = await endGroupParty(groupSessionId, userProfile.uid);
     if (draft) {
       syncFromDraft(draft);
     }
@@ -329,9 +377,11 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     groupSessionId,
     groupOwnerUid,
     groupPhase,
+    groupContext,
     createGroup,
     joinGroup,
     startParty,
+    endParty,
     setParticipantAvatar,
     currentUserParticipantIndex,
     currentUserCanEditActive:

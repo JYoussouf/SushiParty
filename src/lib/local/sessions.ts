@@ -21,6 +21,7 @@ interface SubmitSessionParams {
   participants: SessionParticipant[];
   groupCode?: string;
   flagged?: boolean;
+  startedAt?: string; // ISO; defaults to now. Lets a group session mirror the shared party start.
 }
 
 function createSessionId(): string {
@@ -57,7 +58,7 @@ export async function submitSession(params: SubmitSessionParams): Promise<string
     menuId: params.menuId,
     menuVersion: params.menuVersion,
     location: params.location,
-    startedAt: now,
+    startedAt: params.startedAt ?? now,
     submittedAt: now,
     participants: params.participants,
     flagged: params.flagged ?? false,

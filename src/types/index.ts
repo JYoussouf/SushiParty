@@ -67,6 +67,14 @@ export interface GroupSessionDraft {
   updatedAt: string;
   expiresAt: string;
   participants: SessionParticipant[];
+  // Shared session context the host populates when the party starts (phase='active').
+  // Optional so lobby/legacy drafts stay valid. Lets guests reconstruct results at end.
+  restaurantId?: string;
+  restaurantName?: string;
+  location?: GeoPoint;
+  menuId?: string;
+  menuVersion?: number;
+  startedAt?: string; // ISO
 }
 
 export interface GeoPoint {

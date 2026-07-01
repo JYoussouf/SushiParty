@@ -32,6 +32,10 @@ import {
   updateSessionNote,
 } from '../../src/lib/cloudflare/sessions';
 import {
+  getAllSessions as getAllLocalSessions,
+  getSessionById as getLocalSessionById,
+} from '../../src/lib/local/sessions';
+import {
   getParticipantSummaries,
   getSessionSuperlatives,
   getSessionTotalPieces,
@@ -134,7 +138,7 @@ export default function SessionSummaryScreen() {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile } = useAuth();
-  const params = useLocalSearchParams<{ id?: string; origin?: string; allowUnknown?: string }>();
+  const params = useLocalSearchParams<{ id?: string; origin?: string; allowUnknown?: string; local?: string }>();
   const [session, setSession] = useState<SushiSession | null>(null);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [loading, setLoading] = useState(true);
@@ -164,6 +168,10 @@ export default function SessionSummaryScreen() {
   const sessionId = Array.isArray(params.id) ? params.id[0] : params.id;
   const origin = Array.isArray(params.origin) ? params.origin[0] : params.origin;
   const allowUnknown = Array.isArray(params.allowUnknown) ? params.allowUnknown[0] : params.allowUnknown;
+  // Guests persist their group results LOCALLY only (never to D1), so their summary
+  // must load the session + achievements from local storage. Host/all other flows omit
+  // this flag and read from the backend exactly as before.
+  const isLocal = (Array.isArray(params.local) ? params.local[0] : params.local) === '1';
 
   const loadSession = useCallback(async () => {
     if (!sessionId) {
@@ -175,7 +183,7 @@ export default function SessionSummaryScreen() {
 
     setLoading(true);
     try {
-      const foundSession = await getSessionById(sessionId);
+      const foundSession = await (isLocal ? getLocalSessionById(sessionId) : getSessionById(sessionId));
       if (!foundSession) {
         Alert.alert('Party unavailable', 'That party could not be found on this device.', [
           { text: 'OK', onPress: () => router.back() },
@@ -200,7 +208,7 @@ export default function SessionSummaryScreen() {
       setDraftNote(foundSession.note ?? '');
 
       if (userProfile) {
-        const allSessions = await getAllSessions();
+        const allSessions = await (isLocal ? getAllLocalSessions() : getAllSessions());
         setAllAchievements(getAchievements(allSessions, userProfile.uid));
 
         if (origin === 'submit') {
@@ -219,7 +227,7 @@ export default function SessionSummaryScreen() {
     } finally {
       setLoading(false);
     }
-  }, [allowUnknown, origin, router, sessionId, userProfile]);
+  }, [allowUnknown, isLocal, origin, router, sessionId, userProfile]);
 
   useEffect(() => {
     void loadSession();
@@ -425,7 +433,7 @@ export default function SessionSummaryScreen() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Who showed up hungry?</Text>
-            {availableFriends.length > 0 && (
+            {availableFriends.length > 0 && !isLocal && (
               <TouchableOpacity style={styles.actionChip} onPress={() => setShowTagModal(true)}>
                 <Text style={styles.actionChipText}>Tag Friends</Text>
               </TouchableOpacity>
@@ -530,9 +538,11 @@ export default function SessionSummaryScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Notes</Text>
-              <TouchableOpacity style={styles.actionChip} onPress={() => setShowNoteModal(true)}>
-                <Text style={styles.actionChipText}>Edit Note</Text>
-              </TouchableOpacity>
+              {!isLocal && (
+                <TouchableOpacity style={styles.actionChip} onPress={() => setShowNoteModal(true)}>
+                  <Text style={styles.actionChipText}>Edit Note</Text>
+                </TouchableOpacity>
+              )}
             </View>
             <View style={styles.listCard}>
               <Text style={styles.noteDisplay}>{session.note}</Text>
@@ -540,7 +550,7 @@ export default function SessionSummaryScreen() {
           </View>
         )}
 
-        {!session.note?.trim() && (
+        {!session.note?.trim() && !isLocal && (
           <TouchableOpacity style={styles.addNoteButton} onPress={() => setShowNoteModal(true)}>
             <Text style={styles.addNoteButtonText}>+ Add Note</Text>
           </TouchableOpacity>
