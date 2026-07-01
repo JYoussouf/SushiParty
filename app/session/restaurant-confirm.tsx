@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useTheme } from '../../src/contexts/ThemeContext';
@@ -28,6 +29,11 @@ import type { Restaurant } from '../../src/types';
 
 type RestaurantWithDistance = Restaurant & { distanceKm?: number };
 
+// Approx. height of the absolutely-positioned "Skip for now" footer (button +
+// its bottom offset). Used as the list's bottom padding so the last card
+// scrolls clear of the floating button.
+const FOOTER_CLEARANCE = 120;
+
 // Session-scoped cache so repeat searches are instant (cleared on app restart)
 const searchCache = new Map<string, RestaurantWithDistance[]>();
 
@@ -37,6 +43,7 @@ export default function SessionRestaurantConfirmScreen() {
   const { location, permission, loading: locationLoading, refresh } = useLocation();
   const { setRestaurant } = useRestaurant();
   const t = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(t), [t]);
 
   const [nearby, setNearby] = useState<RestaurantWithDistance[]>([]);
@@ -216,7 +223,7 @@ export default function SessionRestaurantConfirmScreen() {
       <FlatList
         data={displayList}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: FOOTER_CLEARANCE + insets.bottom }]}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.row} onPress={() => { void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); void handleSelect(item); }} disabled={saving}>
@@ -250,7 +257,7 @@ export default function SessionRestaurantConfirmScreen() {
         }
       />
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, { bottom: insets.bottom + 16 }]}>
         <TouchableOpacity style={styles.skipButton} onPress={handleSkip} disabled={saving} activeOpacity={0.85}>
           <LinearGradient
             colors={t.color.accentGradient}
@@ -309,7 +316,7 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: t.color.accentSoft,
   },
   secondaryButtonText: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.onAccent },
-  listContent: { paddingHorizontal: 20, paddingBottom: 140, paddingTop: 6 },
+  listContent: { paddingHorizontal: 20, paddingTop: 6 },
   separator: { height: 10 },
   row: {
     flexDirection: 'row',
@@ -332,7 +339,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     position: 'absolute',
     left: 20,
     right: 20,
-    bottom: 24,
     ...t.shadow.glow(t.color.accent),
   },
   skipButton: {
