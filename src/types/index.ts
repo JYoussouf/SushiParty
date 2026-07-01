@@ -56,10 +56,13 @@ export interface SushiSession {
   flagged?: boolean; // true if anomaly detection raised a flag
 }
 
+export type GroupPhase = 'lobby' | 'active' | 'ended';
+
 export interface GroupSessionDraft {
   id: string;
   code: string;
   ownerUid: string;
+  phase: GroupPhase; // 'lobby' until the host starts, then 'active'; 'ended' closes it
   createdAt: string;
   updatedAt: string;
   expiresAt: string;

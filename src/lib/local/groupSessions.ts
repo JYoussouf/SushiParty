@@ -86,6 +86,7 @@ export async function createGroupSession(
     id: randomId('group'),
     code,
     ownerUid,
+    phase: 'lobby',
     createdAt: now,
     updatedAt: now,
     expiresAt: new Date(Date.now() + GROUP_TTL_MS).toISOString(),

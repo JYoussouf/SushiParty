@@ -5,12 +5,13 @@ import {
   joinGroupParty,
   removeGroupParty,
   resetGroupPartyParticipantCounts,
+  startGroupParty,
   subscribeToGroupParty,
   updateGroupPartyParticipantAvatar,
   updateGroupPartyParticipantCounts,
 } from '../lib/cloudflare/groupParties';
 import { DEFAULT_CAT_AVATAR } from '../lib/catAvatars';
-import type { GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
+import type { GroupPhase, GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
 
 interface SessionContextValue {
   mode: SessionMode;
@@ -27,8 +28,10 @@ interface SessionContextValue {
   groupCode: string | null;
   groupSessionId: string | null;
   groupOwnerUid: string | null;
+  groupPhase: GroupPhase;
   createGroup: () => Promise<GroupSessionDraft>;
   joinGroup: (code: string) => Promise<GroupSessionDraft>;
+  startParty: () => Promise<void>;
   setParticipantAvatar: (avatar: string) => Promise<void>;
   currentUserParticipantIndex: number;
   currentUserCanEditActive: boolean;
@@ -58,6 +61,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [groupSessionId, setGroupSessionId] = useState<string | null>(null);
   const [groupCode, setGroupCode] = useState<string | null>(null);
   const [groupOwnerUid, setGroupOwnerUid] = useState<string | null>(null);
+  const [groupPhase, setGroupPhase] = useState<GroupPhase>('lobby');
   const [localAvatar, setLocalAvatar] = useState<string>(
     () => userProfile?.avatar ?? DEFAULT_CAT_AVATAR,
   );
@@ -107,6 +111,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setGroupSessionId(draft.id);
       setGroupCode(draft.code);
       setGroupOwnerUid(draft.ownerUid);
+      setGroupPhase(draft.phase ?? 'lobby');
       setModeState('group');
       setDraftActive(true);
     },
@@ -132,6 +137,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupSessionId(null);
         setGroupCode(null);
         setGroupOwnerUid(null);
+        setGroupPhase('lobby');
         setModeState('single');
         setDraftActive(false);
         setParticipants([localParticipant]);
@@ -152,6 +158,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         setGroupSessionId(null);
         setGroupCode(null);
         setGroupOwnerUid(null);
+        setGroupPhase('lobby');
       }
 
       setModeState(nextMode);
@@ -229,6 +236,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setGroupSessionId(null);
       setGroupCode(null);
       setGroupOwnerUid(null);
+      setGroupPhase('lobby');
     }
 
     setModeState('single');
@@ -260,6 +268,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     syncFromDraft(draft);
     return draft;
   }, [localAvatar, syncFromDraft, userProfile]);
+
+  const startParty = useCallback(async () => {
+    if (!groupSessionId || !userProfile) {
+      return;
+    }
+
+    const draft = await startGroupParty(groupSessionId, userProfile.uid);
+    if (draft) {
+      syncFromDraft(draft);
+    }
+  }, [groupSessionId, syncFromDraft, userProfile]);
 
   const setParticipantAvatar = useCallback(
     async (avatar: string) => {
@@ -309,8 +328,10 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     groupCode,
     groupSessionId,
     groupOwnerUid,
+    groupPhase,
     createGroup,
     joinGroup,
+    startParty,
     setParticipantAvatar,
     currentUserParticipantIndex,
     currentUserCanEditActive:

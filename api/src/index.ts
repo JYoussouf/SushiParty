@@ -70,10 +70,13 @@ interface Menu {
   items: unknown[];
 }
 
+type GroupPhase = 'lobby' | 'active' | 'ended';
+
 interface GroupSessionDraft {
   id: string;
   code: string;
   ownerUid: string;
+  phase: GroupPhase;
   createdAt: string;
   updatedAt: string;
   expiresAt: string;
@@ -1208,6 +1211,7 @@ export class GroupParty {
         id: body.code,
         code: body.code,
         ownerUid: body.ownerUid,
+        phase: 'lobby',
         createdAt: now,
         updatedAt: now,
         expiresAt: new Date(Date.now() + GROUP_TTL_MS).toISOString(),
@@ -1231,6 +1235,30 @@ export class GroupParty {
         participants: ensureParticipant(draft.participants, body.userId, body.displayName || 'Sushi Friend', body.avatar),
         updatedAt: new Date().toISOString(),
       };
+      await this.writeDraft(next);
+      await this.broadcast(next);
+      return Response.json({ draft: next });
+    }
+
+    if (request.method === 'POST' && path === '/start') {
+      const body = await readJson<{ ownerUid: string }>(request);
+      const draft = await this.requireDraft();
+      if (draft.ownerUid !== body.ownerUid) {
+        return Response.json({ error: 'Only the party owner can start the party.' }, { status: 403 });
+      }
+      const next = { ...draft, phase: 'active' as GroupPhase, updatedAt: new Date().toISOString() };
+      await this.writeDraft(next);
+      await this.broadcast(next);
+      return Response.json({ draft: next });
+    }
+
+    if (request.method === 'POST' && path === '/end') {
+      const body = await readJson<{ ownerUid: string }>(request);
+      const draft = await this.requireDraft();
+      if (draft.ownerUid !== body.ownerUid) {
+        return Response.json({ error: 'Only the party owner can end the party.' }, { status: 403 });
+      }
+      const next = { ...draft, phase: 'ended' as GroupPhase, updatedAt: new Date().toISOString() };
       await this.writeDraft(next);
       await this.broadcast(next);
       return Response.json({ draft: next });
@@ -1318,7 +1346,8 @@ export class GroupParty {
       await this.broadcast(null);
       return null;
     }
-    return draft;
+    // Legacy drafts written before the phase field existed default to 'lobby'.
+    return { ...draft, phase: draft.phase ?? 'lobby' };
   }
 
   private async requireDraft(): Promise<GroupSessionDraft> {

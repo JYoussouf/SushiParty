@@ -170,11 +170,23 @@ export default function LobbyScreen() {
     groupCode,
     groupSessionId,
     groupOwnerUid,
+    groupPhase,
     currentUserParticipantIndex,
     setParticipantAvatar,
     setMode,
+    startParty,
   } = useSession();
   const isHost = !!userProfile && userProfile.uid === groupOwnerUid;
+  // Guards against navigating into the party more than once (host press + guest
+  // phase effect could otherwise both fire before this screen unmounts).
+  const enteredPartyRef = useRef(false);
+
+  const enterParty = useCallback(() => {
+    if (enteredPartyRef.current) return;
+    enteredPartyRef.current = true;
+    logPartyFlow('lobby -> party-intro', { groupCode, groupSessionId });
+    router.replace('/session/party-intro');
+  }, [groupCode, groupSessionId, router]);
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
 
@@ -190,6 +202,16 @@ export default function LobbyScreen() {
       router.replace('/(tabs)/home');
     }
   }, [groupCode, groupSessionId, router]);
+
+  // Guests follow the host into the party: when the shared phase flips to
+  // 'active' (the host pressed start and it broadcast to everyone), non-hosts
+  // still sitting in the lobby move into the party alongside the host.
+  useEffect(() => {
+    if (!groupSessionId || isHost) return;
+    if (groupPhase === 'active') {
+      enterParty();
+    }
+  }, [enterParty, groupPhase, groupSessionId, isHost]);
 
   const joinLink = useMemo(
     () =>
@@ -301,8 +323,12 @@ export default function LobbyScreen() {
           style={styles.startButton}
           activeOpacity={0.85}
           onPress={() => {
-            logPartyFlow('lobby start pressed, replace party-intro', { groupCode, groupSessionId });
-            router.replace('/session/party-intro');
+            logPartyFlow('lobby start pressed', { groupCode, groupSessionId, isHost });
+            if (isHost) {
+              // Broadcast phase='active' so every guest follows, then enter.
+              void startParty();
+            }
+            enterParty();
           }}
         >
           <LinearGradient

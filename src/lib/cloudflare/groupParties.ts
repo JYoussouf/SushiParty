@@ -97,6 +97,34 @@ export async function updateGroupPartyParticipantAvatar(
   return draft;
 }
 
+export async function startGroupParty(
+  groupPartyId: string,
+  ownerUid: string,
+): Promise<GroupSessionDraft | null> {
+  const { draft } = await apiRequest<{ draft: GroupSessionDraft }>(
+    `/groups/${encodeURIComponent(groupPartyId)}/start`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ ownerUid }),
+    },
+  );
+  return draft;
+}
+
+export async function endGroupParty(
+  groupPartyId: string,
+  ownerUid: string,
+): Promise<GroupSessionDraft | null> {
+  const { draft } = await apiRequest<{ draft: GroupSessionDraft }>(
+    `/groups/${encodeURIComponent(groupPartyId)}/end`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ ownerUid }),
+    },
+  );
+  return draft;
+}
+
 export function subscribeToGroupParty(
   groupPartyId: string,
   onChange: (draft: GroupSessionDraft | null) => void,
