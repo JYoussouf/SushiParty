@@ -83,6 +83,8 @@ export default function OnboardingScreen() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewScale = useSharedValue(1);
   const previewStyle = useAnimatedStyle(() => ({ transform: [{ scale: previewScale.value }] }));
+  const ctaScale = useSharedValue(1);
+  const ctaStyle = useAnimatedStyle(() => ({ transform: [{ scale: ctaScale.value }] }));
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -111,6 +113,7 @@ export default function OnboardingScreen() {
 
   const handleContinue = async () => {
     if (!canContinue || saving) return;
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setSaving(true);
     try {
       await completeOnboarding(name.trim(), selectedAvatar, username.trim().toLowerCase());
@@ -118,6 +121,13 @@ export default function OnboardingScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleContinuePressIn = () => {
+    ctaScale.value = withSpring(0.96, { duration: 120 });
+  };
+  const handleContinuePressOut = () => {
+    ctaScale.value = withSpring(1, { duration: 220 });
   };
 
   return (
@@ -222,21 +232,24 @@ export default function OnboardingScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.continueShadow, !canContinue && styles.continueBtnDisabled]}
             onPress={() => void handleContinue()}
+            onPressIn={handleContinuePressIn}
+            onPressOut={handleContinuePressOut}
             disabled={!canContinue || saving}
-            activeOpacity={0.85}
+            activeOpacity={1}
           >
-            <LinearGradient
-              colors={t.color.accentGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.continueBtn}
-            >
-              <Text style={styles.continueBtnText}>
-                {saving ? 'Saving…' : `Let's eat! ${selectedAvatar}`}
-              </Text>
-            </LinearGradient>
+            <Animated.View style={[styles.continueShadow, !canContinue && styles.continueBtnDisabled, ctaStyle]}>
+              <LinearGradient
+                colors={t.color.accentGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.continueBtn}
+              >
+                <Text style={styles.continueBtnText}>
+                  {saving ? 'Saving…' : `Let's eat! ${selectedAvatar}`}
+                </Text>
+              </LinearGradient>
+            </Animated.View>
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
