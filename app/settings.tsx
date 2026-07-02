@@ -282,6 +282,23 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Places</Text>
+          <View style={styles.row}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Favourite sushi spot</Text>
+              <Text style={styles.rowNote}>See the places you&apos;ve partied at and browsed, and pin your favourite.</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.rowActionBtn}
+              activeOpacity={0.85}
+              onPress={() => router.push('/profile/places')}
+            >
+              <Text style={styles.rowActionBtnText}>View</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>My Account</Text>
 
           <View style={styles.row}>

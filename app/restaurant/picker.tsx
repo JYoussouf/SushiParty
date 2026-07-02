@@ -29,6 +29,7 @@ import {
   createRestaurant,
 } from '../../src/lib/cloudflare/restaurants';
 import { formatDistance } from '../../src/lib/geo';
+import { recordViewedPlace } from '../../src/lib/local/placeHistory';
 import type { Restaurant } from '../../src/types';
 
 type RestaurantWithDistance = Restaurant & { distanceKm?: number };
@@ -115,6 +116,13 @@ export default function RestaurantPickerScreen() {
 
   const handleSelect = (restaurant: RestaurantWithDistance) => {
     setRestaurant(restaurant);
+    // Remember that the user opened this spot, so the Places tab can show
+    // browsed-but-not-partied locations alongside visited ones. Fire-and-forget.
+    void recordViewedPlace({
+      id: restaurant.id,
+      name: restaurant.name,
+      address: restaurant.address,
+    });
     router.back();
   };
 

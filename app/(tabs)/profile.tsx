@@ -217,6 +217,25 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        <TouchableOpacity
+          style={styles.wrappedCtaShadow}
+          activeOpacity={0.9}
+          onPress={() => router.push('/wrapped')}
+        >
+          <LinearGradient
+            colors={['#3A1078', '#B0228C', '#E53935']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.wrappedCta}
+          >
+            <View style={styles.wrappedCtaText}>
+              <Text style={styles.wrappedCtaTitle}>Your Sushi Wrapped</Text>
+              <Text style={styles.wrappedCtaSub}>Share your stats to your story</Text>
+            </View>
+            <Text style={styles.wrappedCtaArrow}>→</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
         <AchievementsSection achievements={achievements} autoOpen={params.achievements === '1'} />
 
         <View style={styles.section}>
@@ -256,6 +275,10 @@ export default function ProfileScreen() {
               </TouchableOpacity>
               <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/restaurants')}>
                 <Text style={styles.listRowText}>Restaurant insights</Text>
+                <Text style={styles.listRowChevron}>Open</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/places')}>
+                <Text style={styles.listRowText}>Your places &amp; favourite spot</Text>
                 <Text style={styles.listRowChevron}>Open</Text>
               </TouchableOpacity>
             </>
@@ -618,6 +641,20 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     color: t.color.textSecondary,
     textAlign: 'center',
   },
+  wrappedCtaShadow: { borderRadius: t.radius.lg, ...t.shadow.glow(t.color.purple) },
+  wrappedCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: t.radius.lg,
+    paddingHorizontal: 22,
+    paddingVertical: 20,
+    gap: 12,
+  },
+  wrappedCtaText: { flex: 1, gap: 3 },
+  wrappedCtaTitle: { fontSize: 20, fontFamily: t.font.display, color: '#FFFFFF' },
+  wrappedCtaSub: { fontSize: 14, fontFamily: t.font.bodySemibold, color: 'rgba(255,255,255,0.85)' },
+  wrappedCtaArrow: { fontSize: 24, fontFamily: t.font.bodyBold, color: '#FFFFFF' },
   section: { gap: 12 },
   sectionTitle: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },

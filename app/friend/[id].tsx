@@ -13,8 +13,12 @@ import { StatusBar } from 'expo-status-bar';
 import { BackButton } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
+import { useAuth } from '../../src/contexts/AuthContext';
 import { getFriendById, getFriendSessions } from '../../src/lib/local/friends';
+import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 import { getSessionTotalPieces } from '../../src/lib/sessionSummary';
+import { calculateUserProfileStats } from '../../src/lib/profileStats';
+import { buildFriendComparison, type FriendComparison } from '../../src/lib/friendCompare';
 import type { SushiSession, User } from '../../src/types';
 
 function getInitials(name: string): string {
@@ -31,8 +35,10 @@ export default function FriendProfileScreen() {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const params = useLocalSearchParams<{ id?: string }>();
+  const { userProfile } = useAuth();
   const [friend, setFriend] = useState<User | null>(null);
   const [sessions, setSessions] = useState<SushiSession[]>([]);
+  const [comparison, setComparison] = useState<FriendComparison | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadProfile = useCallback(async () => {
@@ -44,16 +50,27 @@ export default function FriendProfileScreen() {
 
     setLoading(true);
     try {
-      const [friendProfile, friendSessions] = await Promise.all([
+      const [friendProfile, friendSessions, mySessions] = await Promise.all([
         getFriendById(id),
         getFriendSessions(id),
+        getAllSessions(),
       ]);
       setFriend(friendProfile);
       setSessions(friendSessions);
+
+      if (userProfile) {
+        const myStats = calculateUserProfileStats(mySessions, userProfile.uid);
+        const friendStats = calculateUserProfileStats(friendSessions, id);
+        setComparison(
+          buildFriendComparison(myStats, friendStats, friendProfile?.displayName ?? 'Them'),
+        );
+      } else {
+        setComparison(null);
+      }
     } finally {
       setLoading(false);
     }
-  }, [params.id]);
+  }, [params.id, userProfile]);
 
   useEffect(() => {
     void loadProfile();
@@ -96,6 +113,45 @@ export default function FriendProfileScreen() {
           <Text style={styles.username}>@{friend.username}</Text>
           <Text style={styles.heroMeta}>{sessions.length} recent parties in local social mode</Text>
         </View>
+
+        {comparison && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>You vs {friend.displayName.split(' ')[0]}</Text>
+            <View style={styles.compareCard}>
+              <Text style={styles.compareHeadline}>{comparison.headline}</Text>
+              <View style={styles.compareLegendRow}>
+                <Text style={[styles.compareLegend, styles.compareLegendYou]}>You</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={[styles.compareLegend, styles.compareLegendFriend]}>
+                  {friend.displayName.split(' ')[0]}
+                </Text>
+              </View>
+              {comparison.rows.map((row) => (
+                <View key={row.label} style={styles.compareRow}>
+                  <Text
+                    style={[
+                      styles.compareValue,
+                      styles.compareValueLeft,
+                      row.leader === 'you' && styles.compareValueLead,
+                    ]}
+                  >
+                    {row.youValue}
+                  </Text>
+                  <Text style={styles.compareLabel}>{row.label}</Text>
+                  <Text
+                    style={[
+                      styles.compareValue,
+                      styles.compareValueRight,
+                      row.leader === 'friend' && styles.compareValueLead,
+                    ]}
+                  >
+                    {row.friendValue}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Parties</Text>
@@ -210,6 +266,48 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 13,
     fontFamily: t.font.body,
     color: t.color.textTertiary,
+  },
+  compareCard: {
+    borderRadius: t.radius.lg,
+    padding: 18,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    gap: 6,
+    ...t.shadow.card,
+  },
+  compareHeadline: {
+    fontSize: 16,
+    fontFamily: t.font.bodyBold,
+    color: t.color.textPrimary,
+    marginBottom: 4,
+  },
+  compareLegendRow: { flexDirection: 'row', alignItems: 'center' },
+  compareLegend: { fontSize: 12, fontFamily: t.font.bodyBold, letterSpacing: 0.5, textTransform: 'uppercase' },
+  compareLegendYou: { color: t.color.accent },
+  compareLegendFriend: { color: t.color.cyan },
+  compareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: t.color.border,
+  },
+  compareValue: {
+    width: 64,
+    fontSize: 20,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textTertiary,
+  },
+  compareValueLeft: { textAlign: 'left' },
+  compareValueRight: { textAlign: 'right' },
+  compareValueLead: { color: t.color.textPrimary, fontFamily: t.font.bodyBold },
+  compareLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 13,
+    fontFamily: t.font.bodySemibold,
+    color: t.color.textSecondary,
   },
   emptyText: {
     fontSize: 16,
