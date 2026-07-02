@@ -22,6 +22,7 @@ import type { Theme } from '../src/theme/themes';
 import { createPartnerApplication } from '../src/lib/cloudflare/partners';
 
 const CONTACT_EMAIL = 'contact@joseppy.ca';
+const PORTAL_URL = `${process.env.EXPO_PUBLIC_API_BASE_URL ?? ''}/partners`;
 
 const STEPS = [
   'Tell us about your restaurant.',
@@ -104,18 +105,25 @@ export default function PartnerScreen() {
             <Text style={styles.successEmoji}>🎉</Text>
             <Text style={styles.successTitle}>Application received</Text>
             <Text style={styles.successBody}>
-              Thanks! We&apos;ll email {email.trim()} to set up your partner profile - add photos,
-              confirm your details, and get featured to nearby diners.
+              Thanks! Set up your restaurant profile now - claim your listing, add photos and a
+              description - or we&apos;ll email {email.trim()} with next steps.
             </Text>
-            <TouchableOpacity style={styles.successBtnShadow} activeOpacity={0.9} onPress={() => router.back()}>
+            <TouchableOpacity
+              style={styles.successBtnShadow}
+              activeOpacity={0.9}
+              onPress={() => void Linking.openURL(PORTAL_URL)}
+            >
               <LinearGradient
                 colors={t.color.accentGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.successBtn}
               >
-                <Text style={styles.successBtnText}>Done</Text>
+                <Text style={styles.successBtnText}>Set up my profile</Text>
               </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.successLater} onPress={() => router.back()}>
+              <Text style={styles.successLaterText}>Done</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -297,4 +305,6 @@ const makeStyles = (t: Theme) =>
       justifyContent: 'center',
     },
     successBtnText: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.onAccent },
+    successLater: { marginTop: 6, paddingVertical: 10 },
+    successLaterText: { fontSize: 15, fontFamily: t.font.bodySemibold, color: t.color.textSecondary },
   });

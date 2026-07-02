@@ -16,6 +16,12 @@
 			"database_id": "dd049256-6cad-49be-9800-f5e62d63d39f"
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "PHOTOS",
+			"bucket_name": "sushi-party-photos"
+		}
+	],
 	"durable_objects": {
 		"bindings": [
 			{

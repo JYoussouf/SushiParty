@@ -20,6 +20,25 @@ interface DurableObjectNamespace {
   getByName(name: string): DurableObjectStub;
 }
 
+interface R2HTTPMetadata {
+  contentType?: string;
+}
+
+interface R2Object {
+  body: ReadableStream;
+  httpMetadata?: R2HTTPMetadata;
+}
+
+interface R2Bucket {
+  put(
+    key: string,
+    value: ArrayBuffer | ArrayBufferView | ReadableStream | string,
+    options?: { httpMetadata?: R2HTTPMetadata },
+  ): Promise<R2Object>;
+  get(key: string): Promise<R2Object | null>;
+  delete(key: string): Promise<void>;
+}
+
 interface DurableObjectStub {
   fetch(request: Request): Promise<Response>;
 }

@@ -1,6 +1,7 @@
 export interface Env {
   DB: D1Database;
   GROUP_PARTIES: DurableObjectNamespace;
+  PHOTOS?: R2Bucket;
   JWT_SECRET?: string;
   ALLOWED_ORIGIN?: string;
   GOOGLE_PLACES_API_KEY?: string;
@@ -42,6 +43,8 @@ interface Restaurant {
   priceLevel?: number;
   openNow?: boolean;
   googleMapsUri?: string;
+  photos?: string[];
+  featured?: boolean;
 }
 
 interface SessionParticipant {
@@ -335,7 +338,10 @@ function timingSafeEqual(leftValue: string, rightValue: string): boolean {
   return difference === 0;
 }
 
-async function verifyPassword(password: string, credential: AccountCredentialRow): Promise<boolean> {
+async function verifyPassword(
+  password: string,
+  credential: { password_hash: string; password_salt: string; password_iterations: number },
+): Promise<boolean> {
   const candidate = await derivePasswordHash(
     password,
     base64UrlToBytes(credential.password_salt),
@@ -656,6 +662,10 @@ async function handleAuthRegister(request: Request, env: Env): Promise<Response>
   return json(request, env, { token, user, accountBacked: true }, 201);
 }
 
+// ─── Restaurant partner portal ──────────────────────────────────────────────
+
+const MAX_PARTNER_PHOTOS = 8;
+
 interface PartnerApplicationBody {
   restaurantName?: string;
   address?: string;
@@ -663,7 +673,69 @@ interface PartnerApplicationBody {
   phone?: string;
 }
 
-// Restaurant "feature your restaurant" applications — a B2B lead, not a purchase.
+interface PartnerAccountRow {
+  id: string;
+  email: string;
+  password_hash: string;
+  password_salt: string;
+  password_iterations: number;
+}
+
+// Partner tokens reuse the app's HMAC token, namespaced with a "partner:" subject
+// so they can never be mistaken for an app-user token.
+async function requirePartner(request: Request, env: Env): Promise<string> {
+  const subject = await getAuthUid(request, env);
+  if (!subject || !subject.startsWith('partner:')) {
+    throw new HttpError(401, 'Partner sign-in required.');
+  }
+  return subject.slice('partner:'.length);
+}
+
+function photoUrl(url: URL, photoId: string): string {
+  return `${url.origin}/partners/photos/${photoId}`;
+}
+
+async function handlePartners(request: Request, env: Env, parts: string[], url: URL): Promise<Response> {
+  const sub = parts[1];
+
+  // Public portal website.
+  if (request.method === 'GET' && !sub) {
+    return new Response(PARTNER_PORTAL_HTML, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }
+  // App "feature your restaurant" lead form.
+  if (request.method === 'POST' && !sub) {
+    return handlePartnerApplication(request, env);
+  }
+  if (request.method === 'POST' && sub === 'signup') {
+    return handlePartnerSignup(request, env);
+  }
+  if (request.method === 'POST' && sub === 'login') {
+    return handlePartnerLogin(request, env);
+  }
+  if (request.method === 'GET' && sub === 'me') {
+    return handlePartnerMe(request, env, url);
+  }
+  if (request.method === 'PUT' && sub === 'profile') {
+    return handlePartnerSaveProfile(request, env);
+  }
+  if (request.method === 'GET' && sub === 'places' && parts[2] === 'search') {
+    return handlePartnerPlacesSearch(request, env, url);
+  }
+  if (request.method === 'POST' && sub === 'photos') {
+    return handlePartnerUploadPhoto(request, env, url);
+  }
+  if (request.method === 'GET' && sub === 'photos' && parts[2]) {
+    return handlePartnerServePhoto(env, parts[2]);
+  }
+  if (request.method === 'DELETE' && sub === 'photos' && parts[2]) {
+    return handlePartnerDeletePhoto(request, env, parts[2]);
+  }
+  throw new HttpError(404, 'Route not found.');
+}
+
+// Restaurant "feature your restaurant" application — a B2B lead, not a purchase.
 async function handlePartnerApplication(request: Request, env: Env): Promise<Response> {
   const body = await readJson<PartnerApplicationBody>(request);
   const restaurantName = body.restaurantName?.trim() ?? '';
@@ -673,22 +745,483 @@ async function handlePartnerApplication(request: Request, env: Env): Promise<Res
   if (!restaurantName || !address || !isValidEmail(email)) {
     throw new HttpError(400, 'Restaurant name, address and a valid email are required.');
   }
-  const id = randomId('partner');
-  const now = new Date().toISOString();
-  await env.DB.prepare(
-    `CREATE TABLE IF NOT EXISTS partner_applications (
-      id TEXT PRIMARY KEY, restaurant_name TEXT NOT NULL, address TEXT NOT NULL,
-      email TEXT NOT NULL, phone TEXT, created_at TEXT NOT NULL
-    )`,
-  ).run();
+  const id = randomId('partnerapp');
   await env.DB.prepare(
     `INSERT INTO partner_applications (id, restaurant_name, address, email, phone, created_at)
      VALUES (?, ?, ?, ?, ?, ?)`,
   )
-    .bind(id, restaurantName, address, email, phone, now)
+    .bind(id, restaurantName, address, email, phone, new Date().toISOString())
     .run();
   return json(request, env, { id });
 }
+
+async function handlePartnerSignup(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<{ email?: string; password?: string }>(request);
+  const email = normalizeEmail(body.email);
+  const password = typeof body.password === 'string' ? body.password : '';
+  if (!isValidEmail(email)) throw new HttpError(400, 'Please enter a valid email address.');
+  if (password.length < PASSWORD_MIN_LENGTH || password.length > PASSWORD_MAX_LENGTH) {
+    throw new HttpError(400, `Password must be ${PASSWORD_MIN_LENGTH}-${PASSWORD_MAX_LENGTH} characters.`);
+  }
+  const existing = await env.DB.prepare('SELECT id FROM partner_accounts WHERE email = ?')
+    .bind(email)
+    .first<{ id: string }>();
+  if (existing) throw new HttpError(409, 'An account already exists with that email.');
+
+  const id = randomId('partner');
+  const cred = await createPasswordCredential(password);
+  await env.DB.prepare(
+    `INSERT INTO partner_accounts (id, email, password_hash, password_salt, password_iterations, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(id, email, cred.passwordHash, cred.passwordSalt, cred.passwordIterations, new Date().toISOString())
+    .run();
+  const token = await signToken(`partner:${id}`, env);
+  return json(request, env, { token, email }, 201);
+}
+
+async function handlePartnerLogin(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<{ email?: string; password?: string }>(request);
+  const email = normalizeEmail(body.email);
+  const password = typeof body.password === 'string' ? body.password : '';
+  const account = await env.DB.prepare('SELECT * FROM partner_accounts WHERE email = ?')
+    .bind(email)
+    .first<PartnerAccountRow>();
+  if (!account || !(await verifyPassword(password, account))) {
+    throw new HttpError(401, 'Incorrect email or password.');
+  }
+  const token = await signToken(`partner:${account.id}`, env);
+  return json(request, env, { token, email: account.email });
+}
+
+async function handlePartnerMe(request: Request, env: Env, url: URL): Promise<Response> {
+  const partnerId = await requirePartner(request, env);
+  const account = await env.DB.prepare('SELECT email FROM partner_accounts WHERE id = ?')
+    .bind(partnerId)
+    .first<{ email: string }>();
+  const profile = await env.DB.prepare(
+    'SELECT place_id, restaurant_name, address, description, featured FROM partner_profiles WHERE partner_id = ?',
+  )
+    .bind(partnerId)
+    .first<{
+      place_id: string | null;
+      restaurant_name: string | null;
+      address: string | null;
+      description: string | null;
+      featured: number;
+    }>();
+  const photos = await env.DB.prepare(
+    'SELECT id FROM partner_photos WHERE partner_id = ? ORDER BY sort_order, created_at',
+  )
+    .bind(partnerId)
+    .all<{ id: string }>();
+
+  return json(request, env, {
+    email: account?.email ?? '',
+    profile: profile
+      ? {
+          placeId: profile.place_id,
+          restaurantName: profile.restaurant_name,
+          address: profile.address,
+          description: profile.description,
+          featured: profile.featured === 1,
+        }
+      : null,
+    photos: (photos.results ?? []).map((row) => ({ id: row.id, url: photoUrl(url, row.id) })),
+  });
+}
+
+async function handlePartnerSaveProfile(request: Request, env: Env): Promise<Response> {
+  const partnerId = await requirePartner(request, env);
+  const body = await readJson<{
+    placeId?: string;
+    restaurantName?: string;
+    address?: string;
+    description?: string;
+  }>(request);
+  const restaurantName = body.restaurantName?.trim() ?? '';
+  if (!restaurantName) throw new HttpError(400, 'Restaurant name is required.');
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `INSERT INTO partner_profiles (partner_id, place_id, restaurant_name, address, description, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT(partner_id) DO UPDATE SET
+       place_id = excluded.place_id,
+       restaurant_name = excluded.restaurant_name,
+       address = excluded.address,
+       description = excluded.description,
+       updated_at = excluded.updated_at`,
+  )
+    .bind(
+      partnerId,
+      body.placeId?.trim() || null,
+      restaurantName,
+      body.address?.trim() || null,
+      body.description?.trim() || null,
+      now,
+    )
+    .run();
+  return json(request, env, { ok: true });
+}
+
+async function handlePartnerPlacesSearch(request: Request, env: Env, url: URL): Promise<Response> {
+  await requirePartner(request, env);
+  const apiKey = env.GOOGLE_PLACES_API_KEY?.trim();
+  if (!apiKey) throw new HttpError(503, 'Places service not configured.');
+  const query = url.searchParams.get('q')?.trim() ?? '';
+  if (query.length < 2) return json(request, env, { restaurants: [] });
+  const restaurants = await googleSearch(apiKey, query);
+  return json(
+    request,
+    env,
+    { restaurants: restaurants.map((r) => ({ id: r.id, name: r.name, address: r.address })) },
+  );
+}
+
+async function handlePartnerUploadPhoto(request: Request, env: Env, url: URL): Promise<Response> {
+  const partnerId = await requirePartner(request, env);
+  if (!env.PHOTOS) throw new HttpError(503, 'Photo storage is not configured.');
+
+  const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM partner_photos WHERE partner_id = ?')
+    .bind(partnerId)
+    .first<{ n: number }>();
+  if ((count?.n ?? 0) >= MAX_PARTNER_PHOTOS) {
+    throw new HttpError(400, `You can upload up to ${MAX_PARTNER_PHOTOS} photos.`);
+  }
+
+  const contentType = request.headers.get('content-type') ?? 'application/octet-stream';
+  if (!contentType.startsWith('image/')) throw new HttpError(400, 'Please upload an image file.');
+  const bytes = await request.arrayBuffer();
+  if (bytes.byteLength === 0) throw new HttpError(400, 'Empty file.');
+  if (bytes.byteLength > 5 * 1024 * 1024) throw new HttpError(400, 'Images must be under 5 MB.');
+
+  const ext = contentType.split('/')[1]?.split('+')[0] ?? 'jpg';
+  const id = randomId('photo');
+  const key = `partners/${partnerId}/${id}.${ext}`;
+  await env.PHOTOS.put(key, bytes, { httpMetadata: { contentType } });
+  await env.DB.prepare(
+    'INSERT INTO partner_photos (id, partner_id, r2_key, sort_order, created_at) VALUES (?, ?, ?, ?, ?)',
+  )
+    .bind(id, partnerId, key, (count?.n ?? 0), new Date().toISOString())
+    .run();
+  return json(request, env, { id, url: photoUrl(url, id) }, 201);
+}
+
+async function handlePartnerServePhoto(env: Env, photoId: string): Promise<Response> {
+  if (!env.PHOTOS) throw new HttpError(404, 'Not found.');
+  const row = await env.DB.prepare('SELECT r2_key FROM partner_photos WHERE id = ?')
+    .bind(photoId)
+    .first<{ r2_key: string }>();
+  if (!row) throw new HttpError(404, 'Not found.');
+  const object = await env.PHOTOS.get(row.r2_key);
+  if (!object) throw new HttpError(404, 'Not found.');
+  return new Response(object.body, {
+    headers: {
+      'content-type': object.httpMetadata?.contentType ?? 'image/jpeg',
+      'cache-control': 'public, max-age=86400',
+    },
+  });
+}
+
+async function handlePartnerDeletePhoto(request: Request, env: Env, photoId: string): Promise<Response> {
+  const partnerId = await requirePartner(request, env);
+  const row = await env.DB.prepare('SELECT r2_key FROM partner_photos WHERE id = ? AND partner_id = ?')
+    .bind(photoId, partnerId)
+    .first<{ r2_key: string }>();
+  if (!row) throw new HttpError(404, 'Photo not found.');
+  if (env.PHOTOS) await env.PHOTOS.delete(row.r2_key);
+  await env.DB.prepare('DELETE FROM partner_photos WHERE id = ?').bind(photoId).run();
+  return json(request, env, { ok: true });
+}
+
+/** Merge partner photos + featured flag into Google feed results by place id. */
+async function enrichWithPartners(
+  env: Env,
+  url: URL,
+  restaurants: (Restaurant & { distanceKm?: number })[],
+): Promise<void> {
+  if (restaurants.length === 0) return;
+  const ids = restaurants.map((r) => r.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const profiles = await env.DB.prepare(
+    `SELECT partner_id, place_id, featured FROM partner_profiles WHERE place_id IN (${placeholders})`,
+  )
+    .bind(...ids)
+    .all<{ partner_id: string; place_id: string; featured: number }>();
+  const byPlace = new Map((profiles.results ?? []).map((p) => [p.place_id, p]));
+  if (byPlace.size === 0) return;
+
+  await Promise.all(
+    restaurants.map(async (r) => {
+      const profile = byPlace.get(r.id);
+      if (!profile) return;
+      if (profile.featured === 1) r.featured = true;
+      const photos = await env.DB.prepare(
+        'SELECT id FROM partner_photos WHERE partner_id = ? ORDER BY sort_order, created_at',
+      )
+        .bind(profile.partner_id)
+        .all<{ id: string }>();
+      const urls = (photos.results ?? []).map((row) => photoUrl(url, row.id));
+      if (urls.length > 0) r.photos = urls;
+    }),
+  );
+}
+
+const PARTNER_PORTAL_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sushi Party for Restaurants</title>
+<style>
+  :root { --bg:#0E0C0B; --surface:#1C1817; --surface2:#262120; --border:rgba(255,255,255,0.10);
+    --text:#F5F1EE; --muted:#B0A8A2; --faint:#7E756F; --accent:#E53935; --accent2:#FF4B33; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; }
+  .wrap { max-width:640px; margin:0 auto; padding:24px 20px 64px; }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .brand .logo { font-size:26px; }
+  .brand h1 { font-size:20px; margin:0; font-weight:700; }
+  .tagline { color:var(--muted); font-size:14px; margin:0 0 24px; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px; margin-bottom:16px; }
+  h2 { font-size:15px; margin:0 0 12px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  input, textarea { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+    color:var(--text); padding:12px 14px; font-size:15px; font-family:inherit; }
+  input:focus, textarea:focus { outline:none; border-color:var(--accent); }
+  textarea { min-height:90px; resize:vertical; }
+  button { cursor:pointer; border:none; border-radius:999px; font-size:15px; font-weight:700; }
+  .btn { width:100%; background:var(--accent); color:#fff; padding:14px; margin-top:18px; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.secondary { background:transparent; color:var(--accent); border:1.5px solid var(--accent); }
+  .link { background:none; color:var(--accent); font-weight:600; font-size:14px; padding:8px 0; width:auto; }
+  .muted { color:var(--muted); font-size:13px; }
+  .err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:16px; }
+  .ok { color:#9ccc65; font-size:13px; margin-top:10px; min-height:16px; }
+  .hidden { display:none; }
+  .results { margin-top:8px; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .result { padding:12px 14px; border-bottom:1px solid var(--border); cursor:pointer; }
+  .result:last-child { border-bottom:none; }
+  .result:hover { background:var(--surface2); }
+  .result .rname { font-weight:600; font-size:14px; }
+  .result .raddr { color:var(--faint); font-size:12px; }
+  .selected { background:var(--surface2); border:1px solid var(--accent); border-radius:10px; padding:12px 14px; margin-top:8px; }
+  .photos { display:grid; grid-template-columns:repeat(auto-fill,minmax(96px,1fr)); gap:10px; margin-top:12px; }
+  .photo { position:relative; aspect-ratio:1; border-radius:10px; overflow:hidden; background:var(--surface2); }
+  .photo img { width:100%; height:100%; object-fit:cover; display:block; }
+  .photo .del { position:absolute; top:4px; right:4px; width:24px; height:24px; border-radius:12px;
+    background:rgba(0,0,0,0.6); color:#fff; font-size:14px; line-height:24px; text-align:center; padding:0; }
+  .rowbtns { display:flex; gap:10px; align-items:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="brand"><span class="logo">🍣</span><h1>Sushi Party for Restaurants</h1></div>
+  <p class="tagline">Set up your profile to get discovered by hungry diners nearby.</p>
+
+  <div id="authView" class="card">
+    <h2 id="authTitle">Sign in to your partner account</h2>
+    <label>Email</label>
+    <input id="email" type="email" autocomplete="email" placeholder="you@restaurant.com" />
+    <label>Password</label>
+    <input id="password" type="password" autocomplete="current-password" placeholder="At least 8 characters" />
+    <div id="authErr" class="err"></div>
+    <button id="authBtn" class="btn">Sign in</button>
+    <button id="authToggle" class="link">New here? Create a partner account</button>
+  </div>
+
+  <div id="appView" class="hidden">
+    <div class="card">
+      <h2>Your restaurant</h2>
+      <p class="muted">Find and claim your restaurant so your profile shows on the right listing.</p>
+      <input id="placeSearch" type="text" placeholder="Search your restaurant name" />
+      <div id="results" class="results hidden"></div>
+      <div id="selected" class="selected hidden"></div>
+      <label>Restaurant name</label>
+      <input id="rname" type="text" placeholder="Your restaurant name" />
+      <label>Address</label>
+      <input id="raddr" type="text" placeholder="Address" />
+      <label>Description</label>
+      <textarea id="rdesc" placeholder="Tell diners what makes your sushi special."></textarea>
+      <div id="saveOk" class="ok"></div>
+      <div id="saveErr" class="err"></div>
+      <button id="saveBtn" class="btn">Save profile</button>
+    </div>
+
+    <div class="card">
+      <h2>Photos</h2>
+      <p class="muted">Up to 8 photos. These appear on your card in the app's Explore feed.</p>
+      <div id="photos" class="photos"></div>
+      <input id="fileInput" type="file" accept="image/*" multiple class="hidden" />
+      <div id="photoErr" class="err"></div>
+      <button id="addPhotoBtn" class="btn secondary">Add photos</button>
+    </div>
+
+    <div class="rowbtns">
+      <button id="logoutBtn" class="link">Log out</button>
+      <span id="whoami" class="muted"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var TK='sp_partner_token';
+  var mode='login';
+  var selected=null;
+  var searchTimer=null;
+
+  function tok(){ return localStorage.getItem(TK); }
+  function setTok(t){ if(t){ localStorage.setItem(TK,t); } else { localStorage.removeItem(TK); } }
+  function el(id){ return document.getElementById(id); }
+  function show(id,on){ el(id).classList[on?'remove':'add']('hidden'); }
+
+  function api(path, opts){
+    opts = opts || {};
+    opts.headers = opts.headers || {};
+    var t = tok();
+    if (t) { opts.headers['Authorization'] = 'Bearer ' + t; }
+    return fetch(path, opts).then(function(r){
+      return r.text().then(function(txt){
+        var j = {}; try { j = txt ? JSON.parse(txt) : {}; } catch(e){}
+        if (!r.ok) { throw new Error(j.error || ('Error ' + r.status)); }
+        return j;
+      });
+    });
+  }
+
+  // ---- Auth ----
+  function renderAuthMode(){
+    el('authTitle').textContent = mode==='login' ? 'Sign in to your partner account' : 'Create a partner account';
+    el('authBtn').textContent = mode==='login' ? 'Sign in' : 'Create account';
+    el('authToggle').textContent = mode==='login' ? 'New here? Create a partner account' : 'Have an account? Sign in';
+    el('password').setAttribute('autocomplete', mode==='login' ? 'current-password' : 'new-password');
+  }
+  el('authToggle').onclick = function(){ mode = mode==='login' ? 'signup' : 'login'; el('authErr').textContent=''; renderAuthMode(); };
+  el('authBtn').onclick = function(){
+    var email = el('email').value.trim();
+    var password = el('password').value;
+    el('authErr').textContent = '';
+    el('authBtn').disabled = true;
+    api('/partners/' + (mode==='login'?'login':'signup'), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ email: email, password: password })
+    }).then(function(res){
+      setTok(res.token); enterApp();
+    }).catch(function(e){ el('authErr').textContent = e.message; })
+      .then(function(){ el('authBtn').disabled = false; });
+  };
+
+  function logout(){ setTok(null); show('appView',false); show('authView',true); }
+  el('logoutBtn').onclick = logout;
+
+  // ---- Profile ----
+  function selectPlace(p){
+    selected = p;
+    show('results',false); el('placeSearch').value='';
+    el('selected').textContent = 'Claimed: ' + p.name + (p.address? ' — ' + p.address : '');
+    show('selected',true);
+    if(!el('rname').value) el('rname').value = p.name;
+    if(!el('raddr').value && p.address) el('raddr').value = p.address;
+  }
+  el('placeSearch').oninput = function(){
+    var q = el('placeSearch').value.trim();
+    if (searchTimer) clearTimeout(searchTimer);
+    if (q.length < 2) { show('results',false); return; }
+    searchTimer = setTimeout(function(){
+      api('/partners/places/search?q=' + encodeURIComponent(q)).then(function(res){
+        var box = el('results'); box.innerHTML='';
+        (res.restaurants||[]).forEach(function(p){
+          var d = document.createElement('div'); d.className='result';
+          d.innerHTML = '<div class="rname"></div><div class="raddr"></div>';
+          d.querySelector('.rname').textContent = p.name;
+          d.querySelector('.raddr').textContent = p.address || '';
+          d.onclick = function(){ selectPlace(p); };
+          box.appendChild(d);
+        });
+        show('results', (res.restaurants||[]).length>0);
+      }).catch(function(){});
+    }, 350);
+  };
+
+  el('saveBtn').onclick = function(){
+    el('saveOk').textContent=''; el('saveErr').textContent='';
+    el('saveBtn').disabled = true;
+    api('/partners/profile', {
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        placeId: selected ? selected.id : null,
+        restaurantName: el('rname').value.trim(),
+        address: el('raddr').value.trim(),
+        description: el('rdesc').value.trim()
+      })
+    }).then(function(){ el('saveOk').textContent = 'Saved.'; })
+      .catch(function(e){ el('saveErr').textContent = e.message; })
+      .then(function(){ el('saveBtn').disabled = false; });
+  };
+
+  // ---- Photos ----
+  function renderPhotos(photos){
+    var box = el('photos'); box.innerHTML='';
+    photos.forEach(function(ph){
+      var d = document.createElement('div'); d.className='photo';
+      var img = document.createElement('img'); img.src = ph.url; d.appendChild(img);
+      var b = document.createElement('button'); b.className='del'; b.textContent='×';
+      b.onclick = function(){ deletePhoto(ph.id, d); };
+      d.appendChild(b);
+      box.appendChild(d);
+    });
+  }
+  function deletePhoto(id, node){
+    api('/partners/photos/' + id, { method:'DELETE' }).then(function(){
+      if (node && node.parentNode) node.parentNode.removeChild(node);
+    }).catch(function(e){ el('photoErr').textContent = e.message; });
+  }
+  el('addPhotoBtn').onclick = function(){ el('fileInput').click(); };
+  el('fileInput').onchange = function(){
+    var files = Array.prototype.slice.call(el('fileInput').files || []);
+    el('photoErr').textContent='';
+    var chain = Promise.resolve();
+    files.forEach(function(f){
+      chain = chain.then(function(){
+        return api('/partners/photos', { method:'POST', headers:{'Content-Type': f.type}, body: f })
+          .then(function(res){
+            var box = el('photos');
+            var d = document.createElement('div'); d.className='photo';
+            var img = document.createElement('img'); img.src = res.url; d.appendChild(img);
+            var b = document.createElement('button'); b.className='del'; b.textContent='×';
+            b.onclick = function(){ deletePhoto(res.id, d); };
+            d.appendChild(b); box.appendChild(d);
+          });
+      }).catch(function(e){ el('photoErr').textContent = e.message; });
+    });
+    chain.then(function(){ el('fileInput').value=''; });
+  };
+
+  // ---- Boot ----
+  function enterApp(){
+    show('authView',false); show('appView',true);
+    api('/partners/me').then(function(me){
+      el('whoami').textContent = me.email || '';
+      if (me.profile){
+        el('rname').value = me.profile.restaurantName || '';
+        el('raddr').value = me.profile.address || '';
+        el('rdesc').value = me.profile.description || '';
+        if (me.profile.placeId){ selected = { id: me.profile.placeId, name: me.profile.restaurantName||'', address: me.profile.address||'' };
+          el('selected').textContent = 'Claimed: ' + (me.profile.restaurantName||''); show('selected',true); }
+      }
+      renderPhotos(me.photos || []);
+    }).catch(function(){ logout(); });
+  }
+
+  renderAuthMode();
+  if (tok()) { enterApp(); } else { show('authView',true); }
+})();
+</script>
+</body>
+</html>`;
 
 async function handleAuthLogin(request: Request, env: Env): Promise<Response> {
   const body = await readJson<AccountAuthBody>(request);
@@ -1701,6 +2234,7 @@ async function handlePlaces(request: Request, env: Env, parts: string[], url: UR
     if (cached) return new Response(cached.body, { status: cached.status, headers: headers(request, env) });
 
     const restaurants = await googleNearby(apiKey, { latitude: lat, longitude: lng }, radiusKm * 1000);
+    await enrichWithPartners(env, url, restaurants);
     const resp = json(request, env, { restaurants });
     const toStore = new Response(JSON.stringify({ restaurants }), {
       status: 200,
@@ -1725,6 +2259,7 @@ async function handlePlaces(request: Request, env: Env, parts: string[], url: UR
     if (cached) return new Response(cached.body, { status: cached.status, headers: headers(request, env) });
 
     const restaurants = await googleSearch(apiKey, query, center);
+    await enrichWithPartners(env, url, restaurants);
     const resp = json(request, env, { restaurants });
     const toStore = new Response(JSON.stringify({ restaurants }), {
       status: 200,
@@ -1779,11 +2314,10 @@ async function route(request: Request, env: Env): Promise<Response> {
   if (request.method === 'POST' && url.pathname === '/auth/facebook') {
     return handleAuthOAuth(request, env, 'facebook');
   }
-  if (request.method === 'POST' && url.pathname === '/partners') {
-    return handlePartnerApplication(request, env);
-  }
 
   switch (parts[0]) {
+    case 'partners':
+      return handlePartners(request, env, parts, url);
     case 'users':
       return handleUsers(request, env, parts, url);
     case 'sessions':
