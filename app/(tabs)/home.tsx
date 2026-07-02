@@ -12,7 +12,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { SushiPartyLogo, ItemSpriteIdle } from '../../src/components';
+import { Avatar, SushiPartyLogo, ItemSpriteIdle } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -209,7 +209,7 @@ export default function HomeScreen() {
   const { userProfile } = useAuth();
   const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
   const { activeMenu } = useMenu();
-  const avatar = participants[currentUserParticipantIndex]?.avatar ?? '🐱';
+  const avatar = participants[currentUserParticipantIndex]?.avatar;
 
   // Refresh on every mount — gives the app a different feel each open.
   const subtitle = useMemo(() => pickRandom(SUBTITLES), []);
@@ -269,7 +269,7 @@ export default function HomeScreen() {
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
         <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
           <View style={styles.profileAvatarBadge}>
-            <Text style={styles.profileAvatar}>{avatar}</Text>
+            <Avatar value={avatar} size={30} />
           </View>
           {userProfile?.displayName ? (
             <Text style={styles.profileName} numberOfLines={1}>{userProfile.displayName}</Text>
@@ -415,10 +415,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: t.color.surfaceAlt,
     borderWidth: 2,
     borderColor: t.isDark ? t.color.accent : '#fff',
-  },
-  profileAvatar: {
-    fontSize: 18,
-    lineHeight: 23,
   },
   profileName: {
     fontSize: 14,

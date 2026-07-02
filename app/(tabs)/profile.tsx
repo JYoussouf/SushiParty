@@ -36,11 +36,11 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { BackButton } from '../../src/components';
+import { Avatar, BackButton } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
-import { CAT_AVATARS } from '../../src/lib/catAvatars';
+import { AVATAR_CHARACTERS } from '../../src/lib/avatars';
 import { getAchievements } from '../../src/lib/achievements';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 import { calculateUserProfileStats, type UserProfileStats } from '../../src/lib/profileStats';
@@ -162,16 +162,16 @@ export default function ProfileScreen() {
         <View style={styles.avatarCard}>
           {editingProfile ? (
             <View style={styles.inlineEdit}>
-              <AvatarProgressRing emoji={draftAvatar} progress={levelInfo.progress} />
+              <AvatarProgressRing avatar={draftAvatar} progress={levelInfo.progress} />
               <View style={styles.catGrid}>
-                {CAT_AVATARS.map((cat) => (
+                {AVATAR_CHARACTERS.map((character) => (
                   <TouchableOpacity
-                    key={cat}
-                    style={[styles.catBtn, draftAvatar === cat && styles.catBtnSelected]}
-                    onPress={() => setDraftAvatar(cat)}
+                    key={character.id}
+                    style={[styles.catBtn, draftAvatar === character.id && styles.catBtnSelected]}
+                    onPress={() => setDraftAvatar(character.id)}
                     activeOpacity={0.75}
                   >
-                    <Text style={styles.catEmoji}>{cat}</Text>
+                    <Avatar value={character.id} size={46} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -200,7 +200,7 @@ export default function ProfileScreen() {
                 onPress={openEdit}
                 activeOpacity={0.8}
               >
-                <AvatarProgressRing emoji={userProfile?.avatar ?? '🐱'} progress={levelInfo.progress} />
+                <AvatarProgressRing avatar={userProfile?.avatar} progress={levelInfo.progress} />
               </TouchableOpacity>
               <Text style={styles.displayName}>{userProfile?.displayName ?? '-'}</Text>
               <View style={styles.levelPill}>
@@ -271,7 +271,7 @@ export default function ProfileScreen() {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: number }) {
+function AvatarProgressRing({ avatar, progress }: { avatar?: string | undefined; progress: number }) {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const size = 132;
@@ -313,7 +313,7 @@ function AvatarProgressRing({ emoji, progress }: { emoji: string; progress: numb
         />
       </Svg>
       <View style={styles.avatarCore}>
-        <Text style={styles.avatarEmoji}>{emoji}</Text>
+        <Avatar value={avatar} size={80} />
       </View>
     </View>
   );
@@ -603,7 +603,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderWidth: 6,
     borderColor: t.color.surface,
   },
-  avatarEmoji: { fontSize: 54, lineHeight: 64 },
   displayName: { fontSize: 28, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary, textAlign: 'center' },
   levelPill: {
     borderRadius: t.radius.pill,
@@ -643,7 +642,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.color.border,
   },
   catBtnSelected: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
-  catEmoji: { fontSize: 28 },
   nameInput: {
     width: '100%',
     height: 52,

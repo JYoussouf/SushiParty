@@ -1,3 +1,4 @@
+export { Avatar } from './Avatar';
 export { BackButton } from './BackButton';
 export { SushiCounter } from './SushiCounter';
 export { SushiTile } from './SushiTile';

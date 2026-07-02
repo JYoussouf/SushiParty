@@ -15,7 +15,7 @@ import {
   updateGroupPartyParticipantCounts,
   type GroupPartyStartContext,
 } from '../lib/cloudflare/groupParties';
-import { DEFAULT_CAT_AVATAR } from '../lib/catAvatars';
+import { DEFAULT_AVATAR } from '../lib/avatars';
 import type { GroupEndVote, GroupPhase, GroupSessionDraft, SessionMode, SessionParticipant } from '../types';
 
 // Shared session context carried on the draft (host-populated at start). Exposed so a
@@ -62,7 +62,7 @@ function createLocalParticipant(userId?: string, displayName?: string, avatar?: 
   return {
     userId: userId ?? 'local',
     displayName: displayName ?? 'Me',
-    avatar: avatar ?? DEFAULT_CAT_AVATAR,
+    avatar: avatar ?? DEFAULT_AVATAR,
     counts: {},
   };
 }
@@ -83,7 +83,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [groupContext, setGroupContext] = useState<GroupSessionContext | null>(null);
   const [endVote, setEndVote] = useState<GroupEndVote | null>(null);
   const [localAvatar, setLocalAvatar] = useState<string>(
-    () => userProfile?.avatar ?? DEFAULT_CAT_AVATAR,
+    () => userProfile?.avatar ?? DEFAULT_AVATAR,
   );
 
   // Keep localAvatar in sync with the persisted profile avatar

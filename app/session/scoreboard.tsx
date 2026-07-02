@@ -23,7 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { BackButton, ItemSpriteIdle } from '../../src/components';
+import { Avatar, BackButton, ItemSpriteIdle } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
@@ -552,7 +552,7 @@ export default function ScoreboardScreen() {
                   i === 0 && styles.avatarFirst,
                 ]}
               >
-                <Text style={styles.avatarBubbleEmoji}>{p.avatar ?? '🐱'}</Text>
+                <Avatar value={p.avatar} size={30} />
               </View>
             ))}
             {participants.length > 3 && (
@@ -1027,10 +1027,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   avatarOverlap: {
     marginLeft: -10,
-  },
-  avatarBubbleEmoji: {
-    fontSize: 18,
-    lineHeight: 22,
   },
   avatarExtraBubble: {
     backgroundColor: t.color.surfaceAlt,

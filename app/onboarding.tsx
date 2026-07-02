@@ -22,7 +22,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { CAT_AVATARS } from '../src/lib/catAvatars';
+import { AVATAR_CHARACTERS, DEFAULT_AVATAR } from '../src/lib/avatars';
+import { Avatar } from '../src/components';
 import { useTheme } from '../src/contexts/ThemeContext';
 import type { Theme } from '../src/theme/themes';
 import { useAuth } from '../src/contexts/AuthContext';
@@ -49,7 +50,9 @@ function AvatarButton({ avatar, selected, onSelect, styles }: { avatar: string; 
       onPress={handlePress}
       activeOpacity={1}
     >
-      <Animated.Text style={[styles.avatarEmoji, animStyle]}>{avatar}</Animated.Text>
+      <Animated.View style={animStyle}>
+        <Avatar value={avatar} size={46} />
+      </Animated.View>
     </TouchableOpacity>
   );
 }
@@ -68,7 +71,7 @@ export default function OnboardingScreen() {
   const compact = windowHeight < 780;
   const styles = useMemo(() => makeStyles(t, compact), [t, compact]);
   const { completeOnboarding, userProfile } = useAuth();
-  const [selectedAvatar, setSelectedAvatar] = useState<string>(userProfile?.avatar ?? '🐱');
+  const [selectedAvatar, setSelectedAvatar] = useState<string>(userProfile?.avatar ?? DEFAULT_AVATAR);
   const genericNames = ['Google User', 'Apple User', 'Facebook User'];
   const initialName =
     userProfile?.displayName && !genericNames.includes(userProfile.displayName)
@@ -174,15 +177,15 @@ export default function OnboardingScreen() {
             <Text style={styles.label}>Pick your avatar</Text>
             <Text style={styles.avatarHint}>No stress, you can change your look anytime.</Text>
             <Animated.View style={[styles.avatarPreview, previewStyle]}>
-              <Text style={styles.avatarPreviewEmoji}>{selectedAvatar}</Text>
+              <Avatar value={selectedAvatar} size={compact ? 66 : 86} />
             </Animated.View>
             <View style={styles.avatarGrid}>
-              {CAT_AVATARS.map((avatar) => (
+              {AVATAR_CHARACTERS.map((character) => (
                 <AvatarButton
-                  key={avatar}
-                  avatar={avatar}
+                  key={character.id}
+                  avatar={character.id}
                   styles={styles}
-                  selected={avatar === selectedAvatar}
+                  selected={character.id === selectedAvatar}
                   onSelect={(a) => {
                     setSelectedAvatar(a);
                     previewScale.value = withSequence(
@@ -246,7 +249,7 @@ export default function OnboardingScreen() {
                 style={styles.continueBtn}
               >
                 <Text style={styles.continueBtnText}>
-                  {saving ? 'Saving…' : `Let's eat! ${selectedAvatar}`}
+                  {saving ? 'Saving…' : "Let's eat!"}
                 </Text>
               </LinearGradient>
             </Animated.View>
@@ -285,7 +288,6 @@ const makeStyles = (t: Theme, compact: boolean) => {
     justifyContent: 'center',
     ...t.shadow.glow(t.color.accent),
   },
-  avatarPreviewEmoji: { fontSize: compact ? 48 : 62, lineHeight: compact ? 56 : 72 },
   title: {
     fontSize: 36,
     fontFamily: t.font.display,
@@ -342,7 +344,6 @@ const makeStyles = (t: Theme, compact: boolean) => {
     backgroundColor: t.color.accentSoft,
     ...t.shadow.glow(t.color.accent),
   },
-  avatarEmoji: { fontSize: 30 },
   input: {
     height: 54,
     borderRadius: t.radius.md,

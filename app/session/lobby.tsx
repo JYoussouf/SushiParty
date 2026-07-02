@@ -26,7 +26,8 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CAT_AVATARS } from '../../src/lib/catAvatars';
+import { AVATAR_CHARACTERS } from '../../src/lib/avatars';
+import { Avatar } from '../../src/components';
 import { useSession } from '../../src/hooks/useSession';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useRestaurant } from '../../src/contexts/RestaurantContext';
@@ -198,7 +199,7 @@ export default function LobbyScreen() {
     Array<{ id: string; emoji: string; originX: number; originY: number; drift: number }>
   >([]);
 
-  const myAvatar = participants[currentUserParticipantIndex]?.avatar ?? '🐱';
+  const myAvatar = participants[currentUserParticipantIndex]?.avatar;
   const reactionTravel = Math.max(320, height * 0.72);
 
   useEffect(() => {
@@ -292,7 +293,7 @@ export default function LobbyScreen() {
                   key={participant.userId}
                   style={[styles.participantCard, isMe && styles.participantCardMe]}
                 >
-                  <Text style={styles.participantAvatar}>{participant.avatar ?? '🐱'}</Text>
+                  <Avatar value={participant.avatar} size={38} />
                   <View style={styles.participantBody}>
                     <View style={styles.participantNameRow}>
                       <Text style={styles.participantName} numberOfLines={1}>
@@ -308,15 +309,15 @@ export default function LobbyScreen() {
           </View>
 
           <View style={styles.avatarRow}>
-            {CAT_AVATARS.map((avatar) => {
-              const selected = avatar === myAvatar;
+            {AVATAR_CHARACTERS.map((character) => {
+              const selected = character.id === myAvatar;
               return (
                 <TouchableOpacity
-                  key={avatar}
+                  key={character.id}
                   style={[styles.avatarButton, selected && styles.avatarButtonSelected]}
-                  onPress={() => void setParticipantAvatar(avatar)}
+                  onPress={() => void setParticipantAvatar(character.id)}
                 >
-                  <Text style={styles.avatarButtonText}>{avatar}</Text>
+                  <Avatar value={character.id} size={40} />
                 </TouchableOpacity>
               );
             })}
@@ -438,7 +439,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.color.border,
   },
   participantCardMe: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
-  participantAvatar: { fontSize: 30 },
   participantBody: { flex: 1, gap: 2 },
   participantNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   participantName: { flexShrink: 1, fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
@@ -483,7 +483,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderColor: t.color.border,
   },
   avatarButtonSelected: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
-  avatarButtonText: { fontSize: 24 },
   reactionOverlay: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
