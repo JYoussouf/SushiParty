@@ -214,12 +214,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   safe: { flex: 1 },
   header: { paddingHorizontal: 16, paddingVertical: 12 },
-  loadingState: {
-    flex: 1,
-    backgroundColor: t.color.bg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   content: {
     padding: 20,
     gap: 20,
