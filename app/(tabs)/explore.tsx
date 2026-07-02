@@ -54,7 +54,9 @@ export default function ExploreScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-              refreshing={feed.loading}
+              // Cold-start load is owned by the centered indicator; the pull
+              // spinner only shows when refreshing an already-populated list.
+              refreshing={feed.loading && feed.restaurants.length > 0}
               onRefresh={() => void feed.refresh()}
               tintColor={t.color.accent}
             />
