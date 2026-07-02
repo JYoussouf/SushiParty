@@ -46,7 +46,9 @@ export const WrappedCard = forwardRef<View, WrappedCardProps>(function WrappedCa
         </View>
 
         <View style={styles.heroBlock}>
-          <Text style={styles.heroNumber}>{stats.totalPieces.toLocaleString()}</Text>
+          <Text style={styles.heroNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5}>
+            {stats.totalPieces.toLocaleString()}
+          </Text>
           <Text style={styles.heroLabel}>pieces of sushi</Text>
           <Text style={styles.heroSub}>
             across {stats.totalParties} part{stats.totalParties === 1 ? 'y' : 'ies'}, {displayName}
@@ -130,8 +132,9 @@ const makeStyles = (t: Theme, width: number, height: number) =>
       borderWidth: 2,
       borderColor: 'rgba(255,255,255,0.4)',
     },
-    heroBlock: { alignItems: 'flex-start', gap: 2 },
+    heroBlock: { alignSelf: 'stretch', alignItems: 'flex-start', gap: 2 },
     heroNumber: {
+      alignSelf: 'stretch',
       fontSize: Math.min(88, width * 0.24),
       lineHeight: Math.min(92, width * 0.25),
       fontFamily: t.font.display,
