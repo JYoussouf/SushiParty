@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../theme/themes';
 import { formatDistance } from '../lib/geo';
@@ -8,116 +8,153 @@ import { formatRating, priceLevelLabel, type FeedRestaurant } from '../lib/featu
 interface RestaurantCardProps {
   restaurant: FeedRestaurant;
   onPress: () => void;
+  saved: boolean;
+  onToggleSave: () => void;
 }
 
-// Slick, DoorDash-style row: thumbnail tile, name, and a compact meta line
-// (rating · reviews · distance · price · open-now). Featured spots get a badge.
-export function RestaurantCard({ restaurant, onPress }: RestaurantCardProps) {
+// DoorDash-style vertical card: an optional photo carousel on top (photos come
+// only from a restaurant's partner profile), then name + a compact meta line.
+// Restaurants without a profile simply render everything minus the images.
+export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: RestaurantCardProps) {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
 
   const rating = formatRating(restaurant.rating, restaurant.userRatingCount);
   const price = priceLevelLabel(restaurant.priceLevel);
+  const photos = restaurant.photos ?? [];
 
   return (
-    <TouchableOpacity
-      style={[styles.card, restaurant.featured && styles.cardFeatured]}
-      onPress={onPress}
-      activeOpacity={0.85}
-      accessibilityRole="button"
-      accessibilityLabel={`Directions to ${restaurant.name}`}
-    >
-      <View style={styles.thumb}>
-        <Text style={styles.thumbEmoji}>🍣</Text>
-      </View>
+    <View style={styles.card}>
+      {photos.length > 0 ? <PhotoCarousel photos={photos} styles={styles} /> : null}
 
-      <View style={styles.body}>
-        {restaurant.featured ? (
-          <View style={styles.featuredBadge}>
-            <Text style={styles.featuredBadgeText}>★ Featured</Text>
-          </View>
-        ) : null}
-        <Text style={styles.name} numberOfLines={1}>
-          {restaurant.name}
-        </Text>
-        {restaurant.address ? (
-          <Text style={styles.address} numberOfLines={1}>
-            {restaurant.address}
+      <TouchableOpacity style={styles.info} activeOpacity={0.85} onPress={onPress}>
+        <View style={styles.infoText}>
+          <Text style={styles.name} numberOfLines={1}>
+            {restaurant.name}
           </Text>
-        ) : null}
-        <View style={styles.metaRow}>
-          {rating ? (
-            <Text style={styles.metaStrong}>
-              ★ {rating}
-              {restaurant.userRatingCount ? (
-                <Text style={styles.metaSoft}> ({restaurant.userRatingCount.toLocaleString()})</Text>
-              ) : null}
-            </Text>
-          ) : null}
-          {restaurant.distanceKm !== undefined ? (
-            <Text style={styles.metaSoft}>{formatDistance(restaurant.distanceKm)}</Text>
-          ) : null}
-          {price ? <Text style={styles.metaSoft}>{price}</Text> : null}
-          {restaurant.openNow !== undefined ? (
-            <Text style={restaurant.openNow ? styles.open : styles.closed}>
-              {restaurant.openNow ? 'Open' : 'Closed'}
-            </Text>
-          ) : null}
+          <View style={styles.metaRow}>
+            {rating ? (
+              <Text style={styles.metaStrong}>
+                {rating} ★
+                {restaurant.userRatingCount ? (
+                  <Text style={styles.metaSoft}> ({restaurant.userRatingCount.toLocaleString()})</Text>
+                ) : null}
+              </Text>
+            ) : null}
+            {restaurant.distanceKm !== undefined ? (
+              <>
+                {rating ? <Text style={styles.dot}>·</Text> : null}
+                <Text style={styles.metaSoft}>{formatDistance(restaurant.distanceKm)}</Text>
+              </>
+            ) : null}
+            {price ? (
+              <>
+                <Text style={styles.dot}>·</Text>
+                <Text style={styles.metaSoft}>{price}</Text>
+              </>
+            ) : null}
+            {restaurant.openNow !== undefined ? (
+              <>
+                <Text style={styles.dot}>·</Text>
+                <Text style={restaurant.openNow ? styles.open : styles.closed}>
+                  {restaurant.openNow ? 'Open' : 'Closed'}
+                </Text>
+              </>
+            ) : null}
+          </View>
+          {restaurant.featured ? <Text style={styles.sponsored}>Sponsored</Text> : null}
         </View>
-      </View>
 
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.heartBtn}
+          onPress={onToggleSave}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          accessibilityLabel={saved ? `Unsave ${restaurant.name}` : `Save ${restaurant.name}`}
+        >
+          <Text style={[styles.heart, saved && styles.heartActive]}>{saved ? '♥' : '♡'}</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
+
+function PhotoCarousel({ photos, styles }: { photos: string[]; styles: ReturnType<typeof makeStyles> }) {
+  const [width, setWidth] = useState(0);
+  const [active, setActive] = useState(0);
+
+  return (
+    <View style={styles.photoWrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      <ScrollView
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={(e) => {
+          if (width > 0) setActive(Math.round(e.nativeEvent.contentOffset.x / width));
+        }}
+      >
+        {photos.map((uri, i) => (
+          <Image key={`${uri}-${i}`} source={{ uri }} style={[styles.photo, { width }]} resizeMode="cover" />
+        ))}
+      </ScrollView>
+      {photos.length > 1 ? (
+        <View style={styles.dots}>
+          {photos.map((_, i) => (
+            <View key={i} style={[styles.dotPip, i === active && styles.dotPipActive]} />
+          ))}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+const PHOTO_HEIGHT = 172;
 
 const makeStyles = (t: Theme) =>
   StyleSheet.create({
     card: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      padding: 12,
       borderRadius: t.radius.lg,
       backgroundColor: t.color.surface,
       borderWidth: 1,
       borderColor: t.color.border,
+      overflow: 'hidden',
       ...t.shadow.card,
     },
-    cardFeatured: {
-      borderColor: t.color.amber,
-      ...t.shadow.glow(t.color.amber),
-    },
-    thumb: {
-      width: 58,
-      height: 58,
-      borderRadius: t.radius.md,
-      alignItems: 'center',
-      justifyContent: 'center',
+    photoWrap: {
+      width: '100%',
+      height: PHOTO_HEIGHT,
       backgroundColor: t.color.surfaceAlt,
     },
-    thumbEmoji: { fontSize: 30 },
-    body: { flex: 1, gap: 2 },
-    featuredBadge: {
-      alignSelf: 'flex-start',
-      backgroundColor: t.color.amber,
-      borderRadius: t.radius.pill,
+    photo: { height: PHOTO_HEIGHT },
+    dots: {
+      position: 'absolute',
+      bottom: 10,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      gap: 5,
+      backgroundColor: 'rgba(0,0,0,0.35)',
+      borderRadius: 999,
       paddingHorizontal: 8,
-      paddingVertical: 2,
-      marginBottom: 2,
+      paddingVertical: 5,
     },
-    featuredBadgeText: {
-      fontSize: 10,
-      fontFamily: t.font.bodyBold,
-      color: '#1A1300',
-      letterSpacing: 0.4,
+    dotPip: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.55)' },
+    dotPipActive: { backgroundColor: '#FFFFFF' },
+    info: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
     },
-    name: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
-    address: { fontSize: 13, fontFamily: t.font.body, color: t.color.textTertiary },
-    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginTop: 3 },
-    metaStrong: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.amber },
-    metaSoft: { fontSize: 13, fontFamily: t.font.bodySemibold, color: t.color.textSecondary },
-    open: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.success },
-    closed: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary },
-    chevron: { fontSize: 24, color: t.color.textTertiary, paddingRight: 4 },
+    infoText: { flex: 1, gap: 4 },
+    name: { fontSize: 18, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+    metaStrong: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+    metaSoft: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
+    dot: { fontSize: 14, color: t.color.textTertiary },
+    open: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.success },
+    closed: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textTertiary },
+    sponsored: { fontSize: 13, fontFamily: t.font.body, color: t.color.textTertiary },
+    heartBtn: { paddingTop: 2 },
+    heart: { fontSize: 24, color: t.color.textTertiary },
+    heartActive: { color: t.color.accent },
   });

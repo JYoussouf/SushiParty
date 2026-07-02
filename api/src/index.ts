@@ -656,6 +656,40 @@ async function handleAuthRegister(request: Request, env: Env): Promise<Response>
   return json(request, env, { token, user, accountBacked: true }, 201);
 }
 
+interface PartnerApplicationBody {
+  restaurantName?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+}
+
+// Restaurant "feature your restaurant" applications — a B2B lead, not a purchase.
+async function handlePartnerApplication(request: Request, env: Env): Promise<Response> {
+  const body = await readJson<PartnerApplicationBody>(request);
+  const restaurantName = body.restaurantName?.trim() ?? '';
+  const address = body.address?.trim() ?? '';
+  const email = normalizeEmail(body.email ?? '');
+  const phone = body.phone?.trim() ?? '';
+  if (!restaurantName || !address || !isValidEmail(email)) {
+    throw new HttpError(400, 'Restaurant name, address and a valid email are required.');
+  }
+  const id = randomId('partner');
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS partner_applications (
+      id TEXT PRIMARY KEY, restaurant_name TEXT NOT NULL, address TEXT NOT NULL,
+      email TEXT NOT NULL, phone TEXT, created_at TEXT NOT NULL
+    )`,
+  ).run();
+  await env.DB.prepare(
+    `INSERT INTO partner_applications (id, restaurant_name, address, email, phone, created_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  )
+    .bind(id, restaurantName, address, email, phone, now)
+    .run();
+  return json(request, env, { id });
+}
+
 async function handleAuthLogin(request: Request, env: Env): Promise<Response> {
   const body = await readJson<AccountAuthBody>(request);
   const email = normalizeEmail(body.email);
@@ -1744,6 +1778,9 @@ async function route(request: Request, env: Env): Promise<Response> {
   }
   if (request.method === 'POST' && url.pathname === '/auth/facebook') {
     return handleAuthOAuth(request, env, 'facebook');
+  }
+  if (request.method === 'POST' && url.pathname === '/partners') {
+    return handlePartnerApplication(request, env);
   }
 
   switch (parts[0]) {

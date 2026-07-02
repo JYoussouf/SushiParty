@@ -36,7 +36,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Avatar, BackButton } from '../../src/components';
+import { Avatar } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -148,9 +148,6 @@ export default function ProfileScreen() {
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
-      <View style={styles.header}>
-        <BackButton onPress={() => router.replace('/(tabs)/home')} />
-      </View>
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.profileTitleRow}>
           <Text style={styles.profileTitle}>You</Text>
@@ -283,6 +280,18 @@ export default function ProfileScreen() {
               it must not be gated behind having logged a party. */}
           <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/places')}>
             <Text style={styles.listRowText}>Your places &amp; favourite spot</Text>
+            <Text style={styles.listRowChevron}>Open</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>More</Text>
+          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/(tabs)/friends')}>
+            <Text style={styles.listRowText}>Friends</Text>
+            <Text style={styles.listRowChevron}>Open</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/(tabs)/history')}>
+            <Text style={styles.listRowText}>Party history</Text>
             <Text style={styles.listRowChevron}>Open</Text>
           </TouchableOpacity>
         </View>

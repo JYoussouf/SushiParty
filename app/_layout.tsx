@@ -165,7 +165,6 @@ function RootLayoutNav() {
         options={{ headerShown: false, animation: 'slide_from_bottom', gestureEnabled: false }}
       />
       <Stack.Screen name="session/summary" options={{ headerShown: false, animation: 'none', gestureEnabled: false }} />
-      <Stack.Screen name="settings" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="friend/[id]" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="profile/favorites" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="profile/restaurants" options={{ headerShown: false, gestureEnabled: false }} />

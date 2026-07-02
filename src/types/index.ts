@@ -111,6 +111,9 @@ export interface Restaurant {
   googleMapsUri?: string; // canonical Google Maps place URL
   // A restaurant that has paid for premium placement in the near-me feed.
   featured?: boolean;
+  // Photos come only from a restaurant's own partner profile (see app/partner.tsx).
+  // Restaurants without a profile have none and render without images.
+  photos?: string[];
 }
 
 export interface RestaurantStats {

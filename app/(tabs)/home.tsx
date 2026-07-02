@@ -5,31 +5,21 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
-  ActivityIndicator,
-  Alert,
-  Linking,
   Modal,
-  RefreshControl,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
-import { Avatar, SushiPartyLogo, ItemSpriteIdle, RestaurantCard } from '../../src/components';
+import { SushiPartyLogo, ItemSpriteIdle } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSession } from '../../src/hooks/useSession';
 import { useMenu } from '../../src/hooks/useMenu';
-import { useNearbyFeed } from '../../src/hooks/useNearbyFeed';
 import { getAllSessions } from '../../src/lib/local/sessions';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
-import { openDirections } from '../../src/lib/maps';
 import type { Menu, SushiSession } from '../../src/types';
 
 interface HomeButton {
@@ -216,14 +206,11 @@ function computeStatCards(sessions: SushiSession[], uid: string | undefined, men
 
 export default function HomeScreen() {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const { userProfile, isGuest } = useAuth();
-  const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
+  const { groupCode, hasActiveSession } = useSession();
   const { activeMenu } = useMenu();
-  const feed = useNearbyFeed();
-  const avatar = participants[currentUserParticipantIndex]?.avatar;
 
   // Refresh on every mount — gives the app a different feel each open.
   const subtitle = useMemo(() => pickRandom(SUBTITLES), []);
@@ -311,44 +298,6 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
-      {/* Scrim so scrolling feed content fades out behind the floating top bar */}
-      <LinearGradient
-        colors={[t.color.bg, t.color.bg, 'transparent']}
-        style={[styles.topScrim, { height: insets.top + 66 }]}
-        pointerEvents="none"
-      />
-
-      {/* Top bar */}
-      <View style={[styles.topBar, { top: insets.top + 8 }]}>
-        <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
-          <View style={styles.profileAvatarBadge}>
-            <Avatar value={avatar} size={30} />
-          </View>
-          {userProfile?.displayName ? (
-            <Text style={styles.profileName} numberOfLines={1}>{userProfile.displayName}</Text>
-          ) : null}
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/settings')}>
-          <Svg width={22} height={22} viewBox="0 0 24 24">
-            <Path
-              fill={t.color.textSecondary}
-              d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"
-            />
-          </Svg>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={feed.loading}
-            onRefresh={() => void feed.refresh()}
-            tintColor={t.color.accent}
-          />
-        }
-      >
       {/* Hero */}
       <View style={styles.hero}>
         <SushiPartyLogo size="lg" />
@@ -428,78 +377,6 @@ export default function HomeScreen() {
         )}
       </Animated.View>
 
-      {/* ── Sushi near you — featured + nearby feed ─────────────── */}
-      <View style={styles.feedSection}>
-        <Text style={styles.feedTitle}>Sushi near you</Text>
-        <Text style={styles.feedSubtitle}>Tap a spot to get directions.</Text>
-
-        <TouchableOpacity
-          style={styles.promoCard}
-          activeOpacity={0.9}
-          onPress={() => router.push('/featured')}
-        >
-          <Text style={styles.promoEmoji}>⭐️</Text>
-          <View style={styles.promoBody}>
-            <Text style={styles.promoTitle}>Own a sushi spot?</Text>
-            <Text style={styles.promoSub}>Get featured at the top of this feed - tap to learn how.</Text>
-          </View>
-          <Text style={styles.promoArrow}>→</Text>
-        </TouchableOpacity>
-
-        {feed.loading && feed.restaurants.length === 0 ? (
-          <View style={styles.feedState}>
-            <ActivityIndicator color={t.color.accent} />
-          </View>
-        ) : feed.permission === 'denied-permanent' ? (
-          <View style={styles.feedStateCard}>
-            <Text style={styles.feedStateText}>
-              Location is turned off. Enable it in Settings to see sushi spots near you.
-            </Text>
-            <TouchableOpacity onPress={() => void Linking.openSettings()}>
-              <Text style={styles.feedStateLink}>Open Settings</Text>
-            </TouchableOpacity>
-          </View>
-        ) : feed.permission === 'denied' ? (
-          <View style={styles.feedStateCard}>
-            <Text style={styles.feedStateText}>Enable location to see sushi spots near you.</Text>
-            <TouchableOpacity onPress={() => void feed.refresh()}>
-              <Text style={styles.feedStateLink}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : feed.error ? (
-          <View style={styles.feedStateCard}>
-            <Text style={styles.feedStateText}>{feed.error}</Text>
-            <TouchableOpacity onPress={() => void feed.refresh()}>
-              <Text style={styles.feedStateLink}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        ) : feed.restaurants.length === 0 ? (
-          <View style={styles.feedStateCard}>
-            <Text style={styles.feedStateText}>No sushi spots found nearby yet.</Text>
-            <TouchableOpacity onPress={() => void feed.refresh()}>
-              <Text style={styles.feedStateLink}>Try again</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.feedList}>
-            {feed.restaurants.map((r) => (
-              <RestaurantCard
-                key={r.id}
-                restaurant={r}
-                onPress={async () => {
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  const ok = await openDirections(r.location, r.name);
-                  if (!ok) {
-                    Alert.alert('Could not open Maps', `We couldn't open directions to ${r.name}.`);
-                  }
-                }}
-              />
-            ))}
-          </View>
-        )}
-      </View>
-      </ScrollView>
-
       <Modal
         visible={showGuestUpgrade}
         transparent
@@ -546,79 +423,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   safe: {
     flex: 1,
-  },
-
-  // ── Top bar ─────────────────────────────────────────────
-  topScrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    zIndex: 1,
-  },
-  topBar: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    zIndex: 2,
-  },
-  topActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  profileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-    height: 46,
-    paddingLeft: 4,
-    paddingRight: 14,
-    borderRadius: 999,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    ...t.shadow.card,
-    maxWidth: 220,
-  },
-  profileAvatarBadge: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: t.color.surfaceAlt,
-    borderWidth: 2,
-    borderColor: t.isDark ? t.color.accent : '#fff',
-  },
-  profileName: {
-    fontSize: 14,
-    fontFamily: t.font.bodyBold,
-    color: t.color.textPrimary,
-    flexShrink: 1,
-  },
-  iconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  iconButtonText: {
-    fontSize: 20,
-    lineHeight: 24,
   },
 
   // ── Hero ────────────────────────────────────────────────
   hero: {
     alignItems: 'center',
-    paddingTop: 96,
+    paddingTop: 24,
     paddingHorizontal: 24,
     gap: 12,
   },
@@ -706,56 +517,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 36,
     lineHeight: 42,
   },
-
-  // ── Scroll + near-me feed ───────────────────────────────
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  feedSection: {
-    paddingHorizontal: 20,
-    paddingTop: 34,
-    gap: 6,
-  },
-  feedTitle: {
-    fontSize: 22,
-    fontFamily: t.font.display,
-    color: t.color.textPrimary,
-    letterSpacing: -0.3,
-  },
-  feedSubtitle: {
-    fontSize: 14,
-    fontFamily: t.font.body,
-    color: t.color.textSecondary,
-    marginBottom: 10,
-  },
-  promoCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 16,
-    borderRadius: t.radius.lg,
-    backgroundColor: t.isDark ? 'rgba(245,166,35,0.12)' : '#FFF6E5',
-    borderWidth: 1,
-    borderColor: t.color.amber,
-    marginBottom: 14,
-  },
-  promoEmoji: { fontSize: 26 },
-  promoBody: { flex: 1, gap: 2 },
-  promoTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
-  promoSub: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 18 },
-  promoArrow: { fontSize: 20, fontFamily: t.font.bodyBold, color: t.color.amber },
-  feedList: { gap: 12 },
-  feedState: { paddingVertical: 28, alignItems: 'center' },
-  feedStateCard: {
-    borderRadius: t.radius.lg,
-    padding: 18,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    gap: 8,
-  },
-  feedStateText: { fontSize: 14, lineHeight: 20, fontFamily: t.font.body, color: t.color.textSecondary },
-  feedStateLink: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.accent },
 
   // ── Guest upgrade prompt ────────────────────────────────
   guestModalBackdrop: {

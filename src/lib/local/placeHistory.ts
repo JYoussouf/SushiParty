@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const VIEWED_PLACES_KEY = 'sushi-party/viewed-places';
 const FAVORITE_PLACE_KEY = 'sushi-party/favorite-place-key';
+const SAVED_PLACES_KEY = 'sushi-party/saved-places';
 
 const MAX_VIEWED_PLACES = 50;
 
@@ -79,6 +80,30 @@ export async function setFavoritePlaceKey(name: string | null): Promise<void> {
   await AsyncStorage.setItem(FAVORITE_PLACE_KEY, placeKey(name));
 }
 
+// Saved/hearted spots from the Explore feed (a multi-select list, distinct from
+// the single pinned favourite above).
+export async function getSavedPlaceKeys(): Promise<string[]> {
+  const raw = await AsyncStorage.getItem(SAVED_PLACES_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw) as string[];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Toggle a place's saved state by name; returns the new saved state. */
+export async function toggleSavedPlace(name: string): Promise<boolean> {
+  const key = placeKey(name);
+  if (!key) return false;
+  const keys = await getSavedPlaceKeys();
+  const has = keys.includes(key);
+  const next = has ? keys.filter((k) => k !== key) : [...keys, key];
+  await AsyncStorage.setItem(SAVED_PLACES_KEY, JSON.stringify(next));
+  return !has;
+}
+
 export async function clearPlaceHistory(): Promise<void> {
-  await AsyncStorage.multiRemove([VIEWED_PLACES_KEY, FAVORITE_PLACE_KEY]);
+  await AsyncStorage.multiRemove([VIEWED_PLACES_KEY, FAVORITE_PLACE_KEY, SAVED_PLACES_KEY]);
 }

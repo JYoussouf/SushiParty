@@ -19,12 +19,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BackButton } from '../src/components';
-import { useTheme } from '../src/contexts/ThemeContext';
-import type { Theme } from '../src/theme/themes';
-import { useAuth } from '../src/contexts/AuthContext';
-import { buildSessionExportCsv } from '../src/lib/exportSessions';
-import { getAllSessions } from '../src/lib/cloudflare/sessions';
+import { useTheme } from '../../src/contexts/ThemeContext';
+import type { Theme } from '../../src/theme/themes';
+import { useAuth } from '../../src/contexts/AuthContext';
+import { buildSessionExportCsv } from '../../src/lib/exportSessions';
+import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 
 type Styles = ReturnType<typeof makeStyles>;
 
@@ -204,10 +203,6 @@ export default function SettingsScreen() {
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: SCROLL_PADDING_BOTTOM + insets.bottom }]}
       >
-        <View style={styles.topRow}>
-          <BackButton onPress={() => router.back()} />
-        </View>
-
         <Text style={styles.title}>Settings</Text>
 
         <View style={styles.section}>
@@ -283,19 +278,24 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Places</Text>
-          <View style={styles.row}>
+          <TouchableOpacity style={styles.navRow} activeOpacity={0.8} onPress={() => router.push('/profile/places')}>
             <View style={styles.rowText}>
               <Text style={styles.rowTitle}>Favourite sushi spot</Text>
               <Text style={styles.rowNote}>See the places you&apos;ve partied at and browsed, and pin your favourite.</Text>
             </View>
-            <TouchableOpacity
-              style={styles.rowActionBtn}
-              activeOpacity={0.85}
-              onPress={() => router.push('/profile/places')}
-            >
-              <Text style={styles.rowActionBtnText}>View</Text>
-            </TouchableOpacity>
-          </View>
+            <Text style={styles.navChevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>For restaurants</Text>
+          <TouchableOpacity style={styles.navRow} activeOpacity={0.8} onPress={() => router.push('/partner')}>
+            <View style={styles.rowText}>
+              <Text style={styles.rowTitle}>Feature your restaurant</Text>
+              <Text style={styles.rowNote}>Reach nearby diners in the Explore feed - set up a partner account.</Text>
+            </View>
+            <Text style={styles.navChevron}>›</Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
@@ -349,44 +349,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.color.bg },
   safe: { flex: 1 },
   scroll: { padding: 20, gap: 18, paddingBottom: SCROLL_PADDING_BOTTOM },
-  topRow: { flexDirection: 'row', justifyContent: 'flex-start' },
-  title: { fontSize: 28, fontFamily: t.font.display, color: t.color.textPrimary },
+  title: { fontSize: 30, fontFamily: t.font.display, color: t.color.textPrimary },
   section: { gap: 10 },
   sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
-
-  // ── Appearance ─────────────────────────────────────────────
-  appearanceCard: {
-    borderRadius: t.radius.lg,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    padding: 16,
-    gap: 12,
-  },
-  appearanceLabel: { fontSize: 15, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
-  themeOptions: { flexDirection: 'row', gap: 10 },
-  themeOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: t.radius.button,
-    backgroundColor: t.color.surfaceAlt,
-    borderWidth: 1.5,
-    borderColor: t.color.border,
-  },
-  themeOptionActive: {
-    borderColor: t.color.accent,
-    backgroundColor: t.color.accentSoft,
-    ...t.shadow.glow(t.color.accent),
-  },
-  themeOptionEmoji: { fontSize: 18, lineHeight: 22 },
-  themeOptionLabel: { fontSize: 14, fontFamily: t.font.bodySemibold, color: t.color.textSecondary },
-  themeOptionLabelActive: { color: t.isDark ? t.color.onAccent : t.color.accent },
-  themeOptionCheck: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.isDark ? t.color.onAccent : t.color.accent },
 
   soundCard: {
     borderRadius: t.radius.lg,
@@ -454,11 +419,22 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: t.color.border,
   },
+  navRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 16,
+    borderRadius: t.radius.lg,
+    padding: 16,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+  },
+  navChevron: { fontSize: 26, color: t.color.textTertiary, marginTop: -2 },
   rowText: { flex: 1 },
   rowTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary },
 
-  // ── Username ───────────────────────────────────────────────
   usernameCard: {
     borderRadius: t.radius.lg,
     backgroundColor: t.color.surface,
@@ -500,8 +476,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   usernameError: { fontSize: 13, lineHeight: 19, fontFamily: t.font.bodySemibold, color: t.color.danger },
   usernameSuccess: { fontSize: 13, lineHeight: 19, fontFamily: t.font.bodySemibold, color: t.color.accent },
 
-  // Action button chips — explicitly boxed so they render identically on iOS
-  // and Android (bare text links diverge due to Android's includeFontPadding).
   rowActionBtn: {
     paddingVertical: 9,
     paddingHorizontal: 18,
