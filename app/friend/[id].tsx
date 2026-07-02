@@ -148,23 +148,29 @@ export default function FriendProfileScreen() {
               {comparison.rows.map((row) => (
                 <View key={row.label} style={styles.compareRow}>
                   <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
                     style={[
                       styles.compareValue,
                       styles.compareValueLeft,
                       row.leader === 'you' && styles.compareValueLead,
                     ]}
                   >
-                    {row.youValue}
+                    {row.youValue.toLocaleString()}
                   </Text>
                   <Text style={styles.compareLabel}>{row.label}</Text>
                   <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.6}
                     style={[
                       styles.compareValue,
                       styles.compareValueRight,
                       row.leader === 'friend' && styles.compareValueLead,
                     ]}
                   >
-                    {row.friendValue}
+                    {row.friendValue.toLocaleString()}
                   </Text>
                 </View>
               ))}
@@ -313,7 +319,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderTopColor: t.color.border,
   },
   compareValue: {
-    width: 64,
+    flex: 1,
+    minWidth: 56,
     fontSize: 20,
     fontFamily: t.font.bodySemibold,
     color: t.color.textTertiary,
@@ -322,7 +329,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   compareValueRight: { textAlign: 'right' },
   compareValueLead: { color: t.color.textPrimary, fontFamily: t.font.bodyBold },
   compareLabel: {
-    flex: 1,
+    flexShrink: 0,
+    paddingHorizontal: 12,
     textAlign: 'center',
     fontSize: 13,
     fontFamily: t.font.bodySemibold,
