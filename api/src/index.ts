@@ -37,6 +37,11 @@ interface Restaurant {
   location: GeoPoint;
   menuId: string;
   stats: RestaurantStats;
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: number;
+  openNow?: boolean;
+  googleMapsUri?: string;
 }
 
 interface SessionParticipant {
@@ -1520,9 +1525,33 @@ interface GooglePlace {
   displayName?: { text: string };
   formattedAddress?: string;
   location?: { latitude: number; longitude: number };
+  rating?: number;
+  userRatingCount?: number;
+  priceLevel?: string; // Places v1 enum, e.g. 'PRICE_LEVEL_MODERATE'
+  currentOpeningHours?: { openNow?: boolean };
+  googleMapsUri?: string;
 }
 
-const PLACES_FIELD_MASK = 'places.id,places.displayName,places.formattedAddress,places.location';
+const PLACES_FIELD_MASK = [
+  'places.id',
+  'places.displayName',
+  'places.formattedAddress',
+  'places.location',
+  'places.rating',
+  'places.userRatingCount',
+  'places.priceLevel',
+  'places.currentOpeningHours.openNow',
+  'places.googleMapsUri',
+].join(',');
+
+// Places v1 returns price level as an enum string; map it to a 0..4 scale.
+const PRICE_LEVEL_MAP: Record<string, number> = {
+  PRICE_LEVEL_FREE: 0,
+  PRICE_LEVEL_INEXPENSIVE: 1,
+  PRICE_LEVEL_MODERATE: 2,
+  PRICE_LEVEL_EXPENSIVE: 3,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4,
+};
 
 function googleHeaders(apiKey: string): HeadersInit {
   return {
@@ -1540,6 +1569,7 @@ function googlePlaceToRestaurant(
   const loc = p.location;
   if (!name || !loc) return null;
   const location = { latitude: loc.latitude, longitude: loc.longitude };
+  const priceLevel = p.priceLevel ? PRICE_LEVEL_MAP[p.priceLevel] : undefined;
   return {
     id: `google-${p.id}`,
     name,
@@ -1547,6 +1577,11 @@ function googlePlaceToRestaurant(
     location,
     menuId: 'global-default',
     stats: emptyStats(),
+    ...(typeof p.rating === 'number' ? { rating: p.rating } : {}),
+    ...(typeof p.userRatingCount === 'number' ? { userRatingCount: p.userRatingCount } : {}),
+    ...(priceLevel !== undefined ? { priceLevel } : {}),
+    ...(typeof p.currentOpeningHours?.openNow === 'boolean' ? { openNow: p.currentOpeningHours.openNow } : {}),
+    ...(p.googleMapsUri ? { googleMapsUri: p.googleMapsUri } : {}),
     ...(center ? { distanceKm: haversineKm(center, location) } : {}),
   };
 }

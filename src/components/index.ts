@@ -9,3 +9,4 @@ export { SushiPartyLogo } from './SushiPartyLogo';
 export { ItemSprite } from './ItemSprite';
 export { ItemSpriteIdle } from './ItemSpriteIdle';
 export { WrappedCard } from './WrappedCard';
+export { RestaurantCard } from './RestaurantCard';

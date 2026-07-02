@@ -103,6 +103,14 @@ export interface Restaurant {
   location: GeoPoint;
   menuId: string; // points to location-specific or global menu
   stats: RestaurantStats;
+  // Optional Google Places metadata (populated for `google-*` results).
+  rating?: number; // 0..5 average review score
+  userRatingCount?: number; // number of Google reviews
+  priceLevel?: number; // 0..4 ($ .. $$$$)
+  openNow?: boolean; // current open state, when known
+  googleMapsUri?: string; // canonical Google Maps place URL
+  // A restaurant that has paid for premium placement in the near-me feed.
+  featured?: boolean;
 }
 
 export interface RestaurantStats {

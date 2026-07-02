@@ -5,21 +5,26 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
-import { Avatar, SushiPartyLogo, ItemSpriteIdle } from '../../src/components';
+import { Avatar, SushiPartyLogo, ItemSpriteIdle, RestaurantCard } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useSession } from '../../src/hooks/useSession';
 import { useMenu } from '../../src/hooks/useMenu';
+import { useNearbyFeed } from '../../src/hooks/useNearbyFeed';
 import { getAllSessions } from '../../src/lib/local/sessions';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
+import { openDirections } from '../../src/lib/maps';
 import type { Menu, SushiSession } from '../../src/types';
 
 interface HomeButton {
@@ -209,6 +214,7 @@ export default function HomeScreen() {
   const { userProfile } = useAuth();
   const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
   const { activeMenu } = useMenu();
+  const feed = useNearbyFeed();
   const avatar = participants[currentUserParticipantIndex]?.avatar;
 
   // Refresh on every mount — gives the app a different feel each open.
@@ -285,6 +291,10 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Hero */}
       <View style={styles.hero}>
         <SushiPartyLogo size="lg" />
@@ -363,6 +373,63 @@ export default function HomeScreen() {
           ),
         )}
       </Animated.View>
+
+      {/* ── Sushi near you — featured + nearby feed ─────────────── */}
+      <View style={styles.feedSection}>
+        <Text style={styles.feedTitle}>Sushi near you</Text>
+        <Text style={styles.feedSubtitle}>Tap a spot to get directions.</Text>
+
+        <TouchableOpacity
+          style={styles.promoCard}
+          activeOpacity={0.9}
+          onPress={() => router.push('/featured')}
+        >
+          <Text style={styles.promoEmoji}>⭐️</Text>
+          <View style={styles.promoBody}>
+            <Text style={styles.promoTitle}>Own a sushi spot?</Text>
+            <Text style={styles.promoSub}>Get featured at the top of this feed - tap to learn how.</Text>
+          </View>
+          <Text style={styles.promoArrow}>→</Text>
+        </TouchableOpacity>
+
+        {feed.loading && feed.restaurants.length === 0 ? (
+          <View style={styles.feedState}>
+            <ActivityIndicator color={t.color.accent} />
+          </View>
+        ) : feed.permission === 'denied' || feed.permission === 'denied-permanent' ? (
+          <View style={styles.feedStateCard}>
+            <Text style={styles.feedStateText}>Enable location to see sushi spots near you.</Text>
+            <TouchableOpacity onPress={() => void feed.refresh()}>
+              <Text style={styles.feedStateLink}>Try again</Text>
+            </TouchableOpacity>
+          </View>
+        ) : feed.error ? (
+          <View style={styles.feedStateCard}>
+            <Text style={styles.feedStateText}>{feed.error}</Text>
+            <TouchableOpacity onPress={() => void feed.refresh()}>
+              <Text style={styles.feedStateLink}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : feed.restaurants.length === 0 ? (
+          <View style={styles.feedStateCard}>
+            <Text style={styles.feedStateText}>No sushi spots found nearby yet.</Text>
+          </View>
+        ) : (
+          <View style={styles.feedList}>
+            {feed.restaurants.map((r) => (
+              <RestaurantCard
+                key={r.id}
+                restaurant={r}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  void openDirections(r.location, r.name);
+                }}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+      </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -528,6 +595,56 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 36,
     lineHeight: 42,
   },
+
+  // ── Scroll + near-me feed ───────────────────────────────
+  scrollContent: {
+    paddingBottom: 40,
+  },
+  feedSection: {
+    paddingHorizontal: 20,
+    paddingTop: 34,
+    gap: 6,
+  },
+  feedTitle: {
+    fontSize: 22,
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
+    letterSpacing: -0.3,
+  },
+  feedSubtitle: {
+    fontSize: 14,
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
+    marginBottom: 10,
+  },
+  promoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: t.radius.lg,
+    backgroundColor: t.isDark ? 'rgba(245,166,35,0.12)' : '#FFF6E5',
+    borderWidth: 1,
+    borderColor: t.color.amber,
+    marginBottom: 14,
+  },
+  promoEmoji: { fontSize: 26 },
+  promoBody: { flex: 1, gap: 2 },
+  promoTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
+  promoSub: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 18 },
+  promoArrow: { fontSize: 20, fontFamily: t.font.bodyBold, color: t.color.amber },
+  feedList: { gap: 12 },
+  feedState: { paddingVertical: 28, alignItems: 'center' },
+  feedStateCard: {
+    borderRadius: t.radius.lg,
+    padding: 18,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    gap: 8,
+  },
+  feedStateText: { fontSize: 14, lineHeight: 20, fontFamily: t.font.body, color: t.color.textSecondary },
+  feedStateLink: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.accent },
 
   // ── CTAs ────────────────────────────────────────────────
   buttons: {
