@@ -3,6 +3,7 @@ import type { User } from '../../types';
 
 const DEVICE_PROFILE_KEY = 'sushi-party/device-profile';
 const ONBOARDING_KEY = 'sushi-party/onboarding-done';
+const GUEST_MODE_KEY = 'sushi-party/guest-mode';
 
 function randomId(prefix: string): string {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -45,6 +46,20 @@ export async function markOnboardingComplete(): Promise<void> {
 
 export async function clearOnboardingFlag(): Promise<void> {
   await AsyncStorage.removeItem(ONBOARDING_KEY);
+}
+
+// "Guest mode": the user chose to play without an account. Persisted so the
+// account gate keeps letting them in across launches until they sign up.
+export async function isGuestMode(): Promise<boolean> {
+  return (await AsyncStorage.getItem(GUEST_MODE_KEY)) === '1';
+}
+
+export async function setGuestMode(on: boolean): Promise<void> {
+  if (on) {
+    await AsyncStorage.setItem(GUEST_MODE_KEY, '1');
+  } else {
+    await AsyncStorage.removeItem(GUEST_MODE_KEY);
+  }
 }
 
 export async function updateDeviceProfile(

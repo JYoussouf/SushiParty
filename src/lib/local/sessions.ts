@@ -180,3 +180,31 @@ export async function updateSessionNote(sessionId: string, note: string): Promis
 export async function clearLocalSessions(): Promise<void> {
   await AsyncStorage.removeItem(LOCAL_SESSIONS_KEY);
 }
+
+/**
+ * Re-key a guest's locally-stored parties onto their new account uid when they
+ * sign up, so the party they just played isn't orphaned. No-op when the uid is
+ * unchanged (the common email path, where the server preserves the guest uid).
+ * Returns the number of sessions updated.
+ */
+export async function migrateGuestSessions(oldUid: string, newUid: string): Promise<number> {
+  if (!oldUid || !newUid || oldUid === newUid) return 0;
+
+  const sessions = await readSessions();
+  let changed = 0;
+  const next = sessions.map((session) => {
+    let touched = false;
+    const participants = session.participants.map((participant) => {
+      if (participant.userId === oldUid) {
+        touched = true;
+        return { ...participant, userId: newUid };
+      }
+      return participant;
+    });
+    if (touched) changed += 1;
+    return touched ? { ...session, participants } : session;
+  });
+
+  if (changed > 0) await writeSessions(next);
+  return changed;
+}

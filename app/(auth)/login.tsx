@@ -38,7 +38,15 @@ export default function LoginScreen() {
   const router = useRouter();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
-  const { signIn, signUp, signInWithAppleOAuth, signInWithGoogleCode, signInWithFacebookOAuth } = useAuth();
+  const {
+    signIn,
+    signUp,
+    signInWithAppleOAuth,
+    signInWithGoogleCode,
+    signInWithFacebookOAuth,
+    continueAsGuest,
+    onboardingDone,
+  } = useAuth();
   const [credentialMode, setCredentialMode] = useState<CredentialMode>('sign-in');
   const [credentialsOpen, setCredentialsOpen] = useState(false);
   const [displayName, setDisplayName] = useState('');
@@ -56,6 +64,17 @@ export default function LoginScreen() {
 
   const closeCredentials = () => {
     if (!loading) setCredentialsOpen(false);
+  };
+
+  const handleContinueAsGuest = async () => {
+    setLoading(true);
+    try {
+      await continueAsGuest();
+      // Fresh guests set up a profile first; returning guests go straight home.
+      router.replace(onboardingDone ? '/(tabs)/home' : '/onboarding');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAppleSignIn = async () => {
@@ -241,6 +260,15 @@ export default function LoginScreen() {
             activeOpacity={0.82}
           >
             <Text style={styles.emailBtnTextSecondary}>Create an account</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.guestBtn}
+            onPress={() => void handleContinueAsGuest()}
+            disabled={loading}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.guestBtnText}>Continue as guest</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -571,6 +599,17 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     color: t.color.accent,
     fontSize: 15,
     fontFamily: t.font.bodySemibold,
+  },
+  guestBtn: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    marginTop: 2,
+  },
+  guestBtnText: {
+    color: t.color.textSecondary,
+    fontSize: 15,
+    fontFamily: t.font.bodySemibold,
+    textDecorationLine: 'underline',
   },
 
   // ── Bottom sheet ──────────────────────────────────────────

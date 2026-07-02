@@ -34,7 +34,11 @@ function RootLayoutNav() {
   const navState = useRootNavigationState();
   const segments = useSegments();
   const { hasActiveSession, groupSessionId } = useSession();
-  const { accountBacked, onboardingDone, loading: authLoading } = useAuth();
+  const { accountBacked, isGuest, onboardingDone, loading: authLoading } = useAuth();
+  // A guest who chose "Continue as Guest" is allowed past the login wall just
+  // like an account-backed user; only real accounts are auto-bounced out of the
+  // auth screens (so a guest can still open them to upgrade).
+  const authed = accountBacked || isGuest;
 
   useEffect(() => {
     logPartyFlow('root segments changed', {
@@ -62,7 +66,7 @@ function RootLayoutNav() {
     const currentPath = segments.join('/');
     const inAuth = segments[0] === '(auth)';
 
-    if (!accountBacked) {
+    if (!authed) {
       if (!inAuth) {
         logPartyFlow('root auth gate replace login', { currentPath });
         router.replace('/(auth)/login');
@@ -70,7 +74,9 @@ function RootLayoutNav() {
       return;
     }
 
-    if (inAuth) {
+    // Only real accounts auto-exit the auth stack; guests may linger there to
+    // create an account (the post-party upgrade prompt sends them to register).
+    if (accountBacked && inAuth) {
       logPartyFlow('root auth route exit replace', {
         currentPath,
         target: onboardingDone ? '/(tabs)/home' : '/onboarding',
@@ -83,11 +89,11 @@ function RootLayoutNav() {
       logPartyFlow('root onboarding gate replace', { currentPath });
       router.replace('/onboarding');
     }
-  }, [accountBacked, navState?.key, authLoading, onboardingDone, router, segments]);
+  }, [accountBacked, authed, navState?.key, authLoading, onboardingDone, router, segments]);
 
   // Initial home/scoreboard redirect for users who have completed onboarding
   useEffect(() => {
-    if (!navState?.key || authLoading || !accountBacked || !onboardingDone) return;
+    if (!navState?.key || authLoading || !authed || !onboardingDone) return;
     if (didInitialRedirect) return;
     const currentPath = segments.join('/');
     if (currentPath && currentPath !== 'index') {
@@ -113,7 +119,7 @@ function RootLayoutNav() {
     hasActiveSession,
     groupSessionId,
     segments,
-    accountBacked,
+    authed,
     onboardingDone,
     authLoading,
   ]);

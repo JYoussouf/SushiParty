@@ -9,12 +9,14 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Modal,
   RefreshControl,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
@@ -35,6 +37,9 @@ interface HomeButton {
   emoji: string;
   onPress: () => void;
 }
+
+// Shown once, after a guest finishes their first party, to nudge them to save it.
+const GUEST_UPGRADE_PROMPT_KEY = 'sushi-party/guest-upgrade-prompted';
 
 const SUBTITLES = [
   "Tonight's lineup is waiting.",
@@ -214,7 +219,7 @@ export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
-  const { userProfile } = useAuth();
+  const { userProfile, isGuest } = useAuth();
   const { participants, currentUserParticipantIndex, groupCode, hasActiveSession } = useSession();
   const { activeMenu } = useMenu();
   const feed = useNearbyFeed();
@@ -223,6 +228,38 @@ export default function HomeScreen() {
   // Refresh on every mount — gives the app a different feel each open.
   const subtitle = useMemo(() => pickRandom(SUBTITLES), []);
   const [card, setCard] = useState<Card>(() => pickRandom(CARDS));
+  const [showGuestUpgrade, setShowGuestUpgrade] = useState(false);
+
+  // After a guest completes their first party, surface a one-time prompt to
+  // create an account so their history is saved. Re-checked on each focus so it
+  // appears when they return home right after finishing.
+  useFocusEffect(
+    React.useCallback(() => {
+      if (!isGuest) return;
+      let alive = true;
+      void (async () => {
+        const [prompted, sessions] = await Promise.all([
+          AsyncStorage.getItem(GUEST_UPGRADE_PROMPT_KEY),
+          getAllSessions(),
+        ]);
+        if (alive && prompted !== '1' && sessions.length >= 1) setShowGuestUpgrade(true);
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [isGuest]),
+  );
+
+  const dismissGuestUpgrade = async () => {
+    await AsyncStorage.setItem(GUEST_UPGRADE_PROMPT_KEY, '1');
+    setShowGuestUpgrade(false);
+  };
+
+  const goCreateAccount = async () => {
+    await AsyncStorage.setItem(GUEST_UPGRADE_PROMPT_KEY, '1');
+    setShowGuestUpgrade(false);
+    router.push('/(auth)/register');
+  };
 
   useEffect(() => {
     let alive = true;
@@ -462,6 +499,41 @@ export default function HomeScreen() {
         )}
       </View>
       </ScrollView>
+
+      <Modal
+        visible={showGuestUpgrade}
+        transparent
+        animationType="fade"
+        onRequestClose={() => void dismissGuestUpgrade()}
+      >
+        <View style={styles.guestModalBackdrop}>
+          <View style={styles.guestModalCard}>
+            <Text style={styles.guestModalEmoji}>🎉</Text>
+            <Text style={styles.guestModalTitle}>Save your first party</Text>
+            <Text style={styles.guestModalBody}>
+              You&apos;re playing as a guest. Create a free account to keep your party history, avatar
+              and stats - so you never lose them.
+            </Text>
+            <TouchableOpacity
+              style={styles.guestModalPrimaryShadow}
+              activeOpacity={0.9}
+              onPress={() => void goCreateAccount()}
+            >
+              <LinearGradient
+                colors={t.color.accentGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.guestModalPrimary}
+              >
+                <Text style={styles.guestModalPrimaryText}>Create free account</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.guestModalLater} onPress={() => void dismissGuestUpgrade()}>
+              <Text style={styles.guestModalLaterText}>Maybe later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
       </SafeAreaView>
     </View>
   );
@@ -684,6 +756,55 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   feedStateText: { fontSize: 14, lineHeight: 20, fontFamily: t.font.body, color: t.color.textSecondary },
   feedStateLink: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.accent },
+
+  // ── Guest upgrade prompt ────────────────────────────────
+  guestModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  guestModalCard: {
+    width: '100%',
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    padding: 26,
+    alignItems: 'center',
+    gap: 8,
+    ...t.shadow.card,
+  },
+  guestModalEmoji: { fontSize: 44 },
+  guestModalTitle: {
+    fontSize: 22,
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
+    textAlign: 'center',
+  },
+  guestModalBody: {
+    fontSize: 15,
+    lineHeight: 22,
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  guestModalPrimaryShadow: {
+    width: '100%',
+    borderRadius: t.radius.button,
+    ...t.shadow.glow(t.color.accent),
+  },
+  guestModalPrimary: {
+    height: 52,
+    borderRadius: t.radius.button,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guestModalPrimaryText: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.onAccent },
+  guestModalLater: { paddingVertical: 12 },
+  guestModalLaterText: { fontSize: 15, fontFamily: t.font.bodySemibold, color: t.color.textSecondary },
 
   // ── CTAs ────────────────────────────────────────────────
   buttons: {

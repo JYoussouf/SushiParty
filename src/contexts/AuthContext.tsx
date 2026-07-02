@@ -1,12 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { clearLocalSessions } from '../lib/local/sessions';
+import { clearLocalSessions, migrateGuestSessions } from '../lib/local/sessions';
 import {
   clearOnboardingFlag,
   getOrCreateDeviceProfile,
+  isGuestMode,
   isOnboardingComplete,
   markOnboardingComplete,
   replaceDeviceProfile,
   resetDeviceProfile,
+  setGuestMode,
   updateDeviceProfile,
 } from '../lib/local/deviceProfile';
 import {
@@ -30,8 +32,10 @@ interface AuthContextValue {
   remoteUser: LocalIdentity | null;
   userProfile: User | null;
   accountBacked: boolean;
+  isGuest: boolean;
   loading: boolean;
   onboardingDone: boolean;
+  continueAsGuest: () => Promise<void>;
   completeOnboarding: (displayName: string, avatar: string, username: string) => Promise<void>;
   updateLocalProfile: (updates: Partial<Pick<User, 'displayName' | 'avatar'>>) => Promise<void>;
   changeUsername: (username: string) => Promise<void>;
@@ -50,8 +54,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [remoteUser, setRemoteUser] = useState<LocalIdentity | null>(null);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [accountBacked, setAccountBacked] = useState(false);
+  const [isGuest, setIsGuest] = useState(false);
   const [loading, setLoading] = useState(true);
   const [onboardingDone, setOnboardingDone] = useState(false);
+
+  // When a guest signs up, carry their locally-stored parties onto the account
+  // uid and drop guest mode. Email sign-up preserves the uid server-side (so the
+  // re-key is a no-op there); OAuth can assign a new uid, which this rescues.
+  const finalizeGuestUpgrade = useCallback(async (previousUid: string | undefined, nextUid: string) => {
+    if (previousUid) await migrateGuestSessions(previousUid, nextUid);
+    await setGuestMode(false);
+    setIsGuest(false);
+  }, []);
 
   const applyAuthSession = useCallback(async (session: AuthSession, markOnboarded = false) => {
     const stored = await replaceDeviceProfile(session.user);
@@ -67,11 +81,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     void (async () => {
-      const [profile, obDone, storedToken] = await Promise.all([
+      const [profile, obDone, storedToken, guest] = await Promise.all([
         getOrCreateDeviceProfile(),
         isOnboardingComplete(),
         getApiToken(),
+        isGuestMode(),
       ]);
+      setIsGuest(guest);
       let onboardingComplete = obDone;
       try {
         if (storedToken && hasApiBaseUrl()) {
@@ -112,6 +128,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUserProfile(updated);
   };
 
+  // Enter guest mode: play now, no account. The layout gate reads isGuest to let
+  // them past the login wall into onboarding/home.
+  const continueAsGuest = async () => {
+    await setGuestMode(true);
+    setIsGuest(true);
+  };
+
   const changeUsername = async (username: string) => {
     const updated = await changeUsernameRemote(username);
     const stored = await updateDeviceProfile({ username: updated.username });
@@ -131,6 +154,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async (email: string, password: string) => {
     const session = await signInWithEmail(email.trim(), password);
     await applyAuthSession(session, true);
+    await setGuestMode(false);
+    setIsGuest(false);
   };
 
   const signUp = async (
@@ -148,12 +173,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     const session = await registerAccount(localProfile, _password);
     await applyAuthSession(session, true);
+    await finalizeGuestUpgrade(existingProfile.uid, session.user.uid);
   };
 
   const signOut = async () => {
     await clearLocalSessions();
     await signOutRemote();
     await clearOnboardingFlag();
+    await setGuestMode(false);
+    setIsGuest(false);
     setOnboardingDone(false);
     const freshProfile = await resetDeviceProfile();
     try {
@@ -179,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithAppleOAuth = async () => {
+    const previousUid = (await getOrCreateDeviceProfile()).uid;
     const response = await signInWithApple();
     const oauthSession: AuthSession = {
       user: response.user,
@@ -187,24 +216,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Don't force-mark onboarding done — new OAuth users need to set their profile.
     // The isOnboardingComplete flag (written by completeOnboarding) handles returning users.
     await applyAuthSession(oauthSession, false);
+    await finalizeGuestUpgrade(previousUid, response.user.uid);
   };
 
   const signInWithGoogleCode = async (code: string, redirectUri: string) => {
+    const previousUid = (await getOrCreateDeviceProfile()).uid;
     const response = await exchangeGoogleCode(code, redirectUri);
     const oauthSession: AuthSession = {
       user: response.user,
       accountBacked: response.accountBacked,
     };
     await applyAuthSession(oauthSession, false);
+    await finalizeGuestUpgrade(previousUid, response.user.uid);
   };
 
   const signInWithFacebookOAuth = async (appId: string) => {
+    const previousUid = (await getOrCreateDeviceProfile()).uid;
     const response = await signInWithFacebook(appId);
     const oauthSession: AuthSession = {
       user: response.user,
       accountBacked: response.accountBacked,
     };
     await applyAuthSession(oauthSession, false);
+    await finalizeGuestUpgrade(previousUid, response.user.uid);
   };
 
   return (
@@ -213,8 +247,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         remoteUser,
         userProfile,
         accountBacked,
+        isGuest,
         loading,
         onboardingDone,
+        continueAsGuest,
         completeOnboarding,
         updateLocalProfile,
         changeUsername,
