@@ -20,26 +20,25 @@ import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useNearbyFeed } from '../../src/hooks/useNearbyFeed';
 import { openDirections } from '../../src/lib/maps';
-import { getSavedPlaceKeys, placeKey, toggleSavedPlace } from '../../src/lib/local/placeHistory';
+import { getSavedPlaceIds, toggleSavedPlace } from '../../src/lib/local/placeHistory';
 
 export default function ExploreScreen() {
   const router = useRouter();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const feed = useNearbyFeed();
-  const [savedKeys, setSavedKeys] = useState<Set<string>>(new Set());
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    void getSavedPlaceKeys().then((keys) => setSavedKeys(new Set(keys)));
+    void getSavedPlaceIds().then((ids) => setSavedIds(new Set(ids)));
   }, []);
 
-  const handleToggleSave = async (name: string) => {
-    const nowSaved = await toggleSavedPlace(name);
-    setSavedKeys((prev) => {
+  const handleToggleSave = async (id: string) => {
+    const nowSaved = await toggleSavedPlace(id);
+    setSavedIds((prev) => {
       const next = new Set(prev);
-      const key = placeKey(name);
-      if (nowSaved) next.add(key);
-      else next.delete(key);
+      if (nowSaved) next.add(id);
+      else next.delete(id);
       return next;
     });
   };
@@ -118,10 +117,10 @@ export default function ExploreScreen() {
                 <RestaurantCard
                   key={r.id}
                   restaurant={r}
-                  saved={savedKeys.has(placeKey(r.name))}
+                  saved={savedIds.has(r.id)}
                   onToggleSave={() => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    void handleToggleSave(r.name);
+                    void handleToggleSave(r.id);
                   }}
                   onPress={async () => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);

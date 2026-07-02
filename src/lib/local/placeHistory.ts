@@ -81,8 +81,9 @@ export async function setFavoritePlaceKey(name: string | null): Promise<void> {
 }
 
 // Saved/hearted spots from the Explore feed (a multi-select list, distinct from
-// the single pinned favourite above).
-export async function getSavedPlaceKeys(): Promise<string[]> {
+// the single pinned favourite above). Keyed by the stable place id (e.g. the
+// Google place id) so two branches of a chain with the same name don't collide.
+export async function getSavedPlaceIds(): Promise<string[]> {
   const raw = await AsyncStorage.getItem(SAVED_PLACES_KEY);
   if (!raw) return [];
   try {
@@ -93,13 +94,12 @@ export async function getSavedPlaceKeys(): Promise<string[]> {
   }
 }
 
-/** Toggle a place's saved state by name; returns the new saved state. */
-export async function toggleSavedPlace(name: string): Promise<boolean> {
-  const key = placeKey(name);
-  if (!key) return false;
-  const keys = await getSavedPlaceKeys();
-  const has = keys.includes(key);
-  const next = has ? keys.filter((k) => k !== key) : [...keys, key];
+/** Toggle a place's saved state by its id; returns the new saved state. */
+export async function toggleSavedPlace(id: string): Promise<boolean> {
+  if (!id) return false;
+  const ids = await getSavedPlaceIds();
+  const has = ids.includes(id);
+  const next = has ? ids.filter((k) => k !== id) : [...ids, id];
   await AsyncStorage.setItem(SAVED_PLACES_KEY, JSON.stringify(next));
   return !has;
 }
