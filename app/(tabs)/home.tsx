@@ -214,7 +214,9 @@ export default function HomeScreen() {
 
   // Refresh on every mount — gives the app a different feel each open.
   const subtitle = useMemo(() => pickRandom(SUBTITLES), []);
-  const [card, setCard] = useState<Card>(() => pickRandom(CARDS));
+  // Pick the card once, after the (stat-weighted) pool is ready, so the entrance
+  // animation plays against the final card instead of swapping A→B mid-fade.
+  const [card, setCard] = useState<Card | null>(null);
   const [showGuestUpgrade, setShowGuestUpgrade] = useState(false);
 
   // After a guest completes their first party, surface a one-time prompt to
@@ -306,6 +308,7 @@ export default function HomeScreen() {
 
       {/* Rotating "plate" card */}
       <Animated.View style={[styles.plateWrap, cardStyle]}>
+        {card ? (
         <View style={styles.plate}>
           <View style={styles.plateLeft}>
             <View style={styles.ribbon}>
@@ -351,6 +354,9 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
+        ) : (
+          <View style={[styles.plate, styles.platePlaceholder]} />
+        )}
       </Animated.View>
 
       {/* CTAs */}
@@ -516,6 +522,9 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   plateEmoji: {
     fontSize: 36,
     lineHeight: 42,
+  },
+  platePlaceholder: {
+    minHeight: 116,
   },
 
   // ── Guest upgrade prompt ────────────────────────────────
