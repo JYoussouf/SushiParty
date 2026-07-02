@@ -435,9 +435,12 @@ export default function HomeScreen() {
               <RestaurantCard
                 key={r.id}
                 restaurant={r}
-                onPress={() => {
+                onPress={async () => {
                   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  void openDirections(r.location, r.name);
+                  const ok = await openDirections(r.location, r.name);
+                  if (!ok) {
+                    Alert.alert('Could not open Maps', `We couldn't open directions to ${r.name}.`);
+                  }
                 }}
               />
             ))}
