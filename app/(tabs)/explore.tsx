@@ -14,7 +14,6 @@ import {
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import { useRouter } from 'expo-router';
 import { RestaurantCard } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
@@ -23,7 +22,6 @@ import { openDirections } from '../../src/lib/maps';
 import { getSavedPlaceIds, toggleSavedPlace } from '../../src/lib/local/placeHistory';
 
 export default function ExploreScreen() {
-  const router = useRouter();
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const feed = useNearbyFeed();
@@ -63,19 +61,6 @@ export default function ExploreScreen() {
         >
           <Text style={styles.title}>Explore</Text>
           <Text style={styles.subtitle}>Sushi spots near you. Tap one for directions.</Text>
-
-          <TouchableOpacity
-            style={styles.promoCard}
-            activeOpacity={0.9}
-            onPress={() => router.push('/partner')}
-          >
-            <Text style={styles.promoEmoji}>⭐️</Text>
-            <View style={styles.promoBody}>
-              <Text style={styles.promoTitle}>Own a sushi spot?</Text>
-              <Text style={styles.promoSub}>Get featured at the top of this feed - tap to learn how.</Text>
-            </View>
-            <Text style={styles.promoArrow}>→</Text>
-          </TouchableOpacity>
 
           {feed.loading && feed.restaurants.length === 0 ? (
             <View style={styles.feedState}>
@@ -146,22 +131,6 @@ const makeStyles = (t: Theme) =>
     scroll: { padding: 20, paddingBottom: 40, gap: 6 },
     title: { fontSize: 30, fontFamily: t.font.display, color: t.color.textPrimary, letterSpacing: -0.3 },
     subtitle: { fontSize: 15, fontFamily: t.font.body, color: t.color.textSecondary, marginBottom: 12 },
-    promoCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      padding: 16,
-      borderRadius: t.radius.lg,
-      backgroundColor: t.isDark ? 'rgba(245,166,35,0.12)' : '#FFF6E5',
-      borderWidth: 1,
-      borderColor: t.color.amber,
-      marginBottom: 14,
-    },
-    promoEmoji: { fontSize: 26 },
-    promoBody: { flex: 1, gap: 2 },
-    promoTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
-    promoSub: { fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary, lineHeight: 18 },
-    promoArrow: { fontSize: 20, fontFamily: t.font.bodyBold, color: t.color.amber },
     feedList: { gap: 12 },
     feedState: { paddingVertical: 28, alignItems: 'center' },
     feedStateCard: {

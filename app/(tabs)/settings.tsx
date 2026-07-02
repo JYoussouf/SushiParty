@@ -288,11 +288,11 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>For restaurants</Text>
+          <Text style={styles.sectionTitle}>More</Text>
           <TouchableOpacity style={styles.navRow} activeOpacity={0.8} onPress={() => router.push('/partner')}>
             <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Feature your restaurant</Text>
-              <Text style={styles.rowNote}>Reach nearby diners in the Explore feed - set up a partner account.</Text>
+              <Text style={styles.rowTitle}>Become a Partner Restaurant</Text>
+              <Text style={styles.rowNote}>List your restaurant and reach nearby diners in the Explore feed.</Text>
             </View>
             <Text style={styles.navChevron}>›</Text>
           </TouchableOpacity>
