@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -78,20 +79,38 @@ export default function FriendProfileScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingState}>
+      <View style={styles.container}>
         <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
-        <StatusBar style={t.isDark ? 'light' : 'dark'} />
-        <ActivityIndicator size="large" color={t.color.accent} />
+        <SafeAreaView style={styles.safe}>
+          <StatusBar style={t.isDark ? 'light' : 'dark'} />
+          <View style={styles.header}>
+            <BackButton onPress={() => router.back()} />
+          </View>
+          <View style={styles.stateCenter}>
+            <ActivityIndicator size="large" color={t.color.accent} />
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
 
   if (!friend) {
     return (
-      <View style={styles.loadingState}>
+      <View style={styles.container}>
         <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
-        <StatusBar style={t.isDark ? 'light' : 'dark'} />
-        <Text style={styles.emptyText}>Friend not found.</Text>
+        <SafeAreaView style={styles.safe}>
+          <StatusBar style={t.isDark ? 'light' : 'dark'} />
+          <View style={styles.header}>
+            <BackButton onPress={() => router.back()} />
+          </View>
+          <View style={styles.stateCenter}>
+            <Text style={styles.emptyTitle}>This friend isn&apos;t available</Text>
+            <Text style={styles.emptyText}>They may have been removed from your local friends.</Text>
+            <TouchableOpacity style={styles.stateButton} onPress={() => router.back()} activeOpacity={0.85}>
+              <Text style={styles.stateButtonText}>Back to Friends</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
@@ -313,5 +332,31 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 16,
     fontFamily: t.font.body,
     color: t.color.textSecondary,
+    textAlign: 'center',
+  },
+  stateCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 10,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    fontFamily: t.font.display,
+    color: t.color.textPrimary,
+    textAlign: 'center',
+  },
+  stateButton: {
+    marginTop: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: t.radius.button,
+    backgroundColor: t.color.accentSoft,
+  },
+  stateButtonText: {
+    fontSize: 15,
+    fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
   },
 });
