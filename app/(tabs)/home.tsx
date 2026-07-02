@@ -413,6 +413,9 @@ export default function HomeScreen() {
         ) : feed.restaurants.length === 0 ? (
           <View style={styles.feedStateCard}>
             <Text style={styles.feedStateText}>No sushi spots found nearby yet.</Text>
+            <TouchableOpacity onPress={() => void feed.refresh()}>
+              <Text style={styles.feedStateLink}>Try again</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <View style={styles.feedList}>

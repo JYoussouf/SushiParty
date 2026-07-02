@@ -16,7 +16,13 @@ interface UseNearbyFeedReturn {
  * featured (paid) placements first. Reacts to the resolved location.
  */
 export function useNearbyFeed(): UseNearbyFeedReturn {
-  const { location, permission, loading: locLoading, refresh: refreshLocation } = useLocation();
+  const {
+    location,
+    permission,
+    loading: locLoading,
+    error: locError,
+    refresh: refreshLocation,
+  } = useLocation();
   const [restaurants, setRestaurants] = useState<FeedRestaurant[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,5 +54,7 @@ export function useNearbyFeed(): UseNearbyFeedReturn {
     }
   };
 
-  return { restaurants, loading: loading || locLoading, error, permission, refresh };
+  // Surface a location-acquisition error (e.g. a GPS timeout) so the feed can
+  // show its retry affordance instead of a misleading "none found" empty state.
+  return { restaurants, loading: loading || locLoading, error: error ?? locError, permission, refresh };
 }
