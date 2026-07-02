@@ -37,24 +37,29 @@ export default function PlacesScreen() {
   const [places, setPlaces] = useState<PlaceInsight[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
-    if (!userProfile) {
-      setPlaces([]);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    try {
-      const [sessions, viewed, favoriteKey] = await Promise.all([
-        getAllSessions(),
-        getViewedPlaces(),
-        getFavoritePlaceKey(),
-      ]);
-      setPlaces(buildPlaceInsights(sessions, userProfile.uid, viewed, favoriteKey));
-    } finally {
-      setLoading(false);
-    }
-  }, [userProfile]);
+  const load = useCallback(
+    async (silent = false) => {
+      if (!userProfile) {
+        setPlaces([]);
+        setLoading(false);
+        return;
+      }
+      // A silent refresh (e.g. after pinning a favourite) updates the list in
+      // place without swapping it for a spinner or dropping scroll position.
+      if (!silent) setLoading(true);
+      try {
+        const [sessions, viewed, favoriteKey] = await Promise.all([
+          getAllSessions(),
+          getViewedPlaces(),
+          getFavoritePlaceKey(),
+        ]);
+        setPlaces(buildPlaceInsights(sessions, userProfile.uid, viewed, favoriteKey));
+      } finally {
+        if (!silent) setLoading(false);
+      }
+    },
+    [userProfile],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -65,7 +70,7 @@ export default function PlacesScreen() {
   const toggleFavorite = async (place: PlaceInsight) => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await setFavoritePlaceKey(place.isFavorite ? null : place.name);
-    await load();
+    await load(true);
   };
 
   const favorite = places.find((place) => place.isFavorite) ?? null;
