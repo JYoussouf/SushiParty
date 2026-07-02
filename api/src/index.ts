@@ -8,6 +8,7 @@ export interface Env {
   STRIPE_SECRET_KEY?: string;
   STRIPE_PRICE_ID?: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  FEATURED_SLOTS?: string;
 }
 
 type SessionMode = 'single' | 'individual' | 'group';
@@ -1091,7 +1092,34 @@ async function handlePartnerDeletePhoto(request: Request, env: Env, photoId: str
   return json(request, env, { ok: true });
 }
 
-/** Merge partner photos + featured flag into Google feed results by place id. */
+// Sponsored placement is finite inventory. How many top slots exist, and how
+// long each rotation lasts before a different set of sponsors is shown.
+const FEATURED_ROTATION_WINDOW_MS = 15 * 60 * 1000;
+
+function featuredSlots(env: Env): number {
+  const n = Number(env.FEATURED_SLOTS ?? '2');
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 2;
+}
+
+/**
+ * Choose which sponsors fill the (capped) featured slots. When more sponsors
+ * are active than there are slots, rotate the window over time so every payer
+ * gets a fair share of the top placement instead of all appearing at once.
+ * Pure + deterministic for a given (ids, slots, bucket).
+ */
+function selectRotatingFeatured(sortedIds: string[], slots: number, bucket: number): Set<string> {
+  if (slots <= 0 || sortedIds.length === 0) return new Set();
+  if (sortedIds.length <= slots) return new Set(sortedIds);
+  const chosen = new Set<string>();
+  const offset = ((bucket % sortedIds.length) + sortedIds.length) % sortedIds.length;
+  for (let i = 0; i < slots; i += 1) {
+    const id = sortedIds[(offset + i) % sortedIds.length];
+    if (id) chosen.add(id);
+  }
+  return chosen;
+}
+
+/** Merge partner photos (free) + capped/rotated featured flag into feed results by place id. */
 async function enrichWithPartners(
   env: Env,
   url: URL,
@@ -1108,11 +1136,11 @@ async function enrichWithPartners(
   const byPlace = new Map((profiles.results ?? []).map((p) => [p.place_id, p]));
   if (byPlace.size === 0) return;
 
+  // Free tier: every claimed profile shows its photos on its card.
   await Promise.all(
     restaurants.map(async (r) => {
       const profile = byPlace.get(r.id);
       if (!profile) return;
-      if (profile.featured === 1) r.featured = true;
       const photos = await env.DB.prepare(
         'SELECT id FROM partner_photos WHERE partner_id = ? ORDER BY sort_order, created_at',
       )
@@ -1122,6 +1150,19 @@ async function enrichWithPartners(
       if (urls.length > 0) r.photos = urls;
     }),
   );
+
+  // Paid tier: cap + rotate the sponsored slots among the active sponsors that
+  // matched this feed (photos already shown above regardless of placement).
+  const sponsorIds = restaurants
+    .filter((r) => byPlace.get(r.id)?.featured === 1)
+    .map((r) => r.id)
+    .sort((a, b) => a.localeCompare(b));
+  if (sponsorIds.length === 0) return;
+  const bucket = Math.floor(Date.now() / FEATURED_ROTATION_WINDOW_MS);
+  const featured = selectRotatingFeatured(sponsorIds, featuredSlots(env), bucket);
+  restaurants.forEach((r) => {
+    if (featured.has(r.id)) r.featured = true;
+  });
 }
 
 const PARTNER_PORTAL_HTML = `<!DOCTYPE html>

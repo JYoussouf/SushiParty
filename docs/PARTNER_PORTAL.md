@@ -71,6 +71,17 @@ Flow: partner taps **Get featured** in the portal → Stripe Checkout (subscript
 `customer.subscription.deleted/updated` flip it back to `0`. Partners manage or
 cancel through the **Manage subscription** button (Stripe Customer Portal).
 
+### Featured placement is capped + rotated
+
+`featured = 1` means "in the sponsored pool", **not** "always #1". Top placement
+is finite inventory, so `enrichWithPartners` features **at most `FEATURED_SLOTS`**
+sponsors per feed response (default **2**, set via the `FEATURED_SLOTS` var in
+`wrangler.jsonc`) and **rotates** which sponsors fill those slots on a 15-minute
+window. So a busy area with many payers doesn't put everyone on top at once —
+each sponsor gets a fair share of the top slots over time. Sponsorship is also
+naturally geo-scoped: a restaurant is only ever featured to users whose nearby
+results already include it. (Free-tier photos always show, regardless of slot.)
+
 ### Manual override
 
 You can still force `featured` without Stripe (e.g. a comp):
