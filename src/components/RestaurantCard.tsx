@@ -82,26 +82,30 @@ function PhotoCarousel({ photos, styles }: { photos: string[]; styles: ReturnTyp
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState(0);
 
+  // Render the images only once the width is known, so they never paint at
+  // width 0 and flash. The fixed-height wrapper reserves the space meanwhile.
   return (
     <View style={styles.photoWrap} onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onMomentumScrollEnd={(e) => {
-          if (width > 0) setActive(Math.round(e.nativeEvent.contentOffset.x / width));
-        }}
-      >
-        {photos.map((uri, i) => (
-          <Image key={`${uri}-${i}`} source={{ uri }} style={[styles.photo, { width }]} resizeMode="cover" />
-        ))}
-      </ScrollView>
-      {photos.length > 1 ? (
-        <View style={styles.dots}>
-          {photos.map((_, i) => (
-            <View key={i} style={[styles.dotPip, i === active && styles.dotPipActive]} />
-          ))}
-        </View>
+      {width > 0 ? (
+        <>
+          <ScrollView
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => setActive(Math.round(e.nativeEvent.contentOffset.x / width))}
+          >
+            {photos.map((uri, i) => (
+              <Image key={`${uri}-${i}`} source={{ uri }} style={[styles.photo, { width }]} resizeMode="cover" />
+            ))}
+          </ScrollView>
+          {photos.length > 1 ? (
+            <View style={styles.dots}>
+              {photos.map((_, i) => (
+                <View key={i} style={[styles.dotPip, i === active && styles.dotPipActive]} />
+              ))}
+            </View>
+          ) : null}
+        </>
       ) : null}
     </View>
   );
