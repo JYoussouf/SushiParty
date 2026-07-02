@@ -40,10 +40,40 @@ Worker at `/partners/photos/<id>`, so nothing in R2 is exposed directly.
   result by place id. The app's `RestaurantCard` then renders the DoorDash-style
   photo carousel; restaurants without a profile render without images.
 
-## Making a restaurant "featured"
+## Billing — featured placement subscription (Stripe)
 
-`featured` is not partner-editable (it's the paid placement). Set it manually once
-a partner pays:
+Featured placement is a paid subscription, sold on the **web portal** (not in the
+native app), so it's outside Apple's IAP rules. It uses Stripe Checkout +
+Customer Portal; `featured` is kept in sync by a Stripe webhook.
+
+Setup:
+
+```bash
+cd api
+
+# In the Stripe Dashboard: create a recurring Product/Price, then note the price id.
+npx wrangler secret put STRIPE_SECRET_KEY        # sk_live_... (or sk_test_...)
+npx wrangler secret put STRIPE_PRICE_ID          # price_...  (the recurring price)
+npx wrangler secret put STRIPE_WEBHOOK_SECRET     # whsec_...  (from the webhook, below)
+
+npx wrangler deploy
+```
+
+Then in the Stripe Dashboard add a webhook endpoint:
+
+- **URL:** `https://<your-worker-domain>/partners/billing/webhook`
+- **Events:** `checkout.session.completed`, `customer.subscription.updated`,
+  `customer.subscription.deleted`
+- Copy its signing secret into `STRIPE_WEBHOOK_SECRET` (above) and redeploy.
+
+Flow: partner taps **Get featured** in the portal → Stripe Checkout (subscription)
+→ webhook fires `checkout.session.completed` → `featured = 1`. Cancels/lapses via
+`customer.subscription.deleted/updated` flip it back to `0`. Partners manage or
+cancel through the **Manage subscription** button (Stripe Customer Portal).
+
+### Manual override
+
+You can still force `featured` without Stripe (e.g. a comp):
 
 ```bash
 npx wrangler d1 execute sushi-party --remote \
@@ -63,3 +93,6 @@ npx wrangler d1 execute sushi-party --remote \
 | POST | `/partners/photos` | partner | Upload one image (raw body) |
 | GET | `/partners/photos/:id` | – | Serve a photo |
 | DELETE | `/partners/photos/:id` | partner | Remove a photo |
+| POST | `/partners/billing/checkout` | partner | Start a featured subscription (Stripe Checkout) |
+| POST | `/partners/billing/portal` | partner | Manage/cancel subscription (Stripe Customer Portal) |
+| POST | `/partners/billing/webhook` | Stripe sig | Subscription lifecycle → sync `featured` |

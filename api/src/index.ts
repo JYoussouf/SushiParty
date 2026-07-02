@@ -5,6 +5,9 @@ export interface Env {
   JWT_SECRET?: string;
   ALLOWED_ORIGIN?: string;
   GOOGLE_PLACES_API_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_PRICE_ID?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
 }
 
 type SessionMode = 'single' | 'individual' | 'group';
@@ -732,7 +735,161 @@ async function handlePartners(request: Request, env: Env, parts: string[], url: 
   if (request.method === 'DELETE' && sub === 'photos' && parts[2]) {
     return handlePartnerDeletePhoto(request, env, parts[2]);
   }
+  if (sub === 'billing') {
+    return handlePartnerBilling(request, env, parts, url);
+  }
   throw new HttpError(404, 'Route not found.');
+}
+
+// ─── Stripe billing (featured-placement subscription) ───────────────────────
+
+async function stripeApi(
+  env: Env,
+  path: string,
+  params: Record<string, string>,
+): Promise<Record<string, unknown>> {
+  const resp = await fetch(`https://api.stripe.com/v1/${path}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${env.STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: new URLSearchParams(params).toString(),
+  });
+  const data = (await resp.json()) as Record<string, unknown>;
+  if (!resp.ok) {
+    const err = data.error as { message?: string } | undefined;
+    throw new HttpError(502, `Stripe error: ${err?.message ?? resp.status}`);
+  }
+  return data;
+}
+
+function toHex(buffer: ArrayBuffer): string {
+  return Array.from(new Uint8Array(buffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+// Verifies Stripe's `Stripe-Signature` header against the raw body (HMAC-SHA256).
+async function verifyStripeSignature(payload: string, header: string | null, secret: string): Promise<boolean> {
+  if (!header) return false;
+  const parts = Object.fromEntries(header.split(',').map((kv) => kv.split('=') as [string, string]));
+  const timestamp = parts.t;
+  const signature = parts.v1;
+  if (!timestamp || !signature) return false;
+  // Reject events older than 5 minutes to blunt replay attacks.
+  if (Math.abs(Math.floor(Date.now() / 1000) - Number(timestamp)) > 300) return false;
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  );
+  const expected = toHex(await crypto.subtle.sign('HMAC', key, encoder.encode(`${timestamp}.${payload}`)));
+  return timingSafeEqual(expected, signature);
+}
+
+async function handlePartnerBilling(request: Request, env: Env, parts: string[], url: URL): Promise<Response> {
+  const action = parts[2];
+
+  if (request.method === 'POST' && action === 'webhook') {
+    return handleStripeWebhook(request, env);
+  }
+  if (!env.STRIPE_SECRET_KEY || !env.STRIPE_PRICE_ID) {
+    throw new HttpError(503, 'Billing is not configured.');
+  }
+  const portalUrl = `${url.origin}/partners`;
+
+  if (request.method === 'POST' && action === 'checkout') {
+    const partnerId = await requirePartner(request, env);
+    const account = await env.DB.prepare('SELECT email FROM partner_accounts WHERE id = ?')
+      .bind(partnerId)
+      .first<{ email: string }>();
+    const profile = await env.DB.prepare('SELECT stripe_customer_id FROM partner_profiles WHERE partner_id = ?')
+      .bind(partnerId)
+      .first<{ stripe_customer_id: string | null }>();
+
+    const params: Record<string, string> = {
+      mode: 'subscription',
+      'line_items[0][price]': env.STRIPE_PRICE_ID,
+      'line_items[0][quantity]': '1',
+      success_url: `${portalUrl}?billing=success`,
+      cancel_url: `${portalUrl}?billing=cancel`,
+      client_reference_id: partnerId,
+      allow_promotion_codes: 'true',
+    };
+    if (profile?.stripe_customer_id) params.customer = profile.stripe_customer_id;
+    else if (account?.email) params.customer_email = account.email;
+
+    const session = await stripeApi(env, 'checkout/sessions', params);
+    return json(request, env, { url: session.url });
+  }
+
+  if ((request.method === 'POST' || request.method === 'GET') && action === 'portal') {
+    const partnerId = await requirePartner(request, env);
+    const profile = await env.DB.prepare('SELECT stripe_customer_id FROM partner_profiles WHERE partner_id = ?')
+      .bind(partnerId)
+      .first<{ stripe_customer_id: string | null }>();
+    if (!profile?.stripe_customer_id) throw new HttpError(400, 'No active subscription to manage.');
+    const session = await stripeApi(env, 'billing_portal/sessions', {
+      customer: profile.stripe_customer_id,
+      return_url: portalUrl,
+    });
+    return json(request, env, { url: session.url });
+  }
+
+  throw new HttpError(404, 'Route not found.');
+}
+
+const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing']);
+
+async function handleStripeWebhook(request: Request, env: Env): Promise<Response> {
+  const secret = env.STRIPE_WEBHOOK_SECRET;
+  if (!secret) throw new HttpError(503, 'Billing webhook is not configured.');
+  const payload = await request.text();
+  const valid = await verifyStripeSignature(payload, request.headers.get('Stripe-Signature'), secret);
+  if (!valid) throw new HttpError(400, 'Invalid signature.');
+
+  const event = safeJson<{ type?: string; data?: { object?: Record<string, unknown> } }>(payload, {});
+  const obj = event.data?.object ?? {};
+  const now = new Date().toISOString();
+
+  if (event.type === 'checkout.session.completed') {
+    const partnerId = typeof obj.client_reference_id === 'string' ? obj.client_reference_id : '';
+    const customer = typeof obj.customer === 'string' ? obj.customer : null;
+    const subscription = typeof obj.subscription === 'string' ? obj.subscription : null;
+    if (partnerId) {
+      await env.DB.prepare(
+        `INSERT INTO partner_profiles (partner_id, featured, stripe_customer_id, stripe_subscription_id, subscription_status, updated_at)
+         VALUES (?, 1, ?, ?, 'active', ?)
+         ON CONFLICT(partner_id) DO UPDATE SET
+           featured = 1,
+           stripe_customer_id = excluded.stripe_customer_id,
+           stripe_subscription_id = excluded.stripe_subscription_id,
+           subscription_status = 'active',
+           updated_at = excluded.updated_at`,
+      )
+        .bind(partnerId, customer, subscription, now)
+        .run();
+    }
+  } else if (
+    event.type === 'customer.subscription.updated' ||
+    event.type === 'customer.subscription.deleted'
+  ) {
+    const customer = typeof obj.customer === 'string' ? obj.customer : '';
+    const status = typeof obj.status === 'string' ? obj.status : 'canceled';
+    const featured = ACTIVE_SUB_STATUSES.has(status) ? 1 : 0;
+    if (customer) {
+      await env.DB.prepare(
+        'UPDATE partner_profiles SET subscription_status = ?, featured = ?, updated_at = ? WHERE stripe_customer_id = ?',
+      )
+        .bind(status, featured, now, customer)
+        .run();
+    }
+  }
+
+  return json(request, env, { received: true });
 }
 
 // Restaurant "feature your restaurant" application — a B2B lead, not a purchase.
@@ -1058,6 +1215,13 @@ const PARTNER_PORTAL_HTML = `<!DOCTYPE html>
       <button id="addPhotoBtn" class="btn secondary">Add photos</button>
     </div>
 
+    <div class="card">
+      <h2>Featured placement</h2>
+      <p class="muted" id="billingStatus">Loading…</p>
+      <div id="billingErr" class="err"></div>
+      <button id="billingBtn" class="btn hidden">Get featured</button>
+    </div>
+
     <div class="rowbtns">
       <button id="logoutBtn" class="link">Log out</button>
       <span id="whoami" class="muted"></span>
@@ -1200,6 +1364,25 @@ const PARTNER_PORTAL_HTML = `<!DOCTYPE html>
     chain.then(function(){ el('fileInput').value=''; });
   };
 
+  // ---- Billing ----
+  var isFeatured=false;
+  function renderBilling(featured){
+    isFeatured = featured;
+    el('billingStatus').textContent = featured
+      ? 'Your restaurant is featured — you appear at the top of the nearby feed with a Featured badge.'
+      : 'Get featured to appear at the top of the nearby feed with a Featured badge.';
+    el('billingBtn').textContent = featured ? 'Manage subscription' : 'Get featured';
+    show('billingBtn', true);
+  }
+  el('billingBtn').onclick = function(){
+    el('billingErr').textContent = '';
+    el('billingBtn').disabled = true;
+    var path = isFeatured ? '/partners/billing/portal' : '/partners/billing/checkout';
+    api(path, { method:'POST' }).then(function(res){
+      if (res.url) { window.location.href = res.url; } else { el('billingBtn').disabled = false; }
+    }).catch(function(e){ el('billingErr').textContent = e.message; el('billingBtn').disabled = false; });
+  };
+
   // ---- Boot ----
   function enterApp(){
     show('authView',false); show('appView',true);
@@ -1213,9 +1396,13 @@ const PARTNER_PORTAL_HTML = `<!DOCTYPE html>
           el('selected').textContent = 'Claimed: ' + (me.profile.restaurantName||''); show('selected',true); }
       }
       renderPhotos(me.photos || []);
+      renderBilling(!!(me.profile && me.profile.featured));
     }).catch(function(){ logout(); });
   }
 
+  if (location.search.indexOf('billing=success') >= 0 && window.history.replaceState) {
+    window.history.replaceState(null, '', '/partners');
+  }
   renderAuthMode();
   if (tok()) { enterApp(); } else { show('authView',true); }
 })();
