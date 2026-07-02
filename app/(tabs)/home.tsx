@@ -7,6 +7,9 @@ import {
   SafeAreaView,
   ScrollView,
   ActivityIndicator,
+  Alert,
+  Linking,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, Easing } from 'react-native-reanimated';
@@ -396,7 +399,16 @@ export default function HomeScreen() {
           <View style={styles.feedState}>
             <ActivityIndicator color={t.color.accent} />
           </View>
-        ) : feed.permission === 'denied' || feed.permission === 'denied-permanent' ? (
+        ) : feed.permission === 'denied-permanent' ? (
+          <View style={styles.feedStateCard}>
+            <Text style={styles.feedStateText}>
+              Location is turned off. Enable it in Settings to see sushi spots near you.
+            </Text>
+            <TouchableOpacity onPress={() => void Linking.openSettings()}>
+              <Text style={styles.feedStateLink}>Open Settings</Text>
+            </TouchableOpacity>
+          </View>
+        ) : feed.permission === 'denied' ? (
           <View style={styles.feedStateCard}>
             <Text style={styles.feedStateText}>Enable location to see sushi spots near you.</Text>
             <TouchableOpacity onPress={() => void feed.refresh()}>
