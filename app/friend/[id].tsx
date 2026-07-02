@@ -180,6 +180,14 @@ export default function FriendProfileScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Parties</Text>
+          {sessions.length === 0 && (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyCardText}>
+                No shared parties with {friend.displayName.split(' ')[0]} yet - parties you both log
+                will show up here.
+              </Text>
+            </View>
+          )}
           {sessions.map((session) => (
             <View key={session.id} style={styles.sessionCard}>
               <View style={styles.sessionHeader}>
@@ -366,5 +374,18 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 15,
     fontFamily: t.font.bodyBold,
     color: t.color.onAccent,
+  },
+  emptyCard: {
+    borderRadius: t.radius.md,
+    padding: 16,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+  },
+  emptyCardText: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontFamily: t.font.body,
+    color: t.color.textSecondary,
   },
 });
