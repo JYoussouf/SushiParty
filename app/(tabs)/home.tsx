@@ -297,6 +297,13 @@ export default function HomeScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={feed.loading}
+            onRefresh={() => void feed.refresh()}
+            tintColor={t.color.accent}
+          />
+        }
       >
       {/* Hero */}
       <View style={styles.hero}>
