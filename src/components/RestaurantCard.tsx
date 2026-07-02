@@ -23,6 +23,41 @@ export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: Res
   const price = priceLevelLabel(restaurant.priceLevel);
   const photos = restaurant.photos ?? [];
 
+  // Only the segments that actually have a value, so separators land between
+  // real values (no stray leading "·") and the row is omitted when empty.
+  const metaSegments: React.ReactNode[] = [];
+  if (rating) {
+    metaSegments.push(
+      <Text key="rating" style={styles.metaStrong}>
+        {rating} ★
+        {restaurant.userRatingCount ? (
+          <Text style={styles.metaSoft}> ({restaurant.userRatingCount.toLocaleString()})</Text>
+        ) : null}
+      </Text>,
+    );
+  }
+  if (restaurant.distanceKm !== undefined) {
+    metaSegments.push(
+      <Text key="dist" style={styles.metaSoft}>
+        {formatDistance(restaurant.distanceKm)}
+      </Text>,
+    );
+  }
+  if (price) {
+    metaSegments.push(
+      <Text key="price" style={styles.metaSoft}>
+        {price}
+      </Text>,
+    );
+  }
+  if (restaurant.openNow !== undefined) {
+    metaSegments.push(
+      <Text key="open" style={restaurant.openNow ? styles.open : styles.closed}>
+        {restaurant.openNow ? 'Open' : 'Closed'}
+      </Text>,
+    );
+  }
+
   return (
     <View style={styles.card}>
       {photos.length > 0 ? <PhotoCarousel photos={photos} styles={styles} /> : null}
@@ -32,36 +67,16 @@ export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: Res
           <Text style={styles.name} numberOfLines={1}>
             {restaurant.name}
           </Text>
-          <View style={styles.metaRow}>
-            {rating ? (
-              <Text style={styles.metaStrong}>
-                {rating} ★
-                {restaurant.userRatingCount ? (
-                  <Text style={styles.metaSoft}> ({restaurant.userRatingCount.toLocaleString()})</Text>
-                ) : null}
-              </Text>
-            ) : null}
-            {restaurant.distanceKm !== undefined ? (
-              <>
-                {rating ? <Text style={styles.dot}>·</Text> : null}
-                <Text style={styles.metaSoft}>{formatDistance(restaurant.distanceKm)}</Text>
-              </>
-            ) : null}
-            {price ? (
-              <>
-                <Text style={styles.dot}>·</Text>
-                <Text style={styles.metaSoft}>{price}</Text>
-              </>
-            ) : null}
-            {restaurant.openNow !== undefined ? (
-              <>
-                <Text style={styles.dot}>·</Text>
-                <Text style={restaurant.openNow ? styles.open : styles.closed}>
-                  {restaurant.openNow ? 'Open' : 'Closed'}
-                </Text>
-              </>
-            ) : null}
-          </View>
+          {metaSegments.length > 0 ? (
+            <View style={styles.metaRow}>
+              {metaSegments.map((seg, i) => (
+                <React.Fragment key={i}>
+                  {i > 0 ? <Text style={styles.dot}>·</Text> : null}
+                  {seg}
+                </React.Fragment>
+              ))}
+            </View>
+          ) : null}
           {restaurant.featured ? <Text style={styles.sponsored}>Sponsored</Text> : null}
         </View>
 
