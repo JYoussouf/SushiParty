@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -48,6 +49,24 @@ export default function PartnerScreen() {
   const [submitted, setSubmitted] = useState(false);
 
   const canSubmit = restaurantName.trim() && address.trim() && isEmail(email.trim());
+
+  // Only open the portal when we have a real absolute URL; otherwise (missing
+  // EXPO_PUBLIC_API_BASE_URL, or the browser can't open it) reassure by email
+  // rather than letting the primary CTA no-op.
+  const openPortal = async () => {
+    if (/^https?:\/\//i.test(PORTAL_URL)) {
+      try {
+        await Linking.openURL(PORTAL_URL);
+        return;
+      } catch {
+        /* fall through to the email message */
+      }
+    }
+    Alert.alert(
+      "We'll be in touch",
+      `We'll email ${email.trim() || 'you'} a link to set up your restaurant profile.`,
+    );
+  };
 
   // Best-effort email fallback so a lead is never lost if the partner API isn't
   // reachable (e.g. before the Worker route is deployed).
@@ -111,7 +130,7 @@ export default function PartnerScreen() {
             <TouchableOpacity
               style={styles.successBtnShadow}
               activeOpacity={0.9}
-              onPress={() => void Linking.openURL(PORTAL_URL)}
+              onPress={() => void openPortal()}
             >
               <LinearGradient
                 colors={t.color.accentGradient}
