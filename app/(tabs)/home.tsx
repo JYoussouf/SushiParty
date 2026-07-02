@@ -274,6 +274,13 @@ export default function HomeScreen() {
       <SafeAreaView style={styles.safe}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
+      {/* Scrim so scrolling feed content fades out behind the floating top bar */}
+      <LinearGradient
+        colors={[t.color.bg, t.color.bg, 'transparent']}
+        style={[styles.topScrim, { height: insets.top + 66 }]}
+        pointerEvents="none"
+      />
+
       {/* Top bar */}
       <View style={[styles.topBar, { top: insets.top + 8 }]}>
         <TouchableOpacity style={styles.profileButton} onPress={() => router.push('/(tabs)/profile')}>
@@ -470,6 +477,13 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
 
   // ── Top bar ─────────────────────────────────────────────
+  topScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1,
+  },
   topBar: {
     position: 'absolute',
     left: 20,
