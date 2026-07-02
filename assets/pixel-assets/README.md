@@ -5,7 +5,7 @@ Auto-generated from the kawaii pixel engine. Every sprite is 24×24 pixel art ex
 ## Folders
 - **`sprites/<imageKey>.png`** — static thumbnail, **96×96** (4× the 24px source, nearest-neighbour crisp).
 - **`idle/<imageKey>.png`** — 2-frame idle "hover" **sprite sheet**, **192×96** (two 96×96 frames side by side). Frame 0 = rest (identical to `sprites/`), frame 1 = raised 1px.
-- **`engine/`** — the generator (`px-core/forms/forms2/menu.js`). Re-render at any size/format from here.
+- **`engine/`** — the generator (`px-menu.js`, backed by `px-core.js` + `px-forms.js`/`px-forms2.js`). Re-render at any size/format from here.
 - **`manifest.json`** — every menu `imageKey` → its file, display name, category, and whether it shares art with a hero design.
 
 ## Using the static sprite (recommended)
