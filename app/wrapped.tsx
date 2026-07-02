@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -34,6 +34,7 @@ export default function WrappedScreen() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<null | 'share' | 'copy'>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
     if (!userProfile) {
@@ -57,9 +58,16 @@ export default function WrappedScreen() {
   );
 
   const flash = (message: string) => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast(message);
-    setTimeout(() => setToast(null), 2200);
+    toastTimer.current = setTimeout(() => setToast(null), 2200);
   };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
 
   const handleShare = async () => {
     setBusy('share');
@@ -146,7 +154,9 @@ export default function WrappedScreen() {
                   {busy === 'share' ? (
                     <ActivityIndicator color={t.color.onAccent} />
                   ) : (
-                    <Text style={styles.shareBtnText}>Share to Instagram, Snapchat & more</Text>
+                    <Text style={styles.shareBtnText} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
+                      Share to Instagram, Snapchat &amp; more
+                    </Text>
                   )}
                 </LinearGradient>
               </TouchableOpacity>
