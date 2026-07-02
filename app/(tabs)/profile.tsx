@@ -277,12 +277,14 @@ export default function ProfileScreen() {
                 <Text style={styles.listRowText}>Restaurant insights</Text>
                 <Text style={styles.listRowChevron}>Open</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/places')}>
-                <Text style={styles.listRowText}>Your places &amp; favourite spot</Text>
-                <Text style={styles.listRowChevron}>Open</Text>
-              </TouchableOpacity>
             </>
           )}
+          {/* Always available — Places is meaningful with browse-only data too, so
+              it must not be gated behind having logged a party. */}
+          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/places')}>
+            <Text style={styles.listRowText}>Your places &amp; favourite spot</Text>
+            <Text style={styles.listRowChevron}>Open</Text>
+          </TouchableOpacity>
         </View>
 
 
