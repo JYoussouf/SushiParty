@@ -278,64 +278,62 @@ export default function SettingsScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Places</Text>
-          <TouchableOpacity style={styles.navRow} activeOpacity={0.8} onPress={() => router.push('/profile/places')}>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Favourite sushi spot</Text>
-              <Text style={styles.rowNote}>See the places you&apos;ve partied at and browsed, and pin your favourite.</Text>
-            </View>
-            <Text style={styles.navChevron}>›</Text>
-          </TouchableOpacity>
+          <View style={styles.listGroup}>
+            <TouchableOpacity style={styles.listRow} activeOpacity={0.7} onPress={() => router.push('/profile/places')}>
+              <View style={styles.listRowBody}>
+                <Text style={styles.listRowTitle}>Favourite sushi spot</Text>
+                <Text style={styles.listRowSub}>See where you&apos;ve partied and browsed, and pin your favourite.</Text>
+              </View>
+              <Text style={styles.listChevron}>›</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>More</Text>
-          <TouchableOpacity style={styles.navRow} activeOpacity={0.8} onPress={() => router.push('/partner')}>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Become a Partner Restaurant</Text>
-              <Text style={styles.rowNote}>List your restaurant and reach nearby diners in the Explore feed.</Text>
-            </View>
-            <Text style={styles.navChevron}>›</Text>
-          </TouchableOpacity>
+          <View style={styles.listGroup}>
+            <TouchableOpacity style={styles.listRow} activeOpacity={0.7} onPress={() => router.push('/partner')}>
+              <View style={styles.listRowBody}>
+                <Text style={styles.listRowTitle}>Become a Partner Restaurant</Text>
+                <Text style={styles.listRowSub}>List your restaurant and reach nearby diners in the Explore feed.</Text>
+              </View>
+              <Text style={styles.listChevron}>›</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>My Account</Text>
-
-          <View style={styles.row}>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>Export my Party Data</Text>
-              <Text style={styles.rowNote}>Download a readable CSV summary of saved parties.</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.rowActionBtn}
-              activeOpacity={0.85}
-              onPress={() => void handleExportHistory()}
-            >
-              <Text style={styles.rowActionBtnText}>Export</Text>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <View style={styles.listGroup}>
+            <TouchableOpacity style={styles.listRow} activeOpacity={0.7} onPress={() => void handleExportHistory()}>
+              <View style={styles.listRowBody}>
+                <Text style={styles.listRowTitle}>Export my party data</Text>
+                <Text style={styles.listRowSub}>Download a CSV summary of saved parties.</Text>
+              </View>
+              <Text style={styles.listChevron}>›</Text>
             </TouchableOpacity>
-          </View>
 
-          <View style={styles.dangerZone}>
             {accountBacked && (
-              <TouchableOpacity
-                style={styles.actionBtn}
-                activeOpacity={0.85}
-                onPress={() =>
-                  Alert.alert('Sign out', 'You will be signed out of your account.', [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-                  ])
-                }
-              >
-                <Text style={styles.actionBtnText}>Sign out</Text>
-              </TouchableOpacity>
+              <>
+                <View style={styles.listDivider} />
+                <TouchableOpacity
+                  style={styles.listRow}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    Alert.alert('Sign out', 'You will be signed out of your account.', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+                    ])
+                  }
+                >
+                  <Text style={styles.listRowTitle}>Sign out</Text>
+                </TouchableOpacity>
+              </>
             )}
-            <TouchableOpacity
-              style={[styles.actionBtn, styles.dangerBtn]}
-              activeOpacity={0.85}
-              onPress={handleReset}
-            >
-              <Text style={[styles.actionBtnText, styles.dangerBtnText]}>Delete my account</Text>
+
+            <View style={styles.listDivider} />
+            <TouchableOpacity style={styles.listRow} activeOpacity={0.7} onPress={handleReset}>
+              <Text style={[styles.listRowTitle, styles.listRowDanger]}>Delete my account</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -352,6 +350,28 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   title: { fontSize: 30, fontFamily: t.font.display, color: t.color.textPrimary },
   section: { gap: 10 },
   sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
+
+  // Grouped list: rows share one surface, separated by hairline lines (no pills).
+  listGroup: {
+    borderRadius: t.radius.lg,
+    backgroundColor: t.color.surface,
+    borderWidth: 1,
+    borderColor: t.color.border,
+    overflow: 'hidden',
+  },
+  listRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+  },
+  listRowBody: { flex: 1, gap: 2 },
+  listRowTitle: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
+  listRowSub: { fontSize: 13, lineHeight: 18, fontFamily: t.font.body, color: t.color.textSecondary },
+  listRowDanger: { color: t.color.danger, fontFamily: t.font.bodyBold },
+  listChevron: { fontSize: 24, color: t.color.textTertiary },
+  listDivider: { height: StyleSheet.hairlineWidth, backgroundColor: t.color.border, marginLeft: 16 },
 
   soundCard: {
     borderRadius: t.radius.lg,
@@ -408,31 +428,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   },
   sliderLabelText: { fontSize: 10, color: t.color.textTertiary, fontFamily: t.font.bodySemibold, letterSpacing: 0.3 },
 
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    borderRadius: t.radius.lg,
-    padding: 16,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  navRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 16,
-    borderRadius: t.radius.lg,
-    padding: 16,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  navChevron: { fontSize: 26, color: t.color.textTertiary, marginTop: -2 },
-  rowText: { flex: 1 },
-  rowTitle: { fontSize: 16, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
   rowNote: { marginTop: 4, fontSize: 13, lineHeight: 19, fontFamily: t.font.body, color: t.color.textSecondary },
 
   usernameCard: {
@@ -498,42 +493,5 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     color: t.color.onAccent,
     includeFontPadding: false,
     textAlignVertical: 'center',
-  },
-  dangerZone: {
-    marginTop: 8,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-    borderRadius: t.radius.button,
-    backgroundColor: t.color.surface,
-    borderWidth: 1.5,
-    borderColor: t.color.border,
-    shadowColor: '#000000',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 4,
-  },
-  actionBtnText: {
-    fontSize: 14,
-    fontFamily: t.font.bodySemibold,
-    color: t.color.textSecondary,
-    includeFontPadding: false,
-    textAlignVertical: 'center',
-  },
-  dangerBtn: {
-    borderColor: t.color.danger,
-  },
-  dangerBtnText: {
-    color: t.color.danger,
-    fontFamily: t.font.bodyBold,
   },
 });
