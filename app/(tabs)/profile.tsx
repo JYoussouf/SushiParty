@@ -253,11 +253,6 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
               ) : null}
 
-              <View style={styles.statsGrid}>
-                <StatCard label="Parties" value={String(stats.totalSessions)} />
-                <StatCard label="Pieces" value={String(stats.totalPieces)} />
-                <StatCard label="Avg / Party" value={String(stats.averagePiecesPerSession)} />
-              </View>
               {stats.favoriteRestaurant && (
                 <InsightCard
                   title="Favourite Restaurant"
@@ -278,24 +273,20 @@ export default function ProfileScreen() {
                 <Text style={styles.listRowText}>Top dishes</Text>
                 <Text style={styles.listRowChevron}>Open</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/restaurants')}>
-                <Text style={styles.listRowText}>Restaurant insights</Text>
-                <Text style={styles.listRowChevron}>Open</Text>
-              </TouchableOpacity>
             </>
           )}
           {/* Always available — Places is meaningful with browse-only data too, so
               it must not be gated behind having logged a party. */}
           <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/places')}>
-            <Text style={styles.listRowText}>Your places &amp; favourite spot</Text>
+            <Text style={styles.listRowText}>Favourite party spots</Text>
             <Text style={styles.listRowChevron}>Open</Text>
           </TouchableOpacity>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>More</Text>
-          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/(tabs)/friends')}>
-            <Text style={styles.listRowText}>Friends</Text>
+          <Text style={styles.sectionTitle}>Sushi Stats</Text>
+          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/profile/stats')}>
+            <Text style={styles.listRowText}>Lifetime stats</Text>
             <Text style={styles.listRowChevron}>Open</Text>
           </TouchableOpacity>
         </View>
@@ -557,17 +548,6 @@ function AchievementsSection({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  const t = useTheme();
-  const statStyles = useMemo(() => makeStatStyles(t), [t]);
-  return (
-    <View style={statStyles.card}>
-      <Text style={statStyles.value}>{value}</Text>
-      <Text style={statStyles.label}>{label}</Text>
-    </View>
-  );
-}
-
 function InsightCard({ title, value, note }: { title: string; value: string; note: string }) {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
@@ -589,22 +569,6 @@ function EmptyCard({ text }: { text: string }) {
     </View>
   );
 }
-
-const makeStatStyles = (t: Theme) => StyleSheet.create({
-  card: {
-    flexBasis: '48%',
-    backgroundColor: t.color.surface,
-    borderRadius: t.radius.md,
-    padding: 16,
-    alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    ...t.shadow.card,
-  },
-  value: { fontSize: 28, fontFamily: t.font.display, color: t.color.accent },
-  label: { fontSize: 13, color: t.color.textSecondary, fontFamily: t.font.bodySemibold },
-});
 
 const makeStyles = (t: Theme) => StyleSheet.create({
   container: { flex: 1, backgroundColor: t.color.bg },
@@ -663,7 +627,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   sectionTitle: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase' },
   viewAllBtn: { alignItems: 'center', paddingVertical: 12, borderRadius: t.radius.md, backgroundColor: t.color.surfaceAlt },
   viewAllBtnText: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.accent },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   loadingCard: { paddingVertical: 28, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
   emptyCard: { borderRadius: t.radius.md, padding: 18, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
   emptyText: { fontSize: 14, lineHeight: 21, fontFamily: t.font.body, color: t.color.textSecondary },
