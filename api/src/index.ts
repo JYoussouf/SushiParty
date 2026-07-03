@@ -2524,6 +2524,12 @@ async function route(request: Request, env: Env): Promise<Response> {
     });
   }
 
+  if (request.method === 'GET' && url.pathname === '/terms') {
+    return new Response(TERMS_HTML, {
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+    });
+  }
+
   if (request.method === 'POST' && url.pathname === '/auth/device') {
     return handleAuthDevice(request, env);
   }
@@ -2744,6 +2750,53 @@ const SUPPORT_HTML = `<!DOCTYPE html>
 <p>Read our <a href="/privacy">Privacy Policy</a>.</p>
 
 <p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a></p>
+</body>
+</html>`;
+
+const TERMS_HTML = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sushi Party — Terms of Service</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; line-height: 1.6; color: #1a1a1a; }
+  h1 { font-size: 1.8rem; }
+  h2 { font-size: 1.2rem; margin-top: 2rem; }
+  a { color: #e53935; }
+  .muted { color: #666; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<h1>Sushi Party — Terms of Service</h1>
+<p class="muted">Last updated: 2026</p>
+<p>By using Sushi Party ("the app"), you agree to these terms. If you don't agree, please don't use the app.</p>
+
+<h2>Using the app</h2>
+<p>Sushi Party is a scoreboard for tracking sushi you eat at parties. You may use it for your own personal, non-commercial use. Don't misuse the service, attempt to disrupt it, or use it to break the law.</p>
+
+<h2>Your account</h2>
+<p>You're responsible for activity under your account and for keeping your login secure. You can play as a guest or create an account; you can delete your account at any time from the app.</p>
+
+<h2>Your content</h2>
+<p>Party history and any details you enter belong to you. You grant us permission to store and process that data to provide the app, as described in our <a href="/privacy">Privacy Policy</a>.</p>
+
+<h2>Restaurants &amp; listings</h2>
+<p>Nearby restaurant information is provided by third parties (e.g. Google) and may be inaccurate or out of date. Restaurant "featured" placement is a paid advertising service and does not imply an endorsement.</p>
+
+<h2>No warranty</h2>
+<p>The app is provided "as is," without warranties of any kind. We don't guarantee it will be uninterrupted, error-free, or that any information shown is accurate.</p>
+
+<h2>Limitation of liability</h2>
+<p>To the extent permitted by law, JoseppyCo is not liable for any indirect or consequential damages arising from your use of the app.</p>
+
+<h2>Changes</h2>
+<p>We may update these terms from time to time. Continued use of the app after changes means you accept the updated terms.</p>
+
+<h2>Contact</h2>
+<p>Questions about these terms? Email <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>.</p>
+
+<p>JoseppyCo — <a href="mailto:contact@joseppy.ca">contact@joseppy.ca</a>. See also our <a href="/privacy">Privacy Policy</a>.</p>
 </body>
 </html>`;
 

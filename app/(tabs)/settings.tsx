@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import {
-  Alert,
   SafeAreaView,
   ScrollView,
   Share,
@@ -47,7 +46,7 @@ export default function SettingsScreen() {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const insets = useSafeAreaInsets();
-  const { userProfile, accountBacked, signOut } = useAuth();
+  const { userProfile } = useAuth();
 
   const handleExportHistory = async () => {
     if (!userProfile) return;
@@ -56,20 +55,6 @@ export default function SettingsScreen() {
       title: 'Sushi Party History Export',
       message: buildSessionExportCsv(sessions, userProfile.uid),
     });
-  };
-
-  const handleReset = () => {
-    Alert.alert('Delete my account', 'Clear this device profile and all local party history?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: signOut },
-    ]);
-  };
-
-  const handleSignOut = () => {
-    Alert.alert('Sign out', 'You will be signed out of your account.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
-    ]);
   };
 
   return (
@@ -92,17 +77,15 @@ export default function SettingsScreen() {
             onPress={() => router.push('/partner')}
             styles={styles}
           />
+          <ListRow title="Legal" onPress={() => router.push('/settings/legal')} styles={styles} />
 
           <Text style={styles.sectionTitle}>Account</Text>
+          <ListRow title="Manage my account" onPress={() => router.push('/settings/account')} styles={styles} />
           <ListRow
             title="Export my party data"
             onPress={() => void handleExportHistory()}
             styles={styles}
           />
-          {accountBacked ? (
-            <ListRow title="Sign out" danger onPress={handleSignOut} styles={styles} />
-          ) : null}
-          <ListRow title="Delete my account" danger onPress={handleReset} styles={styles} />
         </ScrollView>
       </SafeAreaView>
     </View>
