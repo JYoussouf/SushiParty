@@ -36,13 +36,7 @@ export default function SessionModeScreen() {
         <BackButton onPress={() => router.back()} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Start a Sushi Party</Text>
-          <Text style={styles.title}>Pick the vibe</Text>
-          <Text style={styles.subtitle}>
-            Go solo if it's just you, or open a lobby so friends can pile in with a code.
-          </Text>
-        </View>
+        <Text style={styles.title}>Start a Sushi Party</Text>
 
         <TouchableOpacity
           style={[styles.choiceCard, creatingGroup && { opacity: 0.6 }]}
@@ -76,7 +70,7 @@ export default function SessionModeScreen() {
         ) : null}
 
         <TouchableOpacity
-          style={[styles.choiceCard, styles.choiceCardSolo]}
+          style={styles.choiceCard}
           onPress={() => {
             logPartyFlow('solo start pressed');
             void setMode('single').then(() => {
@@ -104,35 +98,16 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   safe: { flex: 1 },
   navBar: { paddingHorizontal: 16, paddingVertical: 8 },
   scroll: { padding: 20, gap: 18, paddingBottom: 30 },
-  hero: {
-    borderRadius: t.radius.lg,
-    padding: 22,
-    gap: 8,
-    backgroundColor: t.color.surfaceAlt,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontFamily: t.font.bodyBold,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: t.color.accent,
-  },
   title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
-  subtitle: { fontSize: 15, lineHeight: 22, fontFamily: t.font.body, color: t.color.textSecondary },
   choiceCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 14,
     borderRadius: t.radius.lg,
     padding: 18,
-    backgroundColor: t.color.surface,
+    backgroundColor: t.color.surfaceAlt,
     borderWidth: 1,
     borderColor: t.color.border,
-  },
-  choiceCardSolo: {
-    backgroundColor: t.color.surfaceAlt,
   },
   choiceEmoji: { fontSize: 34 },
   choiceBody: { flex: 1, gap: 4 },
