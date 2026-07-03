@@ -437,6 +437,7 @@ function AchievementBadge({ achievement: a, locked }: { achievement: Achievement
 }
 
 const PREVIEW_COUNT = 8; // 2 rows × 4 cols
+const PREVIEW_EARNED = 4; // of the preview, up to this many are random earned ones
 
 function achCategory(id: string): string {
   if (id.startsWith('first-') || id === 'world-tour') return 'debut';
@@ -486,7 +487,21 @@ function AchievementsSection({
   const lockedHidden = achievements.filter((a) => !a.earned && a.hidden);
   const sorted = [...earned, ...lockedVisible, ...lockedHidden];
   const earnedCount = achievements.filter((a) => a.earned).length;
-  const preview = sorted.slice(0, PREVIEW_COUNT);
+
+  // Preview: up to 4 random earned achievements, then fill the rest with ones
+  // you haven't completed yet — a taste of progress plus goals to chase.
+  // Re-rolled whenever the achievements load (e.g. each time you open Profile).
+  const preview = useMemo(() => {
+    const pickedEarned = [...achievements.filter((a) => a.earned)]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, PREVIEW_EARNED);
+    const lockedPool = [
+      ...interleaveByCategory(achievements.filter((a) => !a.earned && !a.hidden)),
+      ...achievements.filter((a) => !a.earned && a.hidden),
+    ];
+    const pickedLocked = lockedPool.slice(0, PREVIEW_COUNT - pickedEarned.length);
+    return [...pickedEarned, ...pickedLocked];
+  }, [achievements]);
 
   React.useEffect(() => {
     if (autoOpen && achievements.length > 0) {
