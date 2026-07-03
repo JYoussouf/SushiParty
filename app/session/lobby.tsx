@@ -26,7 +26,6 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { AVATAR_CHARACTERS } from '../../src/lib/avatars';
 import { Avatar } from '../../src/components';
 import { useSession } from '../../src/hooks/useSession';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -175,7 +174,6 @@ export default function LobbyScreen() {
     groupOwnerUid,
     groupPhase,
     currentUserParticipantIndex,
-    setParticipantAvatar,
     setMode,
     startParty,
   } = useSession();
@@ -199,7 +197,6 @@ export default function LobbyScreen() {
     Array<{ id: string; emoji: string; originX: number; originY: number; drift: number }>
   >([]);
 
-  const myAvatar = participants[currentUserParticipantIndex]?.avatar;
   const reactionTravel = Math.max(320, height * 0.72);
 
   useEffect(() => {
@@ -278,7 +275,6 @@ export default function LobbyScreen() {
             {joinLink ? <QRCode value={joinLink} size={126} /> : null}
           </View>
         </View>
-        <Text style={styles.qrHint}>Scan with your phone camera to open this party directly.</Text>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Party</Text>
@@ -301,21 +297,6 @@ export default function LobbyScreen() {
                     </View>
                   </View>
                 </View>
-              );
-            })}
-          </View>
-
-          <View style={styles.avatarRow}>
-            {AVATAR_CHARACTERS.map((character) => {
-              const selected = character.id === myAvatar;
-              return (
-                <TouchableOpacity
-                  key={character.id}
-                  style={[styles.avatarButton, selected && styles.avatarButtonSelected]}
-                  onPress={() => void setParticipantAvatar(character.id)}
-                >
-                  <Avatar value={character.id} size={40} />
-                </TouchableOpacity>
               );
             })}
           </View>
@@ -406,7 +387,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderWidth: 1,
     borderColor: t.color.border,
   },
-  qrHint: { marginTop: -6, fontSize: 13, fontFamily: t.font.body, color: t.color.textSecondary },
   section: { gap: 10 },
   sectionTitle: { fontSize: 21, fontFamily: t.font.display, color: t.color.textPrimary },
   participantList: { gap: 10 },
@@ -453,18 +433,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
   },
   emoteButtonText: { fontSize: 18 },
-  avatarRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  avatarButton: {
-    width: 48,
-    height: 48,
-    borderRadius: t.radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: t.color.surfaceAlt,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  avatarButtonSelected: { borderColor: t.color.accent, backgroundColor: t.color.accentSoft },
   reactionOverlay: {
     ...StyleSheet.absoluteFillObject,
     overflow: 'hidden',
