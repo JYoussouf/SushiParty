@@ -150,7 +150,9 @@ export default function ProfileScreen() {
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.profileTitleRow}>
-          <Text style={styles.profileTitle}>You</Text>
+          <Text style={styles.profileTitle} numberOfLines={1}>
+            {userProfile?.displayName ?? 'You'}
+          </Text>
           <TouchableOpacity onPress={openEdit} disabled={editingProfile}>
             <Text style={[styles.profileEdit, editingProfile && styles.profileEditDisabled]}>Edit</Text>
           </TouchableOpacity>
@@ -193,23 +195,14 @@ export default function ProfileScreen() {
             </View>
           ) : (
             <View style={styles.avatarMeta}>
-              <TouchableOpacity
-                onPress={openEdit}
-                activeOpacity={0.8}
-              >
+              <TouchableOpacity onPress={openEdit} activeOpacity={0.8}>
                 <AvatarProgressRing avatar={userProfile?.avatar} progress={levelInfo.progress} />
               </TouchableOpacity>
-              <Text style={styles.displayName}>{userProfile?.displayName ?? '-'}</Text>
               <View style={styles.levelPill}>
                 <Text style={styles.levelPillText}>
-                  • Level {levelInfo.level} · {levelTitle(levelInfo.level)}
+                  Level {levelInfo.level} · {levelTitle(levelInfo.level)}
                 </Text>
               </View>
-              <Text style={styles.levelProgressText}>
-                {levelInfo.isMaxLevel
-                  ? 'Max level reached'
-                  : `${Math.round(levelInfo.progress * 100)}% to Level ${levelInfo.level + 1} · ${levelInfo.nextLevelXp - levelInfo.currentLevelXp} XP to go`}
-              </Text>
             </View>
           )}
         </View>
@@ -418,7 +411,7 @@ function AchievementBadge({ achievement: a, locked }: { achievement: Achievement
 }
 
 const PREVIEW_COUNT = 8; // 2 rows × 4 cols
-const PREVIEW_EARNED = 4; // of the preview, up to this many are random earned ones
+const PREVIEW_EARNED = 3; // of the preview, up to this many are random earned ones
 
 function achCategory(id: string): string {
   if (id.startsWith('first-') || id === 'world-tour') return 'debut';
@@ -593,19 +586,15 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  profileTitle: { fontSize: 38, lineHeight: 44, fontFamily: t.font.display, color: t.color.textPrimary },
+  profileTitle: { flex: 1, marginRight: 12, fontSize: 38, lineHeight: 44, fontFamily: t.font.display, color: t.color.textPrimary },
   profileEdit: { fontSize: 18, fontFamily: t.font.bodyBold, color: t.color.accent },
   profileEditDisabled: { opacity: 0.4 },
+  // Flat, social-media-style header: centered character with the level below it
+  // (no surrounding card/tile).
   avatarCard: {
     alignItems: 'center',
     gap: 14,
-    paddingHorizontal: 24,
-    paddingVertical: 34,
-    borderRadius: t.radius.lg,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    ...t.shadow.card,
+    paddingVertical: 8,
   },
   avatarMeta: { alignItems: 'center', gap: 8 },
   inlineEdit: { width: '100%', gap: 12, paddingHorizontal: 4, alignItems: 'center' },
@@ -633,7 +622,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderWidth: 6,
     borderColor: t.color.surface,
   },
-  displayName: { fontSize: 28, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary, textAlign: 'center' },
   levelPill: {
     borderRadius: t.radius.pill,
     paddingHorizontal: 14,
@@ -641,13 +629,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     backgroundColor: t.color.surfaceAlt,
   },
   levelPillText: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.purple },
-  levelProgressText: {
-    marginTop: 6,
-    fontSize: 15,
-    fontFamily: t.font.bodySemibold,
-    color: t.color.textSecondary,
-    textAlign: 'center',
-  },
   section: { gap: 12 },
   sectionTitle: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase' },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
