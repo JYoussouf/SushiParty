@@ -36,7 +36,7 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { Avatar } from '../../src/components';
+import { Avatar, SessionCard } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
@@ -45,7 +45,13 @@ import { getAchievements } from '../../src/lib/achievements';
 import { getAllSessions } from '../../src/lib/cloudflare/sessions';
 import { calculateUserProfileStats, type UserProfileStats } from '../../src/lib/profileStats';
 import { calculateLevel, levelTitle } from '../../src/lib/leveling';
-import type { Achievement } from '../../src/types';
+import type { Achievement, SushiSession } from '../../src/types';
+
+const RECENT_PARTY_COUNT = 3;
+
+function sessionTimestamp(session: SushiSession): number {
+  return new Date(session.submittedAt ?? session.startedAt).getTime();
+}
 
 const EMPTY_STATS: UserProfileStats = {
   totalSessions: 0,
@@ -66,6 +72,7 @@ export default function ProfileScreen() {
   const params = useLocalSearchParams<{ achievements?: string }>();
   const { userProfile, updateLocalProfile } = useAuth();
   const [stats, setStats] = useState<UserProfileStats>(EMPTY_STATS);
+  const [recentSessions, setRecentSessions] = useState<SushiSession[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
   const levelInfo = calculateLevel(achievements);
   const [loading, setLoading] = useState(true);
@@ -76,6 +83,7 @@ export default function ProfileScreen() {
   const loadProfile = useCallback(async () => {
     if (!userProfile) {
       setStats(EMPTY_STATS);
+      setRecentSessions([]);
       setAchievements([]);
       setLoading(false);
       return;
@@ -85,6 +93,14 @@ export default function ProfileScreen() {
     try {
       const sessions = await getAllSessions();
       setStats(calculateUserProfileStats(sessions, userProfile.uid));
+      const mySessions = sessions.filter((session) =>
+        session.participants.some((participant) => participant.userId === userProfile.uid),
+      );
+      setRecentSessions(
+        [...mySessions]
+          .sort((a, b) => sessionTimestamp(b) - sessionTimestamp(a))
+          .slice(0, RECENT_PARTY_COUNT),
+      );
       try {
         const allAchievements = getAchievements(sessions, userProfile.uid);
         setAchievements(allAchievements);
@@ -95,6 +111,7 @@ export default function ProfileScreen() {
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+      setRecentSessions([]);
       // Even on error, show locked achievements
       try {
         setAchievements(getAchievements([], userProfile.uid));
@@ -210,7 +227,9 @@ export default function ProfileScreen() {
         <AchievementsSection achievements={achievements} autoOpen={params.achievements === '1'} />
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Party History</Text>
+          <Text style={styles.sectionTitle}>
+            Party History{stats.totalSessions > 0 ? ` (${stats.totalSessions})` : ''}
+          </Text>
           {loading ? (
             <View style={styles.loadingCard}>
               <ActivityIndicator color={t.color.accent} />
@@ -219,6 +238,21 @@ export default function ProfileScreen() {
             <EmptyCard text="Submit a few parties and this tab will start tracking your pace, favourite restaurant, and most-ordered sushi." />
           ) : (
             <>
+              {recentSessions.map((session) => (
+                <SessionCard
+                  key={session.id}
+                  session={session}
+                  onPress={() =>
+                    router.push({ pathname: '/session/summary', params: { id: session.id, origin: 'history' } })
+                  }
+                />
+              ))}
+              {stats.totalSessions > recentSessions.length ? (
+                <TouchableOpacity style={styles.viewAllBtn} onPress={() => router.push('/(tabs)/history')}>
+                  <Text style={styles.viewAllBtnText}>View all parties</Text>
+                </TouchableOpacity>
+              ) : null}
+
               <View style={styles.statsGrid}>
                 <StatCard label="Parties" value={String(stats.totalSessions)} />
                 <StatCard label="Pieces" value={String(stats.totalPieces)} />
@@ -262,10 +296,6 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>More</Text>
           <TouchableOpacity style={styles.listRow} onPress={() => router.push('/(tabs)/friends')}>
             <Text style={styles.listRowText}>Friends</Text>
-            <Text style={styles.listRowChevron}>Open</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.listRow} onPress={() => router.push('/(tabs)/history')}>
-            <Text style={styles.listRowText}>View all parties</Text>
             <Text style={styles.listRowChevron}>Open</Text>
           </TouchableOpacity>
         </View>
@@ -631,6 +661,8 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   levelPillText: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.purple },
   section: { gap: 12 },
   sectionTitle: { fontSize: 13, fontFamily: t.font.bodyBold, color: t.color.textTertiary, letterSpacing: 0.8, textTransform: 'uppercase' },
+  viewAllBtn: { alignItems: 'center', paddingVertical: 12, borderRadius: t.radius.md, backgroundColor: t.color.surfaceAlt },
+  viewAllBtnText: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.accent },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   loadingCard: { paddingVertical: 28, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
   emptyCard: { borderRadius: t.radius.md, padding: 18, backgroundColor: t.color.surface, borderWidth: 1, borderColor: t.color.border },
