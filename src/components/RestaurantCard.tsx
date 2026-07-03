@@ -7,7 +7,7 @@ import { formatRating, priceLevelLabel, type FeedRestaurant } from '../lib/featu
 
 interface RestaurantCardProps {
   restaurant: FeedRestaurant;
-  onPress: () => void;
+  onDirections: () => void;
   saved: boolean;
   onToggleSave: () => void;
 }
@@ -15,7 +15,7 @@ interface RestaurantCardProps {
 // DoorDash-style vertical card: an optional photo carousel on top (photos come
 // only from a restaurant's partner profile), then name + a compact meta line.
 // Restaurants without a profile simply render everything minus the images.
-export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: RestaurantCardProps) {
+export function RestaurantCard({ restaurant, onDirections, saved, onToggleSave }: RestaurantCardProps) {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
 
@@ -27,9 +27,11 @@ export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: Res
   // real values (no stray leading "·") and the row is omitted when empty.
   const metaSegments: React.ReactNode[] = [];
   if (rating) {
+    // Gold star first so this reads clearly as a rating (not confused with the
+    // distance number that follows).
     metaSegments.push(
       <Text key="rating" style={styles.metaStrong}>
-        {rating} ★
+        <Text style={styles.starIcon}>★</Text> {rating}
         {restaurant.userRatingCount ? (
           <Text style={styles.metaSoft}> ({restaurant.userRatingCount.toLocaleString()})</Text>
         ) : null}
@@ -62,7 +64,7 @@ export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: Res
     <View style={styles.card}>
       {photos.length > 0 ? <PhotoCarousel photos={photos} styles={styles} /> : null}
 
-      <TouchableOpacity style={styles.info} activeOpacity={0.85} onPress={onPress}>
+      <View style={styles.info}>
         <View style={styles.infoText}>
           <Text style={styles.name} numberOfLines={1}>
             {restaurant.name}
@@ -83,12 +85,21 @@ export function RestaurantCard({ restaurant, onPress, saved, onToggleSave }: Res
         <TouchableOpacity
           style={styles.heartBtn}
           onPress={onToggleSave}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
           accessibilityLabel={saved ? `Unsave ${restaurant.name}` : `Save ${restaurant.name}`}
         >
           <Text style={[styles.heart, saved && styles.heartActive]}>{saved ? '♥' : '♡'}</Text>
         </TouchableOpacity>
-      </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.directionsBtn}
+          onPress={onDirections}
+          hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
+          accessibilityLabel={`Directions to ${restaurant.name}`}
+        >
+          <Text style={styles.directionsArrow}>↗</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -159,8 +170,8 @@ const makeStyles = (t: Theme) =>
     dotPipActive: { backgroundColor: '#FFFFFF' },
     info: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: 12,
+      alignItems: 'center',
+      gap: 10,
       paddingHorizontal: 16,
       paddingVertical: 14,
     },
@@ -169,11 +180,21 @@ const makeStyles = (t: Theme) =>
     metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
     metaStrong: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
     metaSoft: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
+    starIcon: { color: t.color.amber },
     dot: { fontSize: 14, color: t.color.textTertiary },
     open: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.success },
     closed: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textTertiary },
     sponsored: { fontSize: 13, fontFamily: t.font.body, color: t.color.textTertiary },
-    heartBtn: { paddingTop: 2 },
+    heartBtn: { padding: 2 },
     heart: { fontSize: 24, color: t.color.textTertiary },
     heartActive: { color: t.color.accent },
+    directionsBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: t.color.accent,
+    },
+    directionsArrow: { fontSize: 20, lineHeight: 24, fontFamily: t.font.bodyBold, color: t.color.onAccent },
   });

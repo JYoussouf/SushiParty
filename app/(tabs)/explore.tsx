@@ -60,7 +60,7 @@ export default function ExploreScreen() {
           }
         >
           <Text style={styles.title}>Explore</Text>
-          <Text style={styles.subtitle}>Sushi spots near you. Tap one for directions.</Text>
+          <Text style={styles.subtitle}>Sushi spots near you!</Text>
 
           {feed.loading && feed.restaurants.length === 0 ? (
             <View style={styles.feedState}>
@@ -107,7 +107,7 @@ export default function ExploreScreen() {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     void handleToggleSave(r.id);
                   }}
-                  onPress={async () => {
+                  onDirections={async () => {
                     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                     const ok = await openDirections(r.location, r.name);
                     if (!ok) {
