@@ -1,9 +1,23 @@
 import React, { useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 import { useTheme } from '../contexts/ThemeContext';
 import type { Theme } from '../theme/themes';
 import { formatDistance } from '../lib/geo';
 import { formatRating, priceLevelLabel, type FeedRestaurant } from '../lib/featuredFeed';
+
+// Maps-style "Directions" glyph: an accent diamond road-sign with a white turn arrow.
+function DirectionsIcon({ size, color, arrow }: { size: number; color: string; arrow: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M21.71 11.29l-9-9c-.39-.39-1.02-.39-1.41 0l-9 9c-.39.39-.39 1.02 0 1.41l9 9c.39.39 1.02.39 1.41 0l9-9c.4-.38.4-1.01.01-1.41z"
+        fill={color}
+      />
+      <Path d="M14 14.5V12h-4v3H8v-4c0-.55.45-1 1-1h5V7.5l3.5 3.5-3.5 3.5z" fill={arrow} />
+    </Svg>
+  );
+}
 
 interface RestaurantCardProps {
   restaurant: FeedRestaurant;
@@ -104,7 +118,7 @@ export function RestaurantCard({ restaurant, onDirections, saved, onToggleSave }
           hitSlop={{ top: 10, bottom: 10, left: 8, right: 8 }}
           accessibilityLabel={`Directions to ${restaurant.name}`}
         >
-          <Text style={styles.directionsArrow}>↗</Text>
+          <DirectionsIcon size={36} color={t.color.accent} arrow={t.color.onAccent} />
         </TouchableOpacity>
       </View>
     </View>
@@ -207,13 +221,5 @@ const makeStyles = (t: Theme) =>
     heartBtn: { padding: 2 },
     heart: { fontSize: 24, color: t.color.textTertiary },
     heartActive: { color: t.color.accent },
-    directionsBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: t.color.accent,
-    },
-    directionsArrow: { fontSize: 20, lineHeight: 24, fontFamily: t.font.bodyBold, color: t.color.onAccent },
+    directionsBtn: { alignItems: 'center', justifyContent: 'center', padding: 2 },
   });
