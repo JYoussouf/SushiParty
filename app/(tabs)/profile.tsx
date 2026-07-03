@@ -391,7 +391,7 @@ function AchievementBadge({ achievement: a, locked }: { achievement: Achievement
   return (
     <>
       <TouchableOpacity
-        style={[achStyles.badge, locked && achStyles.badgeLocked]}
+        style={[achStyles.badge, locked ? achStyles.badgeLocked : achStyles.badgeEarned]}
         onPress={show}
         activeOpacity={1}
       >
@@ -728,6 +728,11 @@ const makeAchStyles = (t: Theme) => StyleSheet.create({
     gap: 4,
   },
   badgeLocked: { opacity: 0.38 },
+  badgeEarned: {
+    borderColor: t.color.success,
+    borderWidth: 2,
+    backgroundColor: t.isDark ? 'rgba(95,184,95,0.12)' : 'rgba(95,184,95,0.10)',
+  },
   badgeEmoji: { fontSize: 24 },
   badgeTitle: { fontSize: 10, fontFamily: t.font.bodyBold, color: t.color.amber, textAlign: 'center', lineHeight: 13 },
   // liquid glass modal
