@@ -87,63 +87,34 @@ export default function SettingsScreen() {
         >
           <Text style={styles.title}>Settings</Text>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Preferences</Text>
-            <View style={styles.listGroup}>
-              <ListRow title="Sound & Music" onPress={() => router.push('/settings/volume')} styles={styles} />
-              <View style={styles.listDivider} />
-              <ListRow
-                title="Username"
-                subtitle={userProfile?.username ? `@${userProfile.username}` : undefined}
-                onPress={() => router.push('/settings/username')}
-                styles={styles}
-              />
-            </View>
-          </View>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+          <ListRow title="Sound & Music" onPress={() => router.push('/settings/volume')} styles={styles} />
+          <ListRow
+            title="Username"
+            subtitle={userProfile?.username ? `@${userProfile.username}` : undefined}
+            onPress={() => router.push('/settings/username')}
+            styles={styles}
+          />
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Places</Text>
-            <View style={styles.listGroup}>
-              <ListRow
-                title="Favourite sushi spot"
-                subtitle="See where you've partied and browsed, and pin your favourite."
-                onPress={() => router.push('/profile/places')}
-                styles={styles}
-              />
-            </View>
-          </View>
+          <Text style={styles.sectionTitle}>More</Text>
+          <ListRow
+            title="Become a Partner Restaurant"
+            subtitle="List your restaurant and reach nearby diners in the Explore feed."
+            onPress={() => router.push('/partner')}
+            styles={styles}
+          />
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>More</Text>
-            <View style={styles.listGroup}>
-              <ListRow
-                title="Become a Partner Restaurant"
-                subtitle="List your restaurant and reach nearby diners in the Explore feed."
-                onPress={() => router.push('/partner')}
-                styles={styles}
-              />
-            </View>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Account</Text>
-            <View style={styles.listGroup}>
-              <ListRow
-                title="Export my party data"
-                subtitle="Download a CSV summary of saved parties."
-                onPress={() => void handleExportHistory()}
-                styles={styles}
-              />
-              {accountBacked ? (
-                <>
-                  <View style={styles.listDivider} />
-                  <ListRow title="Sign out" danger onPress={handleSignOut} styles={styles} />
-                </>
-              ) : null}
-              <View style={styles.listDivider} />
-              <ListRow title="Delete my account" danger onPress={handleReset} styles={styles} />
-            </View>
-          </View>
+          <Text style={styles.sectionTitle}>Account</Text>
+          <ListRow
+            title="Export my party data"
+            subtitle="Download a CSV summary of saved parties."
+            onPress={() => void handleExportHistory()}
+            styles={styles}
+          />
+          {accountBacked ? (
+            <ListRow title="Sign out" danger onPress={handleSignOut} styles={styles} />
+          ) : null}
+          <ListRow title="Delete my account" danger onPress={handleReset} styles={styles} />
         </ScrollView>
       </SafeAreaView>
     </View>
@@ -154,36 +125,38 @@ const makeStyles = (t: Theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: t.color.bg },
     safe: { flex: 1 },
-    scroll: { padding: 20, gap: 18, paddingBottom: SCROLL_PADDING_BOTTOM },
-    title: { fontSize: 30, fontFamily: t.font.display, color: t.color.textPrimary },
-    section: { gap: 10 },
+    scroll: { paddingTop: 20, paddingBottom: SCROLL_PADDING_BOTTOM },
+    title: {
+      fontSize: 30,
+      fontFamily: t.font.display,
+      color: t.color.textPrimary,
+      paddingHorizontal: 20,
+      marginBottom: 6,
+    },
     sectionTitle: {
       fontSize: 13,
       fontFamily: t.font.bodyBold,
       color: t.color.textTertiary,
       letterSpacing: 0.8,
       textTransform: 'uppercase',
+      paddingHorizontal: 20,
+      marginTop: 22,
+      marginBottom: 4,
     },
 
-    // Grouped list: rows share one surface, separated by hairline lines (no pills).
-    listGroup: {
-      borderRadius: t.radius.lg,
-      backgroundColor: t.color.surface,
-      borderWidth: 1,
-      borderColor: t.color.border,
-      overflow: 'hidden',
-    },
+    // Flat, full-width rows separated by hairline lines (DoorDash-style, no cards).
     listRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      paddingHorizontal: 16,
+      paddingHorizontal: 20,
       paddingVertical: 16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.color.border,
     },
     listRowBody: { flex: 1, gap: 2 },
     listRowTitle: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
     listRowSub: { fontSize: 13, lineHeight: 18, fontFamily: t.font.body, color: t.color.textSecondary },
     listRowDanger: { color: t.color.danger, fontFamily: t.font.bodyBold },
     listChevron: { fontSize: 24, color: t.color.textTertiary },
-    listDivider: { height: StyleSheet.hairlineWidth, backgroundColor: t.color.border, marginLeft: 16 },
   });
