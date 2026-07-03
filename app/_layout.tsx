@@ -14,13 +14,13 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { AuthProvider, useAuth } from '../src/contexts/AuthContext';
 import { RestaurantProvider } from '../src/contexts/RestaurantContext';
 import { SessionProvider, useSession } from '../src/contexts/SessionContext';
 import { TransitionProvider } from '../src/contexts/TransitionContext';
 import { ThemeProvider } from '../src/contexts/ThemeContext';
-import { IntroSplash } from '../src/components';
+import { PartySplash } from '../src/components';
 import { appTheme } from '../src/theme/themes';
 
 let didInitialRedirect = false;
@@ -202,7 +202,11 @@ export default function RootLayout() {
             </TransitionProvider>
           </SessionProvider>
         </AuthProvider>
-        {!introDone && <IntroSplash onFinish={() => setIntroDone(true)} />}
+        {!introDone && (
+          <View style={[StyleSheet.absoluteFill, { zIndex: 1000 }]}>
+            <PartySplash onFinish={() => setIntroDone(true)} />
+          </View>
+        )}
       </ThemeProvider>
     </SafeAreaProvider>
   );

@@ -3,7 +3,6 @@ export { BackButton } from './BackButton';
 export { SushiCounter } from './SushiCounter';
 export { SushiTile } from './SushiTile';
 export { SessionCard } from './SessionCard';
-export { IntroSplash } from './IntroSplash';
 export { PartySplash } from './PartySplash';
 export { SushiPartyLogo } from './SushiPartyLogo';
 export { ItemSprite } from './ItemSprite';
