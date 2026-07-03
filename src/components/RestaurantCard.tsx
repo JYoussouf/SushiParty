@@ -52,11 +52,13 @@ export function RestaurantCard({ restaurant, onDirections, saved, onToggleSave }
       </Text>,
     );
   } else {
-    // No rating yet — a clear "New" chip instead of silently dropping the slot.
+    // No rating available. This does NOT mean the place is new — some spots
+    // (e.g. sushi counters inside grocery stores) have reviews hidden — so keep
+    // it neutral rather than labelling it "New".
     metaSegments.push(
-      <View key="new" style={styles.newChip}>
-        <Text style={styles.newChipText}>New</Text>
-      </View>,
+      <Text key="norating" style={styles.noReviews}>
+        No reviews
+      </Text>,
     );
   }
   if (restaurant.distanceKm !== undefined) {
@@ -202,18 +204,7 @@ const makeStyles = (t: Theme) =>
     metaStrong: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textPrimary },
     metaSoft: { fontSize: 14, fontFamily: t.font.body, color: t.color.textSecondary },
     starIcon: { color: t.color.amber },
-    newChip: {
-      borderRadius: t.radius.pill,
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      backgroundColor: t.color.accentSoft,
-    },
-    newChipText: {
-      fontSize: 12,
-      fontFamily: t.font.bodyBold,
-      color: t.color.onAccent,
-      letterSpacing: 0.3,
-    },
+    noReviews: { fontSize: 14, fontFamily: t.font.body, color: t.color.textTertiary, fontStyle: 'italic' },
     dot: { fontSize: 14, color: t.color.textTertiary },
     open: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.success },
     closed: { fontSize: 14, fontFamily: t.font.bodyBold, color: t.color.textTertiary },
