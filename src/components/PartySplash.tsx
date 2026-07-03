@@ -2,11 +2,9 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
-  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
-  withRepeat,
   withTiming,
 } from 'react-native-reanimated';
 import { SushiPartyLogo } from './SushiPartyLogo';
@@ -40,7 +38,6 @@ export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
   const logoOpacity = useSharedValue(0);
   const logoScale = useSharedValue(0.82);
   const logoY = useSharedValue(18);
-  const shimmer = useSharedValue(0);
   const progress = useSharedValue(0);
 
   useEffect(() => {
@@ -48,11 +45,6 @@ export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
     logoOpacity.value = withTiming(1, { duration: 620, easing: Easing.out(Easing.cubic) });
     logoScale.value = withTiming(1, { duration: 760, easing: Easing.out(Easing.back(1.3)) });
     logoY.value = withTiming(0, { duration: 760, easing: Easing.out(Easing.cubic) });
-    shimmer.value = withRepeat(
-      withTiming(1, { duration: 1100, easing: Easing.inOut(Easing.sin) }),
-      -1,
-      true,
-    );
     progress.value = withTiming(1, {
       duration,
       easing: Easing.inOut(Easing.cubic),
@@ -69,16 +61,12 @@ export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
       logPartyFlow('party-splash cleanup');
       clearTimeout(timer);
     };
-  }, [contentOpacity, duration, finishOnce, logoOpacity, logoScale, logoY, progress, shimmer]);
+  }, [contentOpacity, duration, finishOnce, logoOpacity, logoScale, logoY, progress]);
 
   const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
   const logoStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
     transform: [{ translateY: logoY.value }, { scale: logoScale.value }],
-  }));
-  const glowStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(shimmer.value, [0, 1], [0.28, 0.65]),
-    transform: [{ scale: interpolate(shimmer.value, [0, 1], [0.92, 1.08]) }],
   }));
   const loadingStyle = useAnimatedStyle(() => ({
     width: `${progress.value * 100}%`,
@@ -92,7 +80,6 @@ export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
       accessibilityLabel="Skip intro"
     >
       <Animated.View style={[styles.content, contentStyle]} pointerEvents="none">
-        <Animated.View style={[styles.glow, glowStyle]} />
         <Animated.View style={[styles.logoWrap, logoStyle]}>
           <SushiPartyLogo size="lg" />
         </Animated.View>
@@ -116,13 +103,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     justifyContent: 'center',
     gap: 34,
     overflow: 'hidden',
-  },
-  glow: {
-    position: 'absolute',
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: t.color.accentSoft,
   },
   logoWrap: {
     alignItems: 'center',
