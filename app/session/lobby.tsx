@@ -267,10 +267,7 @@ export default function LobbyScreen() {
         <BackButton onPress={confirmLeave} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.hero}>
-          <Text style={styles.eyebrow}>Party Lobby</Text>
-          <Text style={styles.title}>Assemble your sushi crew</Text>
-        </View>
+        <Text style={styles.title}>Assemble your sushi crew</Text>
 
         <View style={styles.codeCard}>
           <View>
@@ -382,21 +379,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
   safe: { flex: 1 },
   navBar: { paddingHorizontal: 16, paddingVertical: 8 },
   scroll: { padding: 20, gap: 18, paddingBottom: 30 },
-  hero: {
-    borderRadius: t.radius.lg,
-    padding: 22,
-    gap: 8,
-    backgroundColor: t.color.surfaceAlt,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontFamily: t.font.bodyBold,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    color: t.color.accent,
-  },
   title: { fontSize: 30, lineHeight: 34, fontFamily: t.font.display, color: t.color.textPrimary },
   codeCard: {
     borderRadius: t.radius.lg,
