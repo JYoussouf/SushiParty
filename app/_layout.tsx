@@ -131,6 +131,9 @@ function RootLayoutNav() {
         animation: 'fade_from_bottom',
         animationDuration: 280,
         gestureEnabled: false,
+        // Dark screen background app-wide so transitions (e.g. the splash fading
+        // out) never flash the navigator's default white.
+        contentStyle: { backgroundColor: appTheme.color.bg },
       }}
     >
       <Stack.Screen name="(tabs)" options={{ animation: 'none', gestureEnabled: false }} />
