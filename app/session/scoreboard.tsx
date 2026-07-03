@@ -23,7 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Avatar, BackButton, ItemSpriteIdle } from '../../src/components';
+import { ItemSpriteIdle, PartyCharacter } from '../../src/components';
 import { useTheme } from '../../src/contexts/ThemeContext';
 import type { Theme } from '../../src/theme/themes';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
@@ -61,7 +61,6 @@ export default function ScoreboardScreen() {
     increment,
     decrement,
     getCount,
-    reset,
     participants,
     setActiveParticipantIndex,
     activeParticipantIndex,
@@ -193,7 +192,7 @@ export default function ScoreboardScreen() {
         withSpring(1, { damping: 14, stiffness: 200 }),
       );
     }
-  }, [sessionTotalPieces]);
+  }, [sessionTotalPieces, tallyScale]);
 
   useEffect(() => {
     logPartyFlow('scoreboard state snapshot', {
@@ -491,73 +490,66 @@ export default function ScoreboardScreen() {
     );
   };
 
-  const handleReset = () => {
-    if (sessionTotalPieces === 0) {
-      void reset();
-      return;
-    }
-    Alert.alert(
-      'Reset all counts?',
-      'This will clear every count for this party. This cannot be undone.',
-      [
-        { text: 'Keep counts', style: 'cancel' },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => void reset(),
-        },
-      ],
-    );
-  };
-
   return (
     <View style={styles.container}>
       <LinearGradient colors={t.color.bgGradient} style={StyleSheet.absoluteFill} />
       <View style={[styles.safe, { paddingTop: insets.top }]}>
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
 
-      {/* Header: back | center */}
+      {/* Header */}
       <View style={styles.header}>
-        <BackButton onPress={handleCancel} disabled={submitting} />
         <TouchableOpacity style={styles.headerCenter} onPress={() => router.push('/restaurant/picker')}>
           <Text style={styles.headerRestaurant} numberOfLines={1}>
-            {restaurant?.name ?? 'Choose restaurant'}
+            {restaurant?.name ?? '-'}
           </Text>
           <Text style={styles.headerTitle}>Sushi Party</Text>
         </TouchableOpacity>
-        <View style={styles.headerSpacer} />
       </View>
 
-      {/* Plate card: running tally + participant avatars */}
-      <View style={styles.tallySection}>
-        <View style={styles.tallyCard}>
-          <View>
-            <Text style={styles.tallyEyebrow}>Running tally</Text>
-            <View style={styles.tallyNumRow}>
-              <Animated.Text style={[styles.tallyNum, tallyStyle]}>{sessionTotalPieces}</Animated.Text>
-              <Text style={styles.tallyUnit}>pieces</Text>
-            </View>
-          </View>
-          <View style={styles.avatarStack}>
-            {participants.slice(0, 3).map((p, i) => (
-              <View
-                key={p.userId}
-                style={[
-                  styles.avatarBubble,
-                  i > 0 && styles.avatarOverlap,
-                  i === 0 && styles.avatarFirst,
-                ]}
+      {/* Stats row */}
+      <View style={styles.statsRow}>
+        <Text style={styles.statLabel}>Total</Text>
+        <Animated.Text style={[styles.statValue, tallyStyle]}>{sessionTotalPieces}</Animated.Text>
+      </View>
+
+      {/* Character grid: actively-participating characters, idling then eating */}
+      <View style={styles.characterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.characterTrack}
+        >
+          {participants.map((participant, index) => {
+            const participantTotal = Object.values(participant.counts).reduce(
+              (sum, count) => sum + count,
+              0,
+            );
+            const isActive = index === activeParticipantIndex;
+            return (
+              <TouchableOpacity
+                key={participant.userId}
+                style={[styles.characterCell, isActive && styles.characterCellActive]}
+                onPress={() => setActiveParticipantIndex(index)}
+                activeOpacity={0.85}
               >
-                <Avatar value={p.avatar} size={30} />
-              </View>
-            ))}
-            {participants.length > 3 && (
-              <View style={[styles.avatarBubble, styles.avatarOverlap, styles.avatarExtraBubble]}>
-                <Text style={styles.avatarExtraText}>+{participants.length - 3}</Text>
-              </View>
-            )}
-          </View>
-        </View>
+                <View style={styles.characterInner}>
+                  <PartyCharacter avatar={participant.avatar} total={participantTotal} size={64} />
+                  {participantTotal > 0 && (
+                    <View style={styles.characterCount}>
+                      <Text style={styles.characterCountText}>{participantTotal}</Text>
+                    </View>
+                  )}
+                </View>
+                <Text
+                  style={[styles.characterName, isActive && styles.characterNameActive]}
+                  numberOfLines={1}
+                >
+                  {participant.displayName}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Segmented control */}
@@ -618,58 +610,6 @@ export default function ScoreboardScreen() {
             </TouchableOpacity>
           ))}
         </ScrollView>
-      )}
-
-      {/* Player bar (group mode) */}
-      {(mode === 'group' || participants.length > 1) && (
-        <View style={styles.participantBar}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.participantTrack}
-          >
-            {participants.map((participant, index) => {
-              const participantTotal = Object.values(participant.counts).reduce(
-                (sum, count) => sum + count,
-                0,
-              );
-              return (
-                <TouchableOpacity
-                  key={participant.userId}
-                  style={[
-                    styles.participantItem,
-                    index === activeParticipantIndex && styles.participantItemActive,
-                  ]}
-                  onPress={() => setActiveParticipantIndex(index)}
-                >
-                  <Text
-                    style={[
-                      styles.participantName,
-                      index === activeParticipantIndex && styles.participantNameActive,
-                    ]}
-                  >
-                    {participant.displayName}
-                  </Text>
-                  <View
-                    style={[
-                      styles.participantScore,
-                      index === activeParticipantIndex && styles.participantScoreActive,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.participantTotal,
-                        index === activeParticipantIndex && styles.participantTotalActive,
-                      ]}
-                    >
-                      {participantTotal}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
       )}
 
       {/* View-only banner */}
@@ -828,10 +768,10 @@ export default function ScoreboardScreen() {
         <View style={styles.footerActions}>
           <TouchableOpacity
             style={styles.resetBtn}
-            onPress={handleReset}
+            onPress={handleCancel}
             disabled={submitting}
           >
-            <Text style={styles.resetBtnText}>Reset</Text>
+            <Text style={styles.resetBtnText}>Cancel party</Text>
           </TouchableOpacity>
           {/* Solo: submit directly. Group host (no open vote): start the end vote.
               Group guests / host mid-vote: no primary button — they use the vote card. */}
@@ -936,10 +876,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: t.color.border,
   },
-  headerSpacer: {
-    width: 40,
-    height: 40,
-  },
   headerCenter: {
     flex: 1,
     alignItems: 'center',
@@ -960,77 +896,86 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     letterSpacing: -0.2,
   },
 
-  // ── Tally card (plate) ──────────────────────────────────
-  tallySection: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
-  },
-  tallyCard: {
+  // ── Stats row ───────────────────────────────────────────
+  statsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: t.color.surface,
-    borderRadius: t.radius.lg,
+    alignItems: 'baseline',
+    gap: 8,
     paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: t.color.border,
-    ...t.shadow.card,
+    paddingTop: 10,
+    paddingBottom: 2,
   },
-  tallyEyebrow: {
-    fontSize: 11,
+  statLabel: {
+    fontSize: 12,
     fontFamily: t.font.bodySemibold,
     color: t.color.textSecondary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  tallyNumRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    gap: 6,
-    marginTop: 4,
-  },
-  tallyNum: {
-    fontSize: 44,
+  statValue: {
+    fontSize: 26,
     fontFamily: t.font.display,
-    color: t.color.accent,
-    letterSpacing: -1,
-    lineHeight: 48,
+    color: t.color.textPrimary,
+    letterSpacing: -0.5,
     includeFontPadding: false,
   },
-  tallyUnit: {
-    fontSize: 14,
-    fontFamily: t.font.bodySemibold,
-    color: t.color.textSecondary,
+
+  // ── Character grid ──────────────────────────────────────
+  characterBar: {
+    paddingBottom: 6,
   },
-  avatarStack: {
-    flexDirection: 'row',
+  characterTrack: {
+    paddingHorizontal: 12,
+    gap: 4,
+    alignItems: 'flex-end',
+  },
+  characterCell: {
+    width: 78,
     alignItems: 'center',
+    gap: 2,
+    paddingTop: 6,
+    paddingBottom: 4,
+    borderRadius: t.radius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
   },
-  avatarBubble: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: t.color.surfaceAlt,
+  characterCellActive: {
+    backgroundColor: t.color.surface,
+    borderColor: t.color.accent,
+  },
+  characterInner: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  characterCount: {
+    position: 'absolute',
+    bottom: -2,
+    right: -4,
+    minWidth: 22,
+    height: 22,
+    paddingHorizontal: 5,
+    borderRadius: 11,
+    backgroundColor: t.color.accent,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: t.color.surface,
+    borderColor: t.color.bg,
   },
-  avatarFirst: {
-    borderColor: t.color.accent,
-  },
-  avatarOverlap: {
-    marginLeft: -10,
-  },
-  avatarExtraBubble: {
-    backgroundColor: t.color.surfaceAlt,
-  },
-  avatarExtraText: {
+  characterCountText: {
     fontSize: 11,
     fontFamily: t.font.bodyBold,
+    color: t.color.onAccent,
+  },
+  characterName: {
+    maxWidth: 78,
+    fontSize: 12,
+    fontFamily: t.font.bodySemibold,
     color: t.color.textSecondary,
+  },
+  characterNameActive: {
+    color: t.color.textPrimary,
   },
 
   // ── Segmented control ───────────────────────────────────
@@ -1095,66 +1040,6 @@ const makeStyles = (t: Theme) => StyleSheet.create({
     fontSize: 12,
     fontFamily: t.font.body,
     color: t.color.textSecondary,
-  },
-
-  // ── Participants ────────────────────────────────────────
-  participantBar: {
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: t.color.border,
-  },
-  participantTrack: {
-    paddingHorizontal: 16,
-    gap: 8,
-    alignItems: 'center',
-  },
-  participantItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 40,
-    paddingLeft: 14,
-    paddingRight: 5,
-    paddingVertical: 5,
-    borderRadius: t.radius.pill,
-    backgroundColor: t.color.surface,
-    borderWidth: 1,
-    borderColor: t.color.border,
-  },
-  participantItemActive: {
-    backgroundColor: t.color.accentSoft,
-    borderColor: t.color.accent,
-  },
-  participantScore: {
-    minWidth: 30,
-    minHeight: 30,
-    marginLeft: 10,
-    paddingHorizontal: 9,
-    borderRadius: 15,
-    backgroundColor: t.color.surfaceAlt,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  participantScoreActive: {
-    backgroundColor: t.color.surface,
-  },
-  participantName: {
-    fontSize: 14,
-    fontFamily: t.font.bodyBold,
-    color: t.color.textSecondary,
-    lineHeight: 20,
-  },
-  participantNameActive: {
-    color: t.color.onAccent,
-  },
-  participantTotal: {
-    fontSize: 12,
-    fontFamily: t.font.bodyBold,
-    color: t.color.textSecondary,
-    lineHeight: 16,
-  },
-  participantTotalActive: {
-    color: t.color.accent,
   },
 
   // ── View-only banner ────────────────────────────────────

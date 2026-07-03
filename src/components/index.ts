@@ -5,6 +5,7 @@ export { SushiTile } from './SushiTile';
 export { SessionCard } from './SessionCard';
 export { PartySplash } from './PartySplash';
 export { SushiPartyLogo } from './SushiPartyLogo';
+export { PartyCharacter } from './PartyCharacter';
 export { ItemSprite } from './ItemSprite';
 export { ItemSpriteIdle } from './ItemSpriteIdle';
 export { WrappedCard } from './WrappedCard';
