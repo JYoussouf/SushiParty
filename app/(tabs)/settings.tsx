@@ -25,23 +25,18 @@ const SCROLL_PADDING_BOTTOM = 40;
 
 function ListRow({
   title,
-  subtitle,
   danger,
   onPress,
   styles,
 }: {
   title: string;
-  subtitle?: string | undefined;
   danger?: boolean;
   onPress: () => void;
   styles: Styles;
 }) {
   return (
     <TouchableOpacity style={styles.listRow} activeOpacity={0.7} onPress={onPress}>
-      <View style={styles.listRowBody}>
-        <Text style={[styles.listRowTitle, danger && styles.listRowDanger]}>{title}</Text>
-        {subtitle ? <Text style={styles.listRowSub}>{subtitle}</Text> : null}
-      </View>
+      <Text style={[styles.listRowTitle, danger && styles.listRowDanger]}>{title}</Text>
       {!danger ? <Text style={styles.listChevron}>›</Text> : null}
     </TouchableOpacity>
   );
@@ -89,17 +84,11 @@ export default function SettingsScreen() {
 
           <Text style={styles.sectionTitle}>Preferences</Text>
           <ListRow title="Sound & Music" onPress={() => router.push('/settings/volume')} styles={styles} />
-          <ListRow
-            title="Username"
-            subtitle={userProfile?.username ? `@${userProfile.username}` : undefined}
-            onPress={() => router.push('/settings/username')}
-            styles={styles}
-          />
+          <ListRow title="Username" onPress={() => router.push('/settings/username')} styles={styles} />
 
           <Text style={styles.sectionTitle}>More</Text>
           <ListRow
             title="Become a Partner Restaurant"
-            subtitle="List your restaurant and reach nearby diners in the Explore feed."
             onPress={() => router.push('/partner')}
             styles={styles}
           />
@@ -107,7 +96,6 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Account</Text>
           <ListRow
             title="Export my party data"
-            subtitle="Download a CSV summary of saved parties."
             onPress={() => void handleExportHistory()}
             styles={styles}
           />
@@ -154,9 +142,7 @@ const makeStyles = (t: Theme) =>
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderBottomColor: t.color.border,
     },
-    listRowBody: { flex: 1, gap: 2 },
-    listRowTitle: { fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
-    listRowSub: { fontSize: 13, lineHeight: 18, fontFamily: t.font.body, color: t.color.textSecondary },
+    listRowTitle: { flex: 1, fontSize: 16, fontFamily: t.font.bodySemibold, color: t.color.textPrimary },
     listRowDanger: { color: t.color.danger, fontFamily: t.font.bodyBold },
     listChevron: { fontSize: 24, color: t.color.textTertiary },
   });
