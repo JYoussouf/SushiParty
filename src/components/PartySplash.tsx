@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
   withDelay,
+  withSequence,
   withTiming,
 } from 'react-native-reanimated';
 import { SushiPartyLogo } from './SushiPartyLogo';
@@ -20,7 +21,13 @@ const logPartyFlow = (...args: unknown[]) => {
   console.log('[party-flow]', Date.now(), ...args);
 };
 
-export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
+// X-style reveal: the logo pops in, holds, then zooms up toward the viewer while
+// the whole splash fades away to reveal the app behind it.
+const ENTRANCE = 640;
+const HOLD = 360;
+const EXIT = 460;
+
+export function PartySplash({ onFinish, duration = ENTRANCE + HOLD + EXIT }: PartySplashProps) {
   const t = useTheme();
   const styles = useMemo(() => makeStyles(t), [t]);
   const finishedRef = useRef(false);
@@ -34,24 +41,25 @@ export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
     },
     [onFinish],
   );
-  const contentOpacity = useSharedValue(1);
+
+  const opacity = useSharedValue(1);
   const logoOpacity = useSharedValue(0);
-  const logoScale = useSharedValue(0.82);
-  const logoY = useSharedValue(18);
-  const progress = useSharedValue(0);
+  const logoScale = useSharedValue(0.86);
+  const logoY = useSharedValue(14);
 
   useEffect(() => {
     logPartyFlow('party-splash animation start', { duration });
-    logoOpacity.value = withTiming(1, { duration: 620, easing: Easing.out(Easing.cubic) });
-    logoScale.value = withTiming(1, { duration: 760, easing: Easing.out(Easing.back(1.3)) });
-    logoY.value = withTiming(0, { duration: 760, easing: Easing.out(Easing.cubic) });
-    progress.value = withTiming(1, {
-      duration,
-      easing: Easing.inOut(Easing.cubic),
-    });
-    contentOpacity.value = withDelay(
-      duration - 520,
-      withTiming(0, { duration: 520, easing: Easing.in(Easing.cubic) }),
+    logoOpacity.value = withTiming(1, { duration: ENTRANCE, easing: Easing.out(Easing.cubic) });
+    logoY.value = withTiming(0, { duration: ENTRANCE, easing: Easing.out(Easing.cubic) });
+    // Pop in (slight overshoot), hold, then accelerate into a big zoom.
+    logoScale.value = withSequence(
+      withTiming(1, { duration: ENTRANCE, easing: Easing.out(Easing.back(1.4)) }),
+      withDelay(HOLD, withTiming(14, { duration: EXIT, easing: Easing.in(Easing.cubic) })),
+    );
+    // The whole splash fades during the zoom, revealing the app underneath.
+    opacity.value = withDelay(
+      ENTRANCE + HOLD,
+      withTiming(0, { duration: EXIT, easing: Easing.in(Easing.cubic) }),
     );
 
     const timer = setTimeout(() => {
@@ -61,63 +69,37 @@ export function PartySplash({ onFinish, duration = 1800 }: PartySplashProps) {
       logPartyFlow('party-splash cleanup');
       clearTimeout(timer);
     };
-  }, [contentOpacity, duration, finishOnce, logoOpacity, logoScale, logoY, progress]);
+  }, [duration, finishOnce, logoOpacity, logoScale, logoY, opacity]);
 
-  const contentStyle = useAnimatedStyle(() => ({ opacity: contentOpacity.value }));
+  const containerStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
   const logoStyle = useAnimatedStyle(() => ({
     opacity: logoOpacity.value,
     transform: [{ translateY: logoY.value }, { scale: logoScale.value }],
   }));
-  const loadingStyle = useAnimatedStyle(() => ({
-    width: `${progress.value * 100}%`,
-  }));
 
   return (
-    <Pressable
-      style={styles.container}
-      onPress={() => finishOnce('tap')}
-      accessibilityRole="button"
-      accessibilityLabel="Skip intro"
-    >
-      <Animated.View style={[styles.content, contentStyle]} pointerEvents="none">
-        <Animated.View style={[styles.logoWrap, logoStyle]}>
-          <SushiPartyLogo size="lg" />
-        </Animated.View>
-
-        <View style={styles.loadingTrack}>
-          <Animated.View style={[styles.loadingFill, loadingStyle]} />
-        </View>
+    <Animated.View style={[styles.container, containerStyle]}>
+      <Pressable
+        style={StyleSheet.absoluteFill}
+        onPress={() => finishOnce('tap')}
+        accessibilityRole="button"
+        accessibilityLabel="Skip intro"
+      />
+      <Animated.View style={[styles.logoWrap, logoStyle]} pointerEvents="none">
+        <SushiPartyLogo size="lg" />
       </Animated.View>
-    </Pressable>
+    </Animated.View>
   );
 }
 
-const makeStyles = (t: Theme) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: t.color.bg,
-  },
-  content: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 34,
-    overflow: 'hidden',
-  },
-  logoWrap: {
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  loadingTrack: {
-    width: 168,
-    height: 8,
-    borderRadius: t.radius.sm,
-    backgroundColor: t.color.border,
-    overflow: 'hidden',
-  },
-  loadingFill: {
-    height: '100%',
-    borderRadius: t.radius.sm,
-    backgroundColor: t.color.accent,
-  },
-});
+const makeStyles = (t: Theme) =>
+  StyleSheet.create({
+    container: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: t.color.bg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    logoWrap: { alignItems: 'center' },
+  });
