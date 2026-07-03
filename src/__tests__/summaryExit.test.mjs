@@ -1,5 +1,5 @@
 /**
- * Tests for the two decision branches added in ticket #8 to SessionSummaryScreen.
+ * Tests for the two decision branches in SessionSummaryScreen.
  *
  * 1. doneLabel(origin) — pure label logic:
  *      origin === 'history'  →  "Back to History"
@@ -10,7 +10,6 @@
  *        if (leaving) return;          // guard
  *        setLeaving(true);
  *        if (origin === 'history') { router.back(); return; }
- *        await showInterstitialIfDue();
  *        router.replace('/(tabs)/home');
  *
  * No React Native, no jest, no Expo. Pure Node.
@@ -29,17 +28,16 @@ function doneLabel(origin) {
 }
 
 // ---------------------------------------------------------------------------
-// Exit machine — mirrors the handleDone async function in summary.tsx.
+// Exit machine — mirrors the handleDone function in summary.tsx.
 //
 // Factory accepts:
-//   origin        — the screen param (string | undefined)
-//   showInterstitialIfDue — async fn (injected; spy-able)
-//   nav           — { back: fn, replaceHome: fn } (injected; spy-able)
+//   origin — the screen param (string | undefined)
+//   nav    — { back: fn, replaceHome: fn } (injected; spy-able)
 //
 // Returns { exit } where exit() is the async callable (same contract as
 // handleDone — can be fired multiple times; guard lives inside the closure).
 // ---------------------------------------------------------------------------
-function makeExit({ origin, showInterstitialIfDue, nav }) {
+function makeExit({ origin, nav }) {
   let leaving = false;
 
   async function exit() {
@@ -51,7 +49,6 @@ function makeExit({ origin, showInterstitialIfDue, nav }) {
       return;
     }
 
-    await showInterstitialIfDue();
     nav.replaceHome();
   }
 
@@ -78,10 +75,6 @@ describe('doneLabel', () => {
     assert.equal(doneLabel('submit'), "Let's Go Home!");
   });
 
-  it("returns \"Let's Go Home!\" when origin is 'lobby'", () => {
-    assert.equal(doneLabel('lobby'), "Let's Go Home!");
-  });
-
   it("returns \"Let's Go Home!\" when origin is an empty string", () => {
     assert.equal(doneLabel(''), "Let's Go Home!");
   });
@@ -95,52 +88,38 @@ describe('doneLabel', () => {
 // Tests: re-entry guard machine (non-history)
 // ---------------------------------------------------------------------------
 describe('makeExit — non-history origin', () => {
-  let interstitialCount;
   let backCount;
   let replaceHomeCount;
-  let showInterstitialIfDue;
   let nav;
 
   beforeEach(() => {
-    interstitialCount = 0;
     backCount = 0;
     replaceHomeCount = 0;
-    showInterstitialIfDue = async () => { interstitialCount++; };
     nav = {
       back: () => { backCount++; },
       replaceHome: () => { replaceHomeCount++; },
     };
   });
 
-  it('single call navigates to home exactly once and shows interstitial once', async () => {
-    const { exit } = makeExit({ origin: undefined, showInterstitialIfDue, nav });
+  it('single call navigates to home exactly once', async () => {
+    const { exit } = makeExit({ origin: undefined, nav });
     await exit();
-    assert.equal(interstitialCount, 1, 'interstitial must fire once');
     assert.equal(replaceHomeCount, 1, 'replaceHome must fire once');
     assert.equal(backCount, 0, 'back must not fire for non-history origin');
   });
 
-  it('rapid double call (sequential await) navigates home only once, interstitial only once', async () => {
-    const { exit } = makeExit({ origin: undefined, showInterstitialIfDue, nav });
+  it('rapid double call navigates home only once', async () => {
+    const { exit } = makeExit({ origin: undefined, nav });
     await exit();
     await exit(); // second call — leaving is already true
-    assert.equal(interstitialCount, 1, 'interstitial must not fire twice');
     assert.equal(replaceHomeCount, 1, 'replaceHome must not fire twice');
   });
 
-  it('concurrent double call (no await between) navigates home only once', async () => {
-    const { exit } = makeExit({ origin: undefined, showInterstitialIfDue, nav });
-    // Both started before either resolves — simulates button + header tap race
-    const [p1, p2] = [exit(), exit()];
+  it('concurrent double call navigates home only once', async () => {
+    const { exit } = makeExit({ origin: undefined, nav });
+    const [p1, p2] = [exit(), exit()]; // button + header tap race
     await Promise.all([p1, p2]);
-    assert.equal(interstitialCount, 1, 'interstitial must fire exactly once under concurrency');
     assert.equal(replaceHomeCount, 1, 'replaceHome must fire exactly once under concurrency');
-  });
-
-  it('does not call back() when origin is undefined', async () => {
-    const { exit } = makeExit({ origin: undefined, showInterstitialIfDue, nav });
-    await exit();
-    assert.equal(backCount, 0, 'back() must not be called for non-history origin');
   });
 });
 
@@ -148,41 +127,35 @@ describe('makeExit — non-history origin', () => {
 // Tests: re-entry guard machine (history origin)
 // ---------------------------------------------------------------------------
 describe('makeExit — history origin', () => {
-  let interstitialCount;
   let backCount;
   let replaceHomeCount;
-  let showInterstitialIfDue;
   let nav;
 
   beforeEach(() => {
-    interstitialCount = 0;
     backCount = 0;
     replaceHomeCount = 0;
-    showInterstitialIfDue = async () => { interstitialCount++; };
     nav = {
       back: () => { backCount++; },
       replaceHome: () => { replaceHomeCount++; },
     };
   });
 
-  it("single call calls back() exactly once and skips interstitial", async () => {
-    const { exit } = makeExit({ origin: 'history', showInterstitialIfDue, nav });
+  it('single call calls back() exactly once', async () => {
+    const { exit } = makeExit({ origin: 'history', nav });
     await exit();
     assert.equal(backCount, 1, 'back() must be called once');
-    assert.equal(interstitialCount, 0, 'interstitial must not fire when origin is history');
     assert.equal(replaceHomeCount, 0, 'replaceHome must not fire when origin is history');
   });
 
-  it("rapid double call only calls back() once", async () => {
-    const { exit } = makeExit({ origin: 'history', showInterstitialIfDue, nav });
+  it('rapid double call only calls back() once', async () => {
+    const { exit } = makeExit({ origin: 'history', nav });
     await exit();
     await exit();
     assert.equal(backCount, 1, 'back() must not be called twice');
-    assert.equal(interstitialCount, 0, 'interstitial must not fire on any history call');
   });
 
-  it("concurrent double call (header + bottom button) only calls back() once", async () => {
-    const { exit } = makeExit({ origin: 'history', showInterstitialIfDue, nav });
+  it('concurrent double call (header + bottom button) only calls back() once', async () => {
+    const { exit } = makeExit({ origin: 'history', nav });
     await Promise.all([exit(), exit()]);
     assert.equal(backCount, 1, 'back() must fire exactly once under concurrency');
     assert.equal(replaceHomeCount, 0, 'replaceHome must not fire for history origin');
@@ -194,39 +167,35 @@ describe('makeExit — history origin', () => {
 // ---------------------------------------------------------------------------
 describe('makeExit — navigation action is determined by origin', () => {
   function makeSpies() {
-    const calls = { back: 0, replaceHome: 0, interstitial: 0 };
-    const showInterstitialIfDue = async () => { calls.interstitial++; };
+    const calls = { back: 0, replaceHome: 0 };
     const nav = {
       back: () => { calls.back++; },
       replaceHome: () => { calls.replaceHome++; },
     };
-    return { calls, showInterstitialIfDue, nav };
+    return { calls, nav };
   }
 
-  it("origin 'history' → back(), no replaceHome, no interstitial", async () => {
-    const { calls, showInterstitialIfDue, nav } = makeSpies();
-    const { exit } = makeExit({ origin: 'history', showInterstitialIfDue, nav });
+  it("origin 'history' → back(), no replaceHome", async () => {
+    const { calls, nav } = makeSpies();
+    const { exit } = makeExit({ origin: 'history', nav });
     await exit();
     assert.equal(calls.back, 1);
     assert.equal(calls.replaceHome, 0);
-    assert.equal(calls.interstitial, 0);
   });
 
-  it("origin 'submit' → replaceHome(), interstitial once, no back", async () => {
-    const { calls, showInterstitialIfDue, nav } = makeSpies();
-    const { exit } = makeExit({ origin: 'submit', showInterstitialIfDue, nav });
+  it("origin 'submit' → replaceHome(), no back", async () => {
+    const { calls, nav } = makeSpies();
+    const { exit } = makeExit({ origin: 'submit', nav });
     await exit();
     assert.equal(calls.back, 0);
     assert.equal(calls.replaceHome, 1);
-    assert.equal(calls.interstitial, 1);
   });
 
-  it("origin undefined → replaceHome(), interstitial once, no back", async () => {
-    const { calls, showInterstitialIfDue, nav } = makeSpies();
-    const { exit } = makeExit({ origin: undefined, showInterstitialIfDue, nav });
+  it("origin undefined → replaceHome(), no back", async () => {
+    const { calls, nav } = makeSpies();
+    const { exit } = makeExit({ origin: undefined, nav });
     await exit();
     assert.equal(calls.back, 0);
     assert.equal(calls.replaceHome, 1);
-    assert.equal(calls.interstitial, 1);
   });
 });

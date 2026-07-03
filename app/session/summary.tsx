@@ -21,7 +21,6 @@ import type { Theme } from '../../src/theme/themes';
 import { useAuth } from '../../src/contexts/AuthContext';
 import { useFriends } from '../../src/hooks/useFriends';
 import { getNewlyEarnedAchievements, getAchievements } from '../../src/lib/achievements';
-import { showInterstitialIfDue } from '../../src/lib/ads';
 import { getCategoryLabel } from '../../src/lib/categoryLabels';
 import { getMenu } from '../../src/lib/cloudflare/menus';
 import { getItemEmoji } from '../../src/lib/itemEmoji';
@@ -288,9 +287,6 @@ export default function SessionSummaryScreen() {
       router.back();
       return;
     }
-    // Occasional interstitial at the natural break — after the user has enjoyed
-    // their results and is heading home (no-op unless ads are enabled / due).
-    await showInterstitialIfDue();
     // Head straight home — the celebratory splash belongs before a party starts,
     // not on the way out, where it would just be dead delay.
     router.replace('/(tabs)/home');

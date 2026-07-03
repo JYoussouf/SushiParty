@@ -21,6 +21,10 @@
 		{
 			"binding": "PHOTOS",
 			"bucket_name": "sushi-party-photos"
+		},
+		{
+			"bucket_name": "sushi-party-photos",
+			"binding": "sushi_party_photos"
 		}
 	],
 	"durable_objects": {

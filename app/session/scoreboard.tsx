@@ -34,7 +34,6 @@ import { useRestaurant } from '../../src/contexts/RestaurantContext';
 import { submitSession } from '../../src/lib/cloudflare/sessions';
 import { submitSession as submitLocalSession } from '../../src/lib/local/sessions';
 import { globalMenu } from '../../src/lib/menus/globalMenu';
-import { prepareInterstitial } from '../../src/lib/ads';
 import { getRestaurantStats } from '../../src/lib/local/restaurantStats';
 import { getRestaurant } from '../../src/lib/cloudflare/restaurants';
 import { getSessionTemplates } from '../../src/lib/local/templates';
@@ -184,9 +183,6 @@ export default function ScoreboardScreen() {
 
   useEffect(() => {
     logPartyFlow('scoreboard mounted');
-    // Warm up the post-party ad while the party is happening, so it shows
-    // instantly at the summary (no-op unless ads are enabled).
-    prepareInterstitial();
     return () => logPartyFlow('scoreboard unmounted');
   }, []);
 
